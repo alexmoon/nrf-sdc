@@ -1,0 +1,8 @@
+[workspace]
+resolver = "2"
+members = [
+    "nrf-mpsl",
+    "nrf-mpsl-sys",
+    "nrf-sdc",
+    "nrf-sdc-sys",
+]
