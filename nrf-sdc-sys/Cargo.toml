@@ -1,10 +1,33 @@
 [package]
 authors = ["Alex Moon <alex@moonspot.org>"]
-description = "Crate name reserved for the nrf-sdc project"
+description = "Rust bindings to the Nordic Softdevice Controller"
 edition = "2021"
-license = "MIT OR Apache-2.0"
+license-file = "third_party/nordic/nrfxlib/LICENSE"
 name = "nrf-sdc-sys"
 repository = "https://github.com/alexmoon/nrf-sdc"
-version = "0.0.0"
+version = "0.1.0"
+
+include = [
+    "./*.md",
+    "build.rs",
+    "src/**",
+    "include/**",
+    "third_party/arm/CMSIS_5/LICENSE.txt",
+    "third_party/arm/CMSIS_5/CMSIS/Core/Include/**",
+    "third_party/nordic/nrfx/LICENSE",
+    "third_party/nordic/nrfx/mdk/*.h",
+    "third_party/nordic/nrfxlib/LICENSE",
+    "third_party/nordic/nrfxlib/softdevice_controller/include/**",
+    "third_party/nordic/nrfxlib/softdevice_controller/lib/**",
+]
+
+[features]
+peripheral = []
+central = []
 
 [dependencies]
+nrf-mpsl-sys = { version = "0.1.0", path = "../nrf-mpsl-sys" }
+
+[build-dependencies]
+bindgen = "0.63.0"
+doxygen-rs = "0.3.0"
