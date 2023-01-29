@@ -5,6 +5,32 @@ edition = "2021"
 license = "MIT OR Apache-2.0"
 name = "nrf-mpsl"
 repository = "https://github.com/alexmoon/nrf-sdc"
-version = "0.0.0"
+version = "0.1.0"
+
+[features]
+nrf52805 = ["nrf52805-pac", "embassy-nrf/nrf52805"]
+nrf52810 = ["nrf52810-pac", "embassy-nrf/nrf52810"]
+nrf52811 = ["nrf52811-pac", "embassy-nrf/nrf52811"]
+nrf52820 = ["nrf52820-pac", "embassy-nrf/nrf52820"]
+nrf52832 = ["nrf52832-pac", "embassy-nrf/nrf52832"]
+nrf52833 = ["nrf52833-pac", "embassy-nrf/nrf52833"]
+nrf52840 = ["nrf52840-pac", "embassy-nrf/nrf52840"]
 
 [dependencies]
+defmt = { version = "0.3", optional = true }
+log = { version = "0.4.11", optional = true }
+
+cortex-m = "0.7.2"
+
+nrf52805-pac  = { version = "0.12.0", features = ["rt"], optional = true }
+nrf52810-pac  = { version = "0.12.0", features = ["rt"], optional = true }
+nrf52811-pac  = { version = "0.12.0", features = ["rt"], optional = true }
+nrf52820-pac  = { version = "0.12.0", features = ["rt"], optional = true }
+nrf52832-pac  = { version = "0.12.0", features = ["rt"], optional = true }
+nrf52833-pac  = { version = "0.12.0", features = ["rt"], optional = true }
+nrf52840-pac  = { version = "0.12.0", features = ["rt"], optional = true }
+
+nrf-mpsl-sys = { version = "0.1.0", path = "../nrf-mpsl-sys" }
+
+embassy-nrf = { version = "0.1.0" }
+embassy-sync = { version = "0.1.0" }
