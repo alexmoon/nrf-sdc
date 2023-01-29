@@ -115,7 +115,7 @@ impl<'d> MultiprotocolServiceLayer<'d> {
         let ret = unsafe {
             raw::mpsl_init(
                 &clock_cfg,
-                raw::IRQn_Type(i32::from(irqs.low_priority.number())),
+                raw::IRQn_Type::from(irqs.low_priority.number()),
                 Some(assert_handler),
             )
         };

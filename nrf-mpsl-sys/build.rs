@@ -15,45 +15,89 @@ struct Callback;
 impl ParseCallbacks for Callback {
     fn process_comment(&self, comment: &str) -> Option<String> {
         Some(doxygen_rs::transform(
-            &comment.replace('[', "\\[").replace("@sa @ref", "@ref"),
+            &comment
+                .replace('[', "\\[")
+                .replace("@sa @ref", "@ref")
+                .replace("mpsl_fem_event_type_t::", ""),
         ))
     }
 }
 
-fn main() {
-    let target = env::var("TARGET").unwrap();
-    let (cpu, float_abi, part) = match target.as_str() {
-        "thumbv7em-none-eabihf" => ("cortex-m4", "hard", "NRF52840_XXAA"),
-        "thumbv7em-none-eabi" => ("cortex-m4", "soft", "NRF52840_XXAA"),
-        "thumbv8m.main-none-eabi" => ("cortex-m33", "soft", "NRF5340_XXAA"),
-        _ => panic!("Unsupported target: {:?}", target),
-    };
+struct Target {
+    target: String,
+    cpu: &'static str,
+    float_abi: &'static str,
+    chip: &'static str,
+}
 
+impl Target {
+    fn new(target: String) -> Self {
+        let (cpu, float_abi, chip) = match target.as_str() {
+            "thumbv7em-none-eabihf" => ("cortex-m4", "hard", "NRF52840_XXAA"),
+            "thumbv7em-none-eabi" => ("cortex-m4", "soft", "NRF52840_XXAA"),
+            "thumbv8m.main-none-eabi" => ("cortex-m33", "soft", "NRF5340_XXAA"),
+            _ => panic!("Unsupported target: {:?}", target),
+        };
+
+        Self {
+            target,
+            cpu,
+            float_abi,
+            chip,
+        }
+    }
+}
+
+fn bindgen(target: &Target) -> bindgen::Builder {
     bindgen::Builder::default()
         .use_core()
-        .header("./include/wrapper.h")
         .size_t_is_usize(true)
-        .clang_arg(format!("--target={}", target))
-        .clang_arg(format!("-mcpu={}", cpu))
-        .clang_arg(format!("-mfloat-abi={}", float_abi))
+        .clang_arg(format!("--target={}", target.target))
+        .clang_arg(format!("-mcpu={}", target.cpu))
+        .clang_arg(format!("-mfloat-abi={}", target.float_abi))
         .clang_arg("-mthumb")
         .clang_arg("-I./include")
         .clang_arg("-I./third_party/arm/CMSIS_5/CMSIS/Core/Include")
         .clang_arg("-I./third_party/nordic/nrfx/mdk")
         .clang_arg("-I./third_party/nordic/nrfxlib/mpsl/include")
-        .clang_arg(format!("-D{}", part))
+        .clang_arg(format!("-D{}", target.chip))
         .allowlist_function("mpsl_.*")
         .allowlist_function("MPSL_.*")
         .allowlist_type("mpsl_.*")
         .allowlist_type("MPSL_.*")
         .allowlist_var("MPSL_.*")
         .allowlist_var("NRF_E.*")
-        .default_enum_style(bindgen::EnumVariation::NewType {
-            is_bitfield: false,
-            is_global: false,
-        })
+        .allowlist_var("UINT8_MAX")
+        .prepend_enum_name(false)
         .rustfmt_bindings(true)
         .parse_callbacks(Box::new(Callback))
+}
+
+fn main() {
+    let target = Target::new(env::var("TARGET").unwrap());
+
+    bindgen(&target)
+        .header("./include/stdlib.h")
+        .header("./third_party/nordic/nrfxlib/mpsl/include/mpsl.h")
+        .header("./third_party/nordic/nrfxlib/mpsl/include/mpsl_clock.h")
+        .header("./third_party/nordic/nrfxlib/mpsl/include/mpsl_coex.h")
+        .header("./third_party/nordic/nrfxlib/mpsl/include/mpsl_cx_abstract_interface.h")
+        .header("./third_party/nordic/nrfxlib/mpsl/include/mpsl_fem_config_common.h")
+        .header("./third_party/nordic/nrfxlib/mpsl/include/mpsl_fem_config_nrf21540_common.h")
+        .header("./third_party/nordic/nrfxlib/mpsl/include/mpsl_fem_config_nrf21540_gpio.h")
+        .header("./third_party/nordic/nrfxlib/mpsl/include/mpsl_fem_config_nrf21540_gpio_spi.h")
+        .header("./third_party/nordic/nrfxlib/mpsl/include/mpsl_fem_config_simple_gpio.h")
+        .header("./third_party/nordic/nrfxlib/mpsl/include/mpsl_fem_init.h")
+        .header("./third_party/nordic/nrfxlib/mpsl/include/mpsl_fem_power_model.h")
+        .header("./third_party/nordic/nrfxlib/mpsl/include/mpsl_fem_types.h")
+        .header("./third_party/nordic/nrfxlib/mpsl/include/mpsl_radio_notification.h")
+        .header("./third_party/nordic/nrfxlib/mpsl/include/mpsl_temp.h")
+        .header("./third_party/nordic/nrfxlib/mpsl/include/mpsl_timeslot.h")
+        .header("./third_party/nordic/nrfxlib/mpsl/include/mpsl_tx_power.h")
+        .header("./third_party/nordic/nrfxlib/mpsl/include/nrf_errno.h")
+        .header("./third_party/nordic/nrfxlib/mpsl/include/protocol/mpsl_cx_protocol_api.h")
+        .header("./third_party/nordic/nrfxlib/mpsl/include/protocol/mpsl_dppi_protocol_api.h")
+        .header("./third_party/nordic/nrfxlib/mpsl/include/protocol/mpsl_fem_protocol_api.h")
         .generate()
         .expect("Unable to generate bindings")
         .write_to_file(PathBuf::from(env::var("OUT_DIR").unwrap()).join("bindings.rs"))
@@ -63,7 +107,7 @@ fn main() {
         .unwrap()
         .join(format!(
             "./third_party/nordic/nrfxlib/mpsl/lib/{}/{}-float",
-            cpu, float_abi
+            target.cpu, target.float_abi
         ));
 
     println!("cargo:rustc-link-search={}", lib_path.to_str().unwrap());

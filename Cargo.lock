@@ -571,7 +571,7 @@ dependencies = [
 
 [[package]]
 name = "nrf-mpsl"
-version = "0.0.0"
+version = "0.1.0"
 dependencies = [
  "cortex-m",
  "defmt",
@@ -599,6 +599,22 @@ dependencies = [
 [[package]]
 name = "nrf-sdc"
 version = "0.0.0"
+dependencies = [
+ "cortex-m",
+ "defmt",
+ "embassy-nrf",
+ "embassy-sync",
+ "log",
+ "nrf-mpsl",
+ "nrf-sdc-sys",
+ "nrf52805-pac",
+ "nrf52810-pac",
+ "nrf52811-pac",
+ "nrf52820-pac",
+ "nrf52832-pac",
+ "nrf52833-pac",
+ "nrf52840-pac",
+]
 
 [[package]]
 name = "nrf-sdc-sys"
