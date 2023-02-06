@@ -59,6 +59,12 @@ impl Error {
     }
 }
 
+impl core::fmt::Display for Error {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        core::fmt::Debug::fmt(self, f)
+    }
+}
+
 impl From<Error> for i32 {
     fn from(value: Error) -> Self {
         value.0.get()
