@@ -10,7 +10,8 @@ mod bindings {
         clippy::missing_safety_doc,
         clippy::redundant_static_lifetimes,
         clippy::too_many_arguments,
-        clippy::useless_transmute
+        clippy::useless_transmute,
+        unused_parens
     )]
 
     #[allow(unused_imports)]
