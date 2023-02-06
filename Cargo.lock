@@ -600,20 +600,15 @@ dependencies = [
 name = "nrf-sdc"
 version = "0.0.0"
 dependencies = [
- "cortex-m",
+ "critical-section",
  "defmt",
+ "embassy-hal-common",
  "embassy-nrf",
  "embassy-sync",
  "log",
  "nrf-mpsl",
  "nrf-sdc-sys",
- "nrf52805-pac",
- "nrf52810-pac",
- "nrf52811-pac",
- "nrf52820-pac",
- "nrf52832-pac",
- "nrf52833-pac",
- "nrf52840-pac",
+ "rand_core",
 ]
 
 [[package]]

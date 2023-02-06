@@ -10,3 +10,4 @@ members = [
 [patch.crates-io]
 embassy-nrf = { git = "https://github.com/embassy-rs/embassy", tag = "embassy-executor-v0.1.1" }
 embassy-sync = { git = "https://github.com/embassy-rs/embassy", tag = "embassy-executor-v0.1.1"}
+embassy-hal-common = { git = "https://github.com/embassy-rs/embassy", tag = "embassy-executor-v0.1.1"}

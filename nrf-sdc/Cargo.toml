@@ -5,6 +5,29 @@ edition = "2021"
 license = "MIT OR Apache-2.0"
 name = "nrf-sdc"
 repository = "https://github.com/alexmoon/nrf-sdc"
-version = "0.0.0"
+version = "0.1.0"
+
+[features]
+nrf52805 = ["nrf-mpsl/nrf52805"]
+nrf52810 = ["nrf-mpsl/nrf52810"]
+nrf52811 = ["nrf-mpsl/nrf52811"]
+nrf52820 = ["nrf-mpsl/nrf52820"]
+nrf52832 = ["nrf-mpsl/nrf52832"]
+nrf52833 = ["nrf-mpsl/nrf52833"]
+nrf52840 = ["nrf-mpsl/nrf52840"]
+
+peripheral = ["nrf-sdc-sys/peripheral"]
+central = ["nrf-sdc-sys/central"]
 
 [dependencies]
+defmt = { version = "0.3", optional = true }
+log = { version = "0.4.11", optional = true }
+
+nrf-mpsl = { version = "0.1.0", path = "../nrf-mpsl" }
+nrf-sdc-sys = { version = "0.1.0", path = "../nrf-sdc-sys" }
+
+embassy-nrf = "0.1.0"
+embassy-hal-common = "0.1.0"
+embassy-sync = "0.1.0"
+critical-section = "1.1.1"
+rand_core = "0.6.4"
