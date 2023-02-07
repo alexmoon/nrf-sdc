@@ -83,7 +83,7 @@ pub struct MultiprotocolServiceLayer<'d> {
 unsafe extern "C" fn assert_handler(file: *const core::ffi::c_char, line: u32) {
     panic!(
         "MultiprotocolServiceLayer: {}:{}",
-        unwrap!(CStr::from_ptr(file).to_str()),
+        CStr::from_ptr(file).to_str().unwrap_or("bad filename"),
         line
     )
 }

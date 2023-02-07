@@ -1,5 +1,5 @@
-#[cfg_attr(feature = "defmt", defmt::Format)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct Temperature(pub(crate) i32);
 
 impl Temperature {

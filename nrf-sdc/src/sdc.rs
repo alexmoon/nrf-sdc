@@ -83,7 +83,7 @@ impl<'d> Peripherals<'d> {
 unsafe extern "C" fn fault_handler(file: *const core::ffi::c_char, line: u32) {
     panic!(
         "SoftdeviceController: {}:{}",
-        unwrap!(CStr::from_ptr(file).to_str()),
+        CStr::from_ptr(file).to_str().unwrap_or("bad filename"),
         line
     )
 }
@@ -458,7 +458,7 @@ impl<'d> SoftdeviceController<'d> {
     }
 
     pub fn hci_data_put(&self, buf: &[u8]) -> Result<(), Error> {
-        assert!(buf.len() >= 4 && buf.len() >= 4 + usize::from(buf[2]) + (usize::from(buf[3]) << 8));
+        assert!(buf.len() >= 4 && buf.len() >= 4 + usize::from(u16::from_le_bytes([buf[2], buf[3]])));
         RetVal::from(unsafe { raw::sdc_hci_data_put(buf.as_ptr()) })
             .to_result()
             .and(Ok(()))
@@ -510,7 +510,6 @@ impl<'d> SoftdeviceController<'d> {
     }
 }
 
-pub enum FlashError {}
 mod sealed {
     pub trait Sealed {}
 }
