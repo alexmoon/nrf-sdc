@@ -1,6 +1,7 @@
 [workspace]
 resolver = "2"
 members = [
+    "examples",
     "nrf-mpsl",
     "nrf-mpsl-sys",
     "nrf-sdc",
@@ -8,6 +9,20 @@ members = [
 ]
 
 [patch.crates-io]
-embassy-nrf = { git = "https://github.com/embassy-rs/embassy", tag = "embassy-executor-v0.1.1" }
-embassy-sync = { git = "https://github.com/embassy-rs/embassy", tag = "embassy-executor-v0.1.1"}
-embassy-hal-common = { git = "https://github.com/embassy-rs/embassy", tag = "embassy-executor-v0.1.1"}
+embassy-nrf = { git = "https://github.com/embassy-rs/embassy", branch = "master" }
+embassy-sync = { git = "https://github.com/embassy-rs/embassy", branch = "master"}
+embassy-hal-common = { git = "https://github.com/embassy-rs/embassy", branch = "master"}
+embassy-executor = { git = "https://github.com/embassy-rs/embassy", branch = "master" }
+embassy-time = { git = "https://github.com/embassy-rs/embassy", branch = "master" }
+
+[profile.dev]
+opt-level = 1               # Use slightly better optimizations.
+
+[profile.release]
+codegen-units = 1
+debug = 2
+debug-assertions = false
+incremental = false
+lto = 'fat'
+opt-level = 'z'
+overflow-checks = false
