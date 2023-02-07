@@ -518,7 +518,7 @@ pub trait VendorExt: Sealed {
     // TODO
     // fn zephyr_read_version_info(p_return: *mut sdc_hci_cmd_vs_zephyr_read_version_info_return_t) -> u8;
     // fn zephyr_read_supported_commands( p_return: *mut sdc_hci_cmd_vs_zephyr_read_supported_commands_return_t, ) -> u8;
-    // fn zephyr_write_bd_addr(p_params: *const sdc_hci_cmd_vs_zephyr_write_bd_addr_t) -> u8;
+    fn zephyr_write_bd_addr(&self, addr: [u8; 6]) -> Result<(), u8>;
     // fn zephyr_read_static_addresses( p_return: *mut sdc_hci_cmd_vs_zephyr_read_static_addresses_return_t, ) -> u8;
     // fn zephyr_read_key_hierarchy_roots( p_return: *mut sdc_hci_cmd_vs_zephyr_read_key_hierarchy_roots_return_t, ) -> u8;
     // fn zephyr_read_chip_temp(p_return: *mut sdc_hci_cmd_vs_zephyr_read_chip_temp_return_t) -> u8;
@@ -540,4 +540,12 @@ pub trait VendorExt: Sealed {
 }
 
 impl<'d> Sealed for SoftdeviceController<'d> {}
-impl<'d> VendorExt for SoftdeviceController<'d> {}
+
+impl<'d> VendorExt for SoftdeviceController<'d> {
+    fn zephyr_write_bd_addr(&self, bd_addr: [u8; 6]) -> Result<(), u8> {
+        let ret = unsafe {
+            raw::sdc_hci_cmd_vs_zephyr_write_bd_addr(&raw::sdc_hci_cmd_vs_zephyr_write_bd_addr_t { bd_addr })
+        };
+        (ret == 0).then_some(()).ok_or(ret)
+    }
+}
