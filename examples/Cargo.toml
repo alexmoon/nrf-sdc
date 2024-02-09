@@ -7,15 +7,11 @@ version = "0.0.0"
 [[bin]]
 name = "hello"
 
-[features]
-default = ["nightly"]
-nightly = ["embassy-executor/nightly", "embassy-nrf/nightly", "embassy-nrf/unstable-traits"]
-
 [dependencies]
 nrf-sdc = { version = "0.1.0", path = "../nrf-sdc", features = ["defmt", "nrf52840", "peripheral"] }
 
-embassy-executor = { version = "0.1.1", features = ["defmt", "integrated-timers", "nightly"] }
-embassy-time = { version = "0.1.0", features = ["defmt", "defmt-timestamp-uptime"] }
+embassy-executor = { version = "0.5", features = ["task-arena-size-32768", "arch-cortex-m", "executor-thread", "defmt", "integrated-timers", "executor-interrupt"] }
+embassy-time = { version = "0.3.0", features = ["defmt", "defmt-timestamp-uptime"] }
 embassy-nrf = { version = "0.1.0", features = ["defmt", "nrf52840", "time-driver-rtc1", "gpiote", "unstable-pac"] }
 
 defmt = "0.3"
@@ -24,3 +20,4 @@ defmt-rtt = "0.4.0"
 cortex-m = { version = "0.7.6", features = ["critical-section-single-core"] }
 cortex-m-rt = "0.7.0"
 panic-probe = { version = "0.3", features = ["print-defmt"] }
+static_cell = "2"

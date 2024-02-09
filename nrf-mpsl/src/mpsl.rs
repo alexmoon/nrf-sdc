@@ -3,8 +3,11 @@ use core::future::poll_fn;
 use core::marker::PhantomData;
 use core::task::Poll;
 
-use embassy_nrf::interrupt::{self, Interrupt, InterruptExt, Priority};
+use embassy_nrf::interrupt;
+use embassy_nrf::interrupt::Priority;
+use embassy_nrf::interrupt::typelevel::{Interrupt, POWER_CLOCK, RADIO, RTC0, TIMER0, Binding, Handler};
 use embassy_nrf::{peripherals, Peripheral, PeripheralRef};
+use cortex_m::interrupt::InterruptNumber as _;
 use embassy_sync::waitqueue::AtomicWaker;
 
 use crate::error::{Error, RetVal};
@@ -49,32 +52,6 @@ impl<'d> Peripherals<'d> {
     }
 }
 
-pub struct Interrupts<'d, I: Interrupt> {
-    pub radio: PeripheralRef<'d, interrupt::RADIO>,
-    pub rtc0: PeripheralRef<'d, interrupt::RTC0>,
-    pub timer0: PeripheralRef<'d, interrupt::TIMER0>,
-    pub power_clock: PeripheralRef<'d, interrupt::POWER_CLOCK>,
-    pub low_priority: PeripheralRef<'d, I>,
-}
-
-impl<'d, I: Interrupt> Interrupts<'d, I> {
-    pub fn new(
-        radio: impl Peripheral<P = interrupt::RADIO> + 'd,
-        rtc0: impl Peripheral<P = interrupt::RTC0> + 'd,
-        timer0: impl Peripheral<P = interrupt::TIMER0> + 'd,
-        power_clock: impl Peripheral<P = interrupt::POWER_CLOCK> + 'd,
-        low_priority: impl Peripheral<P = I> + 'd,
-    ) -> Self {
-        Interrupts {
-            radio: radio.into_ref(),
-            rtc0: rtc0.into_ref(),
-            timer0: timer0.into_ref(),
-            power_clock: power_clock.into_ref(),
-            low_priority: low_priority.into_ref(),
-        }
-    }
-}
-
 pub struct MultiprotocolServiceLayer<'d> {
     // Prevent Send, Sync
     _private: PhantomData<&'d *mut ()>,
@@ -95,11 +72,19 @@ impl<'d> Drop for MultiprotocolServiceLayer<'d> {
 }
 
 impl<'d> MultiprotocolServiceLayer<'d> {
-    pub fn new<I: Interrupt>(
+    pub fn new<T, I>(
         p: Peripherals<'d>,
-        irqs: Interrupts<'d, I>,
+        _irq: I,
         clock_cfg: raw::mpsl_clock_lfclk_cfg_t,
-    ) -> Result<Self, Error> {
+    ) -> Result<Self, Error>
+        where
+    T: Interrupt,
+    I: Binding<T, LowPrioInterruptHandler>
+        + Binding<interrupt::typelevel::RADIO, HighPrioInterruptHandler>
+        + Binding<interrupt::typelevel::TIMER0, HighPrioInterruptHandler>
+        + Binding<interrupt::typelevel::RTC0, HighPrioInterruptHandler>
+        + Binding<interrupt::typelevel::POWER_CLOCK, ClockInterruptHandler>,
+    {
         assert!(
             cortex_m::peripheral::SCB::vect_active() == cortex_m::peripheral::scb::VectActive::ThreadMode,
             "MultiprotocolServiceLayer must be initialized from thread mode"
@@ -108,28 +93,22 @@ impl<'d> MultiprotocolServiceLayer<'d> {
         // Peripherals are used by the MPSL library, so we merely take ownership and ignore them
         let _ = p;
 
-        irqs.low_priority.set_priority(Priority::P4);
-        irqs.low_priority.set_handler(Self::low_priority_isr);
-        irqs.low_priority.unpend();
+        T::set_priority(Priority::P4);
+        T::unpend();
 
         let ret = unsafe {
             raw::mpsl_init(
                 &clock_cfg,
-                raw::IRQn_Type::from(irqs.low_priority.number()),
+                raw::IRQn_Type::from(T::IRQ.number()),
                 Some(assert_handler),
             )
         };
         RetVal::from(ret).to_result()?;
 
-        irqs.radio.set_priority(Priority::P0);
-        irqs.rtc0.set_priority(Priority::P0);
-        irqs.timer0.set_priority(Priority::P0);
-        irqs.power_clock.set_priority(Priority::P4);
-
-        irqs.radio.set_handler(Self::radio_isr);
-        irqs.rtc0.set_handler(Self::rtc0_isr);
-        irqs.timer0.set_handler(Self::timer0_isr);
-        irqs.power_clock.set_handler(Self::power_clock_isr);
+        RADIO::set_priority(Priority::P0);
+        RTC0::set_priority(Priority::P0);
+        TIMER0::set_priority(Priority::P0);
+        POWER_CLOCK::set_priority(Priority::P4);
 
         Ok(MultiprotocolServiceLayer { _private: PhantomData })
     }
@@ -156,24 +135,40 @@ impl<'d> MultiprotocolServiceLayer<'d> {
     pub async fn request_hfclk(&self) -> Result<hfclk::Hfclk, Error> {
         hfclk::Hfclk::new()
     }
+}
 
-    fn low_priority_isr(_ctx: *mut ()) {
+
+// Low priority interrupts
+pub struct LowPrioInterruptHandler;
+impl<T: Interrupt> Handler<T> for LowPrioInterruptHandler {
+    unsafe fn on_interrupt() {
         WAKER.wake();
     }
+}
 
-    fn radio_isr(_ctx: *mut ()) {
-        unsafe { raw::MPSL_IRQ_RADIO_Handler() }
+pub struct ClockInterruptHandler;
+impl Handler<interrupt::typelevel::POWER_CLOCK> for ClockInterruptHandler {
+    unsafe fn on_interrupt() {
+        raw::MPSL_IRQ_CLOCK_Handler();
     }
+}
 
-    fn timer0_isr(_ctx: *mut ()) {
-        unsafe { raw::MPSL_IRQ_TIMER0_Handler() }
+// High priority interrupts
+pub struct HighPrioInterruptHandler;
+impl Handler<interrupt::typelevel::RADIO> for HighPrioInterruptHandler {
+    unsafe fn on_interrupt() {
+        raw::MPSL_IRQ_RADIO_Handler();
     }
+}
 
-    fn rtc0_isr(_ctx: *mut ()) {
-        unsafe { raw::MPSL_IRQ_RTC0_Handler() }
+impl Handler<interrupt::typelevel::TIMER0> for HighPrioInterruptHandler {
+    unsafe fn on_interrupt() {
+        raw::MPSL_IRQ_TIMER0_Handler();
     }
+}
 
-    fn power_clock_isr(_ctx: *mut ()) {
-        unsafe { raw::MPSL_IRQ_CLOCK_Handler() }
+impl Handler<interrupt::typelevel::RTC0> for HighPrioInterruptHandler {
+    unsafe fn on_interrupt() {
+        raw::MPSL_IRQ_RTC0_Handler();
     }
 }
