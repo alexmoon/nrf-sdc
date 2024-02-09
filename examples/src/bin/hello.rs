@@ -1,18 +1,28 @@
 #![no_std]
 #![no_main]
-#![feature(type_alias_impl_trait)]
 
 use defmt::{info, unwrap};
 use embassy_executor::Spawner;
-use embassy_executor::_export::StaticCell;
 use embassy_nrf::gpio::{Level, Output, OutputDrive};
-use embassy_nrf::interrupt::{self, take};
+use embassy_nrf::interrupt;
+use embassy_nrf::peripherals;
 use embassy_time::{Duration, Timer};
+use embassy_nrf::bind_interrupts;
 use nrf_sdc::{self as sdc, mpsl, pac, VendorExt};
 use sdc::mpsl::MultiprotocolServiceLayer;
 use sdc::raw::HCI_MSG_BUFFER_MAX_SIZE;
 use sdc::rng_pool::RngPool;
+use static_cell::StaticCell;
 use {defmt_rtt as _, panic_probe as _};
+
+bind_interrupts!(struct Irqs {
+    RNG => sdc::rng_pool::InterruptHandler;
+    SWI0_EGU0 => mpsl::LowPrioInterruptHandler;
+    POWER_CLOCK => mpsl::ClockInterruptHandler;
+    RADIO => mpsl::HighPrioInterruptHandler;
+    TIMER0 => mpsl::HighPrioInterruptHandler;
+    RTC0 => mpsl::HighPrioInterruptHandler;
+});
 
 fn build_sdc<'d>(
     p: nrf_sdc::Peripherals<'d>,
@@ -52,13 +62,6 @@ async fn main(spawner: Spawner) {
         p.PPI_CH30,
         p.PPI_CH31,
     );
-    let mpsl_irqs = mpsl::Interrupts::new(
-        take!(RADIO),
-        take!(RTC0),
-        take!(TIMER0),
-        take!(POWER_CLOCK),
-        take!(SWI1_EGU1),
-    );
     let lfclk_cfg = mpsl::raw::mpsl_clock_lfclk_cfg_t {
         source: mpsl::raw::MPSL_CLOCK_LF_SRC_RC as u8,
         rc_ctiv: mpsl::raw::MPSL_RECOMMENDED_RC_CTIV as u8,
@@ -68,7 +71,7 @@ async fn main(spawner: Spawner) {
     };
     static MPSL: StaticCell<MultiprotocolServiceLayer> = StaticCell::new();
     let mpsl = MPSL.init(unwrap!(mpsl::MultiprotocolServiceLayer::new(
-        mpsl_p, mpsl_irqs, lfclk_cfg
+        mpsl_p, Irqs, lfclk_cfg
     )));
     spawner.must_spawn(mpsl_task(&*mpsl));
 
@@ -77,9 +80,8 @@ async fn main(spawner: Spawner) {
         p.PPI_CH24, p.PPI_CH25, p.PPI_CH26, p.PPI_CH27, p.PPI_CH28, p.PPI_CH29,
     );
 
-    let irq = take!(RNG);
     let mut pool = [0; 256];
-    let rng = sdc::rng_pool::RngPool::new(p.RNG, irq, &mut pool, 64);
+    let rng = sdc::rng_pool::RngPool::new(p.RNG, Irqs, &mut pool, 64);
 
     let mut sdc_mem = [0; 1584];
     let sdc = unwrap!(build_sdc(sdc_p, &rng, mpsl, &mut sdc_mem));
