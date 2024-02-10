@@ -8,13 +8,6 @@ members = [
     "nrf-sdc-sys",
 ]
 
-[patch.crates-io]
-embassy-nrf = { git = "https://github.com/embassy-rs/embassy", branch = "master" }
-embassy-sync = { git = "https://github.com/embassy-rs/embassy", branch = "master"}
-embassy-hal-common = { git = "https://github.com/embassy-rs/embassy", branch = "master"}
-embassy-executor = { git = "https://github.com/embassy-rs/embassy", branch = "master" }
-embassy-time = { git = "https://github.com/embassy-rs/embassy", branch = "master" }
-
 [profile.dev]
 opt-level = 1               # Use slightly better optimizations.
 
@@ -26,3 +19,12 @@ incremental = false
 lto = 'fat'
 opt-level = 'z'
 overflow-checks = false
+
+[patch.crates-io]
+embassy-executor = { git = "https://github.com/embassy-rs/embassy.git", branch = "main" }
+embassy-nrf = { git = "https://github.com/embassy-rs/embassy.git", branch = "main" }
+embassy-sync = { git = "https://github.com/embassy-rs/embassy.git", branch = "main" }
+embassy-futures = { git = "https://github.com/embassy-rs/embassy.git", branch = "main" }
+embassy-time = { git = "https://github.com/embassy-rs/embassy.git", branch = "main" }
+embassy-time-driver = { git = "https://github.com/embassy-rs/embassy.git", branch = "main" }
+embassy-embedded-hal = { git = "https://github.com/embassy-rs/embassy.git", branch = "main" }

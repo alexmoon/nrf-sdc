@@ -1,11 +1,12 @@
 use core::future::poll_fn;
+use core::marker::PhantomData;
 use core::ptr;
 use core::sync::atomic::{AtomicPtr, AtomicU32, AtomicUsize, Ordering};
 use core::task::Poll;
 
-use embassy_hal_common::{Peripheral, PeripheralRef};
-use embassy_nrf::interrupt::{self, InterruptExt};
+use embassy_nrf::interrupt::typelevel::Interrupt;
 use embassy_nrf::peripherals::RNG;
+use embassy_nrf::{interrupt, into_ref, Peripheral, PeripheralRef};
 use embassy_sync::waitqueue::AtomicWaker;
 
 use crate::pac;
@@ -41,10 +42,10 @@ struct State {
 ///
 /// It has a non-blocking API, and a blocking api through `rand`.
 pub struct RngPool<'d> {
-    irq: PeripheralRef<'d, interrupt::RNG>,
     threshold: usize,
     read: AtomicUsize,
     blocking: AtomicU32,
+    _peri: PeripheralRef<'d, RNG>,
 }
 
 impl<'d> Drop for RngPool<'d> {
@@ -55,8 +56,7 @@ impl<'d> Drop for RngPool<'d> {
         self.bias_correction(false);
 
         // Disable and remove the irq handler
-        self.irq.disable();
-        self.irq.remove_handler();
+        interrupt::typelevel::RNG::disable();
 
         // The interrupt is now disabled and can't preempt us anymore, so the order doesn't matter here.
         STATE.base.store(ptr::null_mut(), Ordering::Release);
@@ -66,50 +66,12 @@ impl<'d> Drop for RngPool<'d> {
     }
 }
 
-impl<'d> RngPool<'d> {
-    /// Creates a new RngPool driver from the `RNG` peripheral and interrupt.
-    ///
-    /// The length of `pool` must be a power of two.
-    ///
-    /// SAFETY: `RngPool` must not have its lifetime end without running its destructor, e.g. using `mem::forget`.
-    pub fn new(
-        _rng: impl Peripheral<P = RNG> + 'd,
-        irq: impl Peripheral<P = interrupt::RNG> + 'd,
-        pool: &'d mut [u8],
-        threshold: usize,
-    ) -> Self {
-        assert!(pool.len().is_power_of_two());
+pub struct InterruptHandler {
+    _phantom: PhantomData<RNG>,
+}
 
-        let irq = irq.into_ref();
-        irq.disable();
-
-        let base = pool.as_mut_ptr();
-
-        let this = Self {
-            irq,
-            threshold,
-            read: AtomicUsize::new(0),
-            blocking: AtomicU32::new(0),
-        };
-
-        this.stop();
-        this.disable_irq();
-
-        // The interrupt is not yet enabled, so the order doesn't matter here.
-        STATE.base.store(base, Ordering::Release);
-        STATE.len.store(pool.len(), Ordering::Release);
-        STATE.head.store(0, Ordering::Release);
-        STATE.tail.store(0, Ordering::Release);
-        STATE.trigger.store(core::ptr::null_mut(), Ordering::Release);
-
-        this.irq.set_handler(Self::on_interrupt);
-        this.irq.unpend();
-        this.irq.enable();
-
-        this
-    }
-
-    fn on_interrupt(_: *mut ()) {
+impl interrupt::typelevel::Handler<interrupt::typelevel::RNG> for InterruptHandler {
+    unsafe fn on_interrupt() {
         // Clear the event.
         regs().events_valrdy.reset();
 
@@ -157,6 +119,47 @@ impl<'d> RngPool<'d> {
         } else if ptr == STATE.trigger.load(Ordering::Acquire) {
             STATE.waker.wake();
         }
+    }
+}
+
+impl<'d> RngPool<'d> {
+    /// Creates a new RngPool driver from the `RNG` peripheral and interrupt.
+    ///
+    /// The length of `pool` must be a power of two.
+    ///
+    /// SAFETY: `RngPool` must not have its lifetime end without running its destructor, e.g. using `mem::forget`.
+    pub fn new(
+        _rng: impl Peripheral<P = RNG> + 'd,
+        _irq: impl interrupt::typelevel::Binding<interrupt::typelevel::RNG, InterruptHandler> + 'd,
+        pool: &'d mut [u8],
+        threshold: usize,
+    ) -> Self {
+        into_ref!(_rng);
+        assert!(pool.len().is_power_of_two());
+
+        let base = pool.as_mut_ptr();
+
+        let this = Self {
+            threshold,
+            read: AtomicUsize::new(0),
+            blocking: AtomicU32::new(0),
+            _peri: _rng,
+        };
+
+        this.stop();
+        this.disable_irq();
+
+        // The interrupt is not yet enabled, so the order doesn't matter here.
+        STATE.base.store(base, Ordering::Release);
+        STATE.len.store(pool.len(), Ordering::Release);
+        STATE.head.store(0, Ordering::Release);
+        STATE.tail.store(0, Ordering::Release);
+        STATE.trigger.store(core::ptr::null_mut(), Ordering::Release);
+
+        interrupt::typelevel::RNG::unpend();
+        unsafe { interrupt::typelevel::RNG::enable() };
+
+        this
     }
 
     fn stop(&self) {
