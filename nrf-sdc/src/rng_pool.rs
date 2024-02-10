@@ -1,14 +1,12 @@
 use core::future::poll_fn;
+use core::marker::PhantomData;
 use core::ptr;
 use core::sync::atomic::{AtomicPtr, AtomicU32, AtomicUsize, Ordering};
 use core::task::Poll;
-use core::marker::PhantomData;
 
-use embassy_nrf::{Peripheral, PeripheralRef};
 use embassy_nrf::interrupt::typelevel::Interrupt;
-use embassy_nrf::interrupt::{self, InterruptExt};
 use embassy_nrf::peripherals::RNG;
-use embassy_nrf::into_ref;
+use embassy_nrf::{interrupt, into_ref, Peripheral, PeripheralRef};
 use embassy_sync::waitqueue::AtomicWaker;
 
 use crate::pac;
@@ -58,7 +56,7 @@ impl<'d> Drop for RngPool<'d> {
         self.bias_correction(false);
 
         // Disable and remove the irq handler
-        unsafe { interrupt::typelevel::RNG::disable() };
+        interrupt::typelevel::RNG::disable();
 
         // The interrupt is now disabled and can't preempt us anymore, so the order doesn't matter here.
         STATE.base.store(ptr::null_mut(), Ordering::Release);
@@ -304,7 +302,6 @@ impl<'d> RngPool<'d> {
         }
     }
 }
-
 
 impl<'d> rand_core::RngCore for RngPool<'d> {
     fn fill_bytes(&mut self, dest: &mut [u8]) {

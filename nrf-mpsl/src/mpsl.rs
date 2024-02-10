@@ -3,11 +3,10 @@ use core::future::poll_fn;
 use core::marker::PhantomData;
 use core::task::Poll;
 
-use embassy_nrf::interrupt;
-use embassy_nrf::interrupt::Priority;
-use embassy_nrf::interrupt::typelevel::{Interrupt, POWER_CLOCK, RADIO, RTC0, TIMER0, Binding, Handler};
-use embassy_nrf::{peripherals, Peripheral, PeripheralRef};
 use cortex_m::interrupt::InterruptNumber as _;
+use embassy_nrf::interrupt::typelevel::{Binding, Handler, Interrupt, POWER_CLOCK, RADIO, RTC0, TIMER0};
+use embassy_nrf::interrupt::Priority;
+use embassy_nrf::{interrupt, peripherals, Peripheral, PeripheralRef};
 use embassy_sync::waitqueue::AtomicWaker;
 
 use crate::error::{Error, RetVal};
@@ -72,18 +71,14 @@ impl<'d> Drop for MultiprotocolServiceLayer<'d> {
 }
 
 impl<'d> MultiprotocolServiceLayer<'d> {
-    pub fn new<T, I>(
-        p: Peripherals<'d>,
-        _irq: I,
-        clock_cfg: raw::mpsl_clock_lfclk_cfg_t,
-    ) -> Result<Self, Error>
-        where
-    T: Interrupt,
-    I: Binding<T, LowPrioInterruptHandler>
-        + Binding<interrupt::typelevel::RADIO, HighPrioInterruptHandler>
-        + Binding<interrupt::typelevel::TIMER0, HighPrioInterruptHandler>
-        + Binding<interrupt::typelevel::RTC0, HighPrioInterruptHandler>
-        + Binding<interrupt::typelevel::POWER_CLOCK, ClockInterruptHandler>,
+    pub fn new<T, I>(p: Peripherals<'d>, _irq: I, clock_cfg: raw::mpsl_clock_lfclk_cfg_t) -> Result<Self, Error>
+    where
+        T: Interrupt,
+        I: Binding<T, LowPrioInterruptHandler>
+            + Binding<interrupt::typelevel::RADIO, HighPrioInterruptHandler>
+            + Binding<interrupt::typelevel::TIMER0, HighPrioInterruptHandler>
+            + Binding<interrupt::typelevel::RTC0, HighPrioInterruptHandler>
+            + Binding<interrupt::typelevel::POWER_CLOCK, ClockInterruptHandler>,
     {
         assert!(
             cortex_m::peripheral::SCB::vect_active() == cortex_m::peripheral::scb::VectActive::ThreadMode,
@@ -96,13 +91,7 @@ impl<'d> MultiprotocolServiceLayer<'d> {
         T::set_priority(Priority::P4);
         T::unpend();
 
-        let ret = unsafe {
-            raw::mpsl_init(
-                &clock_cfg,
-                raw::IRQn_Type::from(T::IRQ.number()),
-                Some(assert_handler),
-            )
-        };
+        let ret = unsafe { raw::mpsl_init(&clock_cfg, raw::IRQn_Type::from(T::IRQ.number()), Some(assert_handler)) };
         RetVal::from(ret).to_result()?;
 
         RADIO::set_priority(Priority::P0);
@@ -136,7 +125,6 @@ impl<'d> MultiprotocolServiceLayer<'d> {
         hfclk::Hfclk::new()
     }
 }
-
 
 // Low priority interrupts
 pub struct LowPrioInterruptHandler;
