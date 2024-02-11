@@ -15,7 +15,7 @@ use raw::{
 };
 
 use crate::rng_pool::RngPool;
-use crate::{hci, pac, raw, Error, RetVal};
+use crate::{pac, raw, Error, RetVal};
 
 static WAKER: AtomicWaker = AtomicWaker::new();
 static FLASH_STATUS: Signal<ThreadModeRawMutex, Result<(), Error>> = Signal::new();
@@ -900,394 +900,460 @@ impl<'d> SoftdeviceController<'d> {
         let ret = unsafe { raw::sdc_hci_cmd_le_conn_update(&params) };
         hci::Status::from(ret).to_result()
     }
-    //     pub fn le_set_host_channel_classification(&self,
-    //         p_params: *const sdc_hci_cmd_le_set_host_channel_classification_t,
-    //     ) -> Result<(), hci::Error> {
-    //         raw::sdc_hci_cmd_le_set_host_channel_classification(
-    //             p_params: *const sdc_hci_cmd_le_set_host_channel_classification_t,
-    //         )
-    //     }
-    //     pub fn le_read_channel_map(&self,
-    //         p_params: *const sdc_hci_cmd_le_read_channel_map_t,
-    //         p_return: *mut sdc_hci_cmd_le_read_channel_map_return_t,
-    //     ) -> Result<(), hci::Error> {
-    //         raw::sdc_hci_cmd_le_read_channel_map(
-    //             p_params: *const sdc_hci_cmd_le_read_channel_map_t,
-    //             p_return: *mut sdc_hci_cmd_le_read_channel_map_return_t,
-    //         )
-    //     }
-    //     pub fn le_read_remote_features(&self, p_params: *const sdc_hci_cmd_le_read_remote_features_t) -> Result<(), hci::Error> {
-    //         raw::sdc_hci_cmd_le_read_remote_features(p_params: *const sdc_hci_cmd_le_read_remote_features_t)
-    //     }
-    //     pub fn le_encrypt(&self,
-    //         p_params: *const sdc_hci_cmd_le_encrypt_t,
-    //         p_return: *mut sdc_hci_cmd_le_encrypt_return_t,
-    //     ) -> Result<(), hci::Error> {
-    //         raw::sdc_hci_cmd_le_encrypt(
-    //             p_params: *const sdc_hci_cmd_le_encrypt_t,
-    //             p_return: *mut sdc_hci_cmd_le_encrypt_return_t,
-    //         )
-    //     }
-    //     pub fn le_rand(&self, p_return: *mut sdc_hci_cmd_le_rand_return_t) -> Result<(), hci::Error> {
-    //         raw::sdc_hci_cmd_le_rand(p_return: *mut sdc_hci_cmd_le_rand_return_t)
-    //     }
-    //     pub fn le_enable_encryption(&self, p_params: *const sdc_hci_cmd_le_enable_encryption_t) -> Result<(), hci::Error> {
-    //         raw::sdc_hci_cmd_le_enable_encryption(p_params: *const sdc_hci_cmd_le_enable_encryption_t)
-    //     }
-    //     pub fn le_long_term_key_request_reply(&self,
-    //         p_params: *const sdc_hci_cmd_le_long_term_key_request_reply_t,
-    //         p_return: *mut sdc_hci_cmd_le_long_term_key_request_reply_return_t,
-    //     ) -> Result<(), hci::Error> {
-    //         raw::sdc_hci_cmd_le_long_term_key_request_reply(
-    //             p_params: *const sdc_hci_cmd_le_long_term_key_request_reply_t,
-    //             p_return: *mut sdc_hci_cmd_le_long_term_key_request_reply_return_t,
-    //         )
-    //     }
-    //     pub fn le_long_term_key_request_negative_reply(&self,
-    //         p_params: *const sdc_hci_cmd_le_long_term_key_request_negative_reply_t,
-    //         p_return: *mut sdc_hci_cmd_le_long_term_key_request_negative_reply_return_t,
-    //     ) -> Result<(), hci::Error> {
-    //         raw::sdc_hci_cmd_le_long_term_key_request_negative_reply(
-    //             p_params: *const sdc_hci_cmd_le_long_term_key_request_negative_reply_t,
-    //             p_return: *mut sdc_hci_cmd_le_long_term_key_request_negative_reply_return_t,
-    //         )
-    //     }
-    //     pub fn le_read_supported_states(&self,
-    //         p_return: *mut sdc_hci_cmd_le_read_supported_states_return_t,
-    //     ) -> Result<(), hci::Error> {
-    //         raw::sdc_hci_cmd_le_read_supported_states(p_return: *mut sdc_hci_cmd_le_read_supported_states_return_t)
-    //     }
-    //     pub fn le_test_end(&self, p_return: *mut sdc_hci_cmd_le_test_end_return_t) -> Result<(), hci::Error> {
-    //         raw::sdc_hci_cmd_le_test_end(p_return: *mut sdc_hci_cmd_le_test_end_return_t)
-    //     }
-    //     pub fn le_set_data_length(&self,
-    //         p_params: *const sdc_hci_cmd_le_set_data_length_t,
-    //         p_return: *mut sdc_hci_cmd_le_set_data_length_return_t,
-    //     ) -> Result<(), hci::Error> {
-    //         raw::sdc_hci_cmd_le_set_data_length(
-    //             p_params: *const sdc_hci_cmd_le_set_data_length_t,
-    //             p_return: *mut sdc_hci_cmd_le_set_data_length_return_t,
-    //         )
-    //     }
-    //     pub fn le_read_suggested_default_data_length(&self,
-    //         p_return: *mut sdc_hci_cmd_le_read_suggested_default_data_length_return_t,
-    //     ) -> Result<(), hci::Error> {
-    //         raw::sdc_hci_cmd_le_read_suggested_default_data_length(
-    //             p_return: *mut sdc_hci_cmd_le_read_suggested_default_data_length_return_t,
-    //         )
-    //     }
-    //     pub fn le_write_suggested_default_data_length(&self,
-    //         p_params: *const sdc_hci_cmd_le_write_suggested_default_data_length_t,
-    //     ) -> Result<(), hci::Error> {
-    //         raw::sdc_hci_cmd_le_write_suggested_default_data_length(
-    //             p_params: *const sdc_hci_cmd_le_write_suggested_default_data_length_t,
-    //         )
-    //     }
-    //     pub fn le_add_device_to_resolving_list(&self,
-    //         p_params: *const sdc_hci_cmd_le_add_device_to_resolving_list_t,
-    //     ) -> Result<(), hci::Error> {
-    //         raw::sdc_hci_cmd_le_add_device_to_resolving_list(p_params: *const sdc_hci_cmd_le_add_device_to_resolving_list_t)
-    //     }
-    //     pub fn le_remove_device_from_resolving_list(&self,
-    //         p_params: *const sdc_hci_cmd_le_remove_device_from_resolving_list_t,
-    //     ) -> Result<(), hci::Error> {
-    //         raw::sdc_hci_cmd_le_remove_device_from_resolving_list(
-    //             p_params: *const sdc_hci_cmd_le_remove_device_from_resolving_list_t,
-    //         )
-    //     }
-    //     pub fn le_clear_resolving_list(&self, ) -> Result<(), hci::Error> {
-    //         raw::sdc_hci_cmd_le_clear_resolving_list()
-    //     }
-    //     pub fn le_read_resolving_list_size(&self,
-    //         p_return: *mut sdc_hci_cmd_le_read_resolving_list_size_return_t,
-    //     ) -> Result<(), hci::Error> {
-    //         raw::sdc_hci_cmd_le_read_resolving_list_size(p_return: *mut sdc_hci_cmd_le_read_resolving_list_size_return_t)
-    //     }
-    //     pub fn le_set_address_resolution_enable(&self,
-    //         p_params: *const sdc_hci_cmd_le_set_address_resolution_enable_t,
-    //     ) -> Result<(), hci::Error> {
-    //         raw::sdc_hci_cmd_le_set_address_resolution_enable(
-    //             p_params: *const sdc_hci_cmd_le_set_address_resolution_enable_t,
-    //         )
-    //     }
-    //     pub fn le_set_resolvable_private_address_timeout(&self,
-    //         p_params: *const sdc_hci_cmd_le_set_resolvable_private_address_timeout_t,
-    //     ) -> Result<(), hci::Error> {
-    //         raw::sdc_hci_cmd_le_set_resolvable_private_address_timeout(
-    //             p_params: *const sdc_hci_cmd_le_set_resolvable_private_address_timeout_t,
-    //         )
-    //     }
-    //     pub fn le_read_max_data_length(&self,
-    //         p_return: *mut sdc_hci_cmd_le_read_max_data_length_return_t,
-    //     ) -> Result<(), hci::Error> {
-    //         raw::sdc_hci_cmd_le_read_max_data_length(p_return: *mut sdc_hci_cmd_le_read_max_data_length_return_t)
-    //     }
-    //     pub fn le_read_phy(&self,
-    //         p_params: *const sdc_hci_cmd_le_read_phy_t,
-    //         p_return: *mut sdc_hci_cmd_le_read_phy_return_t,
-    //     ) -> Result<(), hci::Error> {
-    //         raw::sdc_hci_cmd_le_read_phy(
-    //             p_params: *const sdc_hci_cmd_le_read_phy_t,
-    //             p_return: *mut sdc_hci_cmd_le_read_phy_return_t,
-    //         )
-    //     }
-    //     pub fn le_set_default_phy(&self, p_params: *const sdc_hci_cmd_le_set_default_phy_t) -> Result<(), hci::Error> {
-    //         raw::sdc_hci_cmd_le_set_default_phy(p_params: *const sdc_hci_cmd_le_set_default_phy_t)
-    //     }
-    //     pub fn le_set_phy(&self, p_params: *const sdc_hci_cmd_le_set_phy_t) -> Result<(), hci::Error> {
-    //         raw::sdc_hci_cmd_le_set_phy(p_params: *const sdc_hci_cmd_le_set_phy_t)
-    //     }
-    //     pub fn le_set_adv_set_random_address(&self,
-    //         p_params: *const sdc_hci_cmd_le_set_adv_set_random_address_t,
-    //     ) -> Result<(), hci::Error> {
-    //         raw::sdc_hci_cmd_le_set_adv_set_random_address(p_params: *const sdc_hci_cmd_le_set_adv_set_random_address_t)
-    //     }
-    //     pub fn le_set_ext_adv_params(&self,
-    //         p_params: *const sdc_hci_cmd_le_set_ext_adv_params_t,
-    //         p_return: *mut sdc_hci_cmd_le_set_ext_adv_params_return_t,
-    //     ) -> Result<(), hci::Error> {
-    //         raw::sdc_hci_cmd_le_set_ext_adv_params(
-    //             p_params: *const sdc_hci_cmd_le_set_ext_adv_params_t,
-    //             p_return: *mut sdc_hci_cmd_le_set_ext_adv_params_return_t,
-    //         )
-    //     }
-    //     pub fn le_set_ext_adv_data(&self, p_params: *const sdc_hci_cmd_le_set_ext_adv_data_t) -> Result<(), hci::Error> {
-    //         raw::sdc_hci_cmd_le_set_ext_adv_data(p_params: *const sdc_hci_cmd_le_set_ext_adv_data_t)
-    //     }
-    //     pub fn le_set_ext_scan_response_data(&self,
-    //         p_params: *const sdc_hci_cmd_le_set_ext_scan_response_data_t,
-    //     ) -> Result<(), hci::Error> {
-    //         raw::sdc_hci_cmd_le_set_ext_scan_response_data(p_params: *const sdc_hci_cmd_le_set_ext_scan_response_data_t)
-    //     }
-    //     pub fn le_set_ext_adv_enable(&self, p_params: *const sdc_hci_cmd_le_set_ext_adv_enable_t) -> Result<(), hci::Error> {
-    //         raw::sdc_hci_cmd_le_set_ext_adv_enable(p_params: *const sdc_hci_cmd_le_set_ext_adv_enable_t)
-    //     }
-    //     pub fn le_read_max_adv_data_length(&self,
-    //         p_return: *mut sdc_hci_cmd_le_read_max_adv_data_length_return_t,
-    //     ) -> Result<(), hci::Error> {
-    //         raw::sdc_hci_cmd_le_read_max_adv_data_length(p_return: *mut sdc_hci_cmd_le_read_max_adv_data_length_return_t)
-    //     }
-    //     pub fn le_read_number_of_supported_adv_sets(&self,
-    //         p_return: *mut sdc_hci_cmd_le_read_number_of_supported_adv_sets_return_t,
-    //     ) -> Result<(), hci::Error> {
-    //         raw::sdc_hci_cmd_le_read_number_of_supported_adv_sets(
-    //             p_return: *mut sdc_hci_cmd_le_read_number_of_supported_adv_sets_return_t,
-    //         )
-    //     }
-    //     pub fn le_remove_adv_set(&self, p_params: *const sdc_hci_cmd_le_remove_adv_set_t) -> Result<(), hci::Error> {
-    //         raw::sdc_hci_cmd_le_remove_adv_set(p_params: *const sdc_hci_cmd_le_remove_adv_set_t)
-    //     }
-    //     pub fn le_clear_adv_sets(&self, ) -> Result<(), hci::Error> {
-    //         raw::sdc_hci_cmd_le_clear_adv_sets()
-    //     }
-    //     pub fn le_set_periodic_adv_params(&self,
-    //         p_params: *const sdc_hci_cmd_le_set_periodic_adv_params_t,
-    //     ) -> Result<(), hci::Error> {
-    //         raw::sdc_hci_cmd_le_set_periodic_adv_params(p_params: *const sdc_hci_cmd_le_set_periodic_adv_params_t)
-    //     }
-    //     pub fn le_set_periodic_adv_data(&self, p_params: *const sdc_hci_cmd_le_set_periodic_adv_data_t) -> Result<(), hci::Error> {
-    //         raw::sdc_hci_cmd_le_set_periodic_adv_data(p_params: *const sdc_hci_cmd_le_set_periodic_adv_data_t)
-    //     }
-    //     pub fn le_set_periodic_adv_enable(&self,
-    //         p_params: *const sdc_hci_cmd_le_set_periodic_adv_enable_t,
-    //     ) -> Result<(), hci::Error> {
-    //         raw::sdc_hci_cmd_le_set_periodic_adv_enable(p_params: *const sdc_hci_cmd_le_set_periodic_adv_enable_t)
-    //     }
-    //     pub fn le_set_ext_scan_params(&self, p_params: *const sdc_hci_cmd_le_set_ext_scan_params_t) -> Result<(), hci::Error> {
-    //         raw::sdc_hci_cmd_le_set_ext_scan_params(p_params: *const sdc_hci_cmd_le_set_ext_scan_params_t)
-    //     }
-    //     pub fn le_set_ext_scan_enable(&self, p_params: *const sdc_hci_cmd_le_set_ext_scan_enable_t) -> Result<(), hci::Error> {
-    //         raw::sdc_hci_cmd_le_set_ext_scan_enable(p_params: *const sdc_hci_cmd_le_set_ext_scan_enable_t)
-    //     }
-    //     pub fn le_ext_create_conn(&self, p_params: *const sdc_hci_cmd_le_ext_create_conn_t) -> Result<(), hci::Error> {
-    //         raw::sdc_hci_cmd_le_ext_create_conn(p_params: *const sdc_hci_cmd_le_ext_create_conn_t)
-    //     }
-    //     pub fn le_periodic_adv_create_sync(&self,
-    //         p_params: *const sdc_hci_cmd_le_periodic_adv_create_sync_t,
-    //     ) -> Result<(), hci::Error> {
-    //         raw::sdc_hci_cmd_le_periodic_adv_create_sync(p_params: *const sdc_hci_cmd_le_periodic_adv_create_sync_t)
-    //     }
-    //     pub fn le_periodic_adv_create_sync_cancel(&self, ) -> Result<(), hci::Error> {
-    //         raw::sdc_hci_cmd_le_periodic_adv_create_sync_cancel()
-    //     }
-    //     pub fn le_periodic_adv_terminate_sync(&self,
-    //         p_params: *const sdc_hci_cmd_le_periodic_adv_terminate_sync_t,
-    //     ) -> Result<(), hci::Error> {
-    //         raw::sdc_hci_cmd_le_periodic_adv_terminate_sync(p_params: *const sdc_hci_cmd_le_periodic_adv_terminate_sync_t)
-    //     }
-    //     pub fn le_add_device_to_periodic_adv_list(&self,
-    //         p_params: *const sdc_hci_cmd_le_add_device_to_periodic_adv_list_t,
-    //     ) -> Result<(), hci::Error> {
-    //         raw::sdc_hci_cmd_le_add_device_to_periodic_adv_list(
-    //             p_params: *const sdc_hci_cmd_le_add_device_to_periodic_adv_list_t,
-    //         )
-    //     }
-    //     pub fn le_remove_device_from_periodic_adv_list(&self,
-    //         p_params: *const sdc_hci_cmd_le_remove_device_from_periodic_adv_list_t,
-    //     ) -> Result<(), hci::Error> {
-    //         raw::sdc_hci_cmd_le_remove_device_from_periodic_adv_list(
-    //             p_params: *const sdc_hci_cmd_le_remove_device_from_periodic_adv_list_t,
-    //         )
-    //     }
-    //     pub fn le_clear_periodic_adv_list(&self, ) -> Result<(), hci::Error> {
-    //         raw::sdc_hci_cmd_le_clear_periodic_adv_list()
-    //     }
-    //     pub fn le_read_periodic_adv_list_size(&self,
-    //         p_return: *mut sdc_hci_cmd_le_read_periodic_adv_list_size_return_t,
-    //     ) -> Result<(), hci::Error> {
-    //         raw::sdc_hci_cmd_le_read_periodic_adv_list_size(
-    //             p_return: *mut sdc_hci_cmd_le_read_periodic_adv_list_size_return_t,
-    //         )
-    //     }
-    //     pub fn le_read_transmit_power(&self,
-    //         p_return: *mut sdc_hci_cmd_le_read_transmit_power_return_t,
-    //     ) -> Result<(), hci::Error> {
-    //         raw::sdc_hci_cmd_le_read_transmit_power(p_return: *mut sdc_hci_cmd_le_read_transmit_power_return_t)
-    //     }
-    //     pub fn le_read_rf_path_compensation(&self,
-    //         p_return: *mut sdc_hci_cmd_le_read_rf_path_compensation_return_t,
-    //     ) -> Result<(), hci::Error> {
-    //         raw::sdc_hci_cmd_le_read_rf_path_compensation(p_return: *mut sdc_hci_cmd_le_read_rf_path_compensation_return_t)
-    //     }
-    //     pub fn le_write_rf_path_compensation(&self,
-    //         p_params: *const sdc_hci_cmd_le_write_rf_path_compensation_t,
-    //     ) -> Result<(), hci::Error> {
-    //         raw::sdc_hci_cmd_le_write_rf_path_compensation(p_params: *const sdc_hci_cmd_le_write_rf_path_compensation_t)
-    //     }
-    //     pub fn le_set_privacy_mode(&self, p_params: *const sdc_hci_cmd_le_set_privacy_mode_t) -> Result<(), hci::Error> {
-    //         raw::sdc_hci_cmd_le_set_privacy_mode(p_params: *const sdc_hci_cmd_le_set_privacy_mode_t)
-    //     }
-    //     pub fn le_set_connless_cte_transmit_params(&self,
-    //         p_params: *const sdc_hci_cmd_le_set_connless_cte_transmit_params_t,
-    //     ) -> Result<(), hci::Error> {
-    //         raw::sdc_hci_cmd_le_set_connless_cte_transmit_params(
-    //             p_params: *const sdc_hci_cmd_le_set_connless_cte_transmit_params_t,
-    //         )
-    //     }
-    //     pub fn le_set_connless_cte_transmit_enable(&self,
-    //         p_params: *const sdc_hci_cmd_le_set_connless_cte_transmit_enable_t,
-    //     ) -> Result<(), hci::Error> {
-    //         raw::sdc_hci_cmd_le_set_connless_cte_transmit_enable(
-    //             p_params: *const sdc_hci_cmd_le_set_connless_cte_transmit_enable_t,
-    //         )
-    //     }
-    //     pub fn le_set_conn_cte_transmit_params(&self,
-    //         p_params: *const sdc_hci_cmd_le_set_conn_cte_transmit_params_t,
-    //         p_return: *mut sdc_hci_cmd_le_set_conn_cte_transmit_params_return_t,
-    //     ) -> Result<(), hci::Error> {
-    //         raw::sdc_hci_cmd_le_set_conn_cte_transmit_params(
-    //             p_params: *const sdc_hci_cmd_le_set_conn_cte_transmit_params_t,
-    //             p_return: *mut sdc_hci_cmd_le_set_conn_cte_transmit_params_return_t,
-    //         )
-    //     }
-    //     pub fn le_conn_cte_response_enable(&self,
-    //         p_params: *const sdc_hci_cmd_le_conn_cte_response_enable_t,
-    //         p_return: *mut sdc_hci_cmd_le_conn_cte_response_enable_return_t,
-    //     ) -> Result<(), hci::Error> {
-    //         raw::sdc_hci_cmd_le_conn_cte_response_enable(
-    //             p_params: *const sdc_hci_cmd_le_conn_cte_response_enable_t,
-    //             p_return: *mut sdc_hci_cmd_le_conn_cte_response_enable_return_t,
-    //         )
-    //     }
-    //     pub fn le_read_antenna_information(&self,
-    //         p_return: *mut sdc_hci_cmd_le_read_antenna_information_return_t,
-    //     ) -> Result<(), hci::Error> {
-    //         raw::sdc_hci_cmd_le_read_antenna_information(p_return: *mut sdc_hci_cmd_le_read_antenna_information_return_t)
-    //     }
-    //     pub fn le_set_periodic_adv_receive_enable(&self,
-    //         p_params: *const sdc_hci_cmd_le_set_periodic_adv_receive_enable_t,
-    //     ) -> Result<(), hci::Error> {
-    //         raw::sdc_hci_cmd_le_set_periodic_adv_receive_enable(
-    //             p_params: *const sdc_hci_cmd_le_set_periodic_adv_receive_enable_t,
-    //         )
-    //     }
-    //     pub fn le_periodic_adv_sync_transfer(&self,
-    //         p_params: *const sdc_hci_cmd_le_periodic_adv_sync_transfer_t,
-    //         p_return: *mut sdc_hci_cmd_le_periodic_adv_sync_transfer_return_t,
-    //     ) -> Result<(), hci::Error> {
-    //         raw::sdc_hci_cmd_le_periodic_adv_sync_transfer(
-    //             p_params: *const sdc_hci_cmd_le_periodic_adv_sync_transfer_t,
-    //             p_return: *mut sdc_hci_cmd_le_periodic_adv_sync_transfer_return_t,
-    //         )
-    //     }
-    //     pub fn le_periodic_adv_set_info_transfer(&self,
-    //         p_params: *const sdc_hci_cmd_le_periodic_adv_set_info_transfer_t,
-    //         p_return: *mut sdc_hci_cmd_le_periodic_adv_set_info_transfer_return_t,
-    //     ) -> Result<(), hci::Error> {
-    //         raw::sdc_hci_cmd_le_periodic_adv_set_info_transfer(
-    //             p_params: *const sdc_hci_cmd_le_periodic_adv_set_info_transfer_t,
-    //             p_return: *mut sdc_hci_cmd_le_periodic_adv_set_info_transfer_return_t,
-    //         )
-    //     }
-    //     pub fn le_set_periodic_adv_sync_transfer_params(&self,
-    //         p_params: *const sdc_hci_cmd_le_set_periodic_adv_sync_transfer_params_t,
-    //         p_return: *mut sdc_hci_cmd_le_set_periodic_adv_sync_transfer_params_return_t,
-    //     ) -> Result<(), hci::Error> {
-    //         raw::sdc_hci_cmd_le_set_periodic_adv_sync_transfer_params(
-    //             p_params: *const sdc_hci_cmd_le_set_periodic_adv_sync_transfer_params_t,
-    //             p_return: *mut sdc_hci_cmd_le_set_periodic_adv_sync_transfer_params_return_t,
-    //         )
-    //     }
-    //     pub fn le_set_default_periodic_adv_sync_transfer_params(&self,
-    //         p_params: *const sdc_hci_cmd_le_set_default_periodic_adv_sync_transfer_params_t,
-    //     ) -> Result<(), hci::Error> {
-    //         raw::sdc_hci_cmd_le_set_default_periodic_adv_sync_transfer_params(
-    //             p_params: *const sdc_hci_cmd_le_set_default_periodic_adv_sync_transfer_params_t,
-    //         )
-    //     }
-    //     pub fn le_request_peer_sca(&self, p_params: *const sdc_hci_cmd_le_request_peer_sca_t) -> Result<(), hci::Error> {
-    //         raw::sdc_hci_cmd_le_request_peer_sca(p_params: *const sdc_hci_cmd_le_request_peer_sca_t)
-    //     }
-    //     pub fn le_enhanced_read_transmit_power_level(&self,
-    //         p_params: *const sdc_hci_cmd_le_enhanced_read_transmit_power_level_t,
-    //         p_return: *mut sdc_hci_cmd_le_enhanced_read_transmit_power_level_return_t,
-    //     ) -> Result<(), hci::Error> {
-    //         raw::sdc_hci_cmd_le_enhanced_read_transmit_power_level(
-    //             p_params: *const sdc_hci_cmd_le_enhanced_read_transmit_power_level_t,
-    //             p_return: *mut sdc_hci_cmd_le_enhanced_read_transmit_power_level_return_t,
-    //         )
-    //     }
-    //     pub fn le_read_remote_transmit_power_level(&self,
-    //         p_params: *const sdc_hci_cmd_le_read_remote_transmit_power_level_t,
-    //     ) -> Result<(), hci::Error> {
-    //         raw::sdc_hci_cmd_le_read_remote_transmit_power_level(
-    //             p_params: *const sdc_hci_cmd_le_read_remote_transmit_power_level_t,
-    //         )
-    //     }
-    //     pub fn le_set_path_loss_reporting_params(&self,
-    //         p_params: *const sdc_hci_cmd_le_set_path_loss_reporting_params_t,
-    //         p_return: *mut sdc_hci_cmd_le_set_path_loss_reporting_params_return_t,
-    //     ) -> Result<(), hci::Error> {
-    //         raw::sdc_hci_cmd_le_set_path_loss_reporting_params(
-    //             p_params: *const sdc_hci_cmd_le_set_path_loss_reporting_params_t,
-    //             p_return: *mut sdc_hci_cmd_le_set_path_loss_reporting_params_return_t,
-    //         )
-    //     }
-    //     pub fn le_set_path_loss_reporting_enable(&self,
-    //         p_params: *const sdc_hci_cmd_le_set_path_loss_reporting_enable_t,
-    //         p_return: *mut sdc_hci_cmd_le_set_path_loss_reporting_enable_return_t,
-    //     ) -> Result<(), hci::Error> {
-    //         raw::sdc_hci_cmd_le_set_path_loss_reporting_enable(
-    //             p_params: *const sdc_hci_cmd_le_set_path_loss_reporting_enable_t,
-    //             p_return: *mut sdc_hci_cmd_le_set_path_loss_reporting_enable_return_t,
-    //         )
-    //     }
-    //     pub fn le_set_transmit_power_reporting_enable(&self,
-    //         p_params: *const sdc_hci_cmd_le_set_transmit_power_reporting_enable_t,
-    //         p_return: *mut sdc_hci_cmd_le_set_transmit_power_reporting_enable_return_t,
-    //     ) -> Result<(), hci::Error> {
-    //         raw::sdc_hci_cmd_le_set_transmit_power_reporting_enable(
-    //             p_params: *const sdc_hci_cmd_le_set_transmit_power_reporting_enable_t,
-    //             p_return: *mut sdc_hci_cmd_le_set_transmit_power_reporting_enable_return_t,
-    //         )
-    //     }
-    //     pub fn le_set_data_related_address_changes(&self,
-    //         p_params: *const sdc_hci_cmd_le_set_data_related_address_changes_t,
-    //     ) -> Result<(), hci::Error> {
-    //         raw::sdc_hci_cmd_le_set_data_related_address_changes(
-    //             p_params: *const sdc_hci_cmd_le_set_data_related_address_changes_t,
-    //         )
-    //     }
+
+    pub fn le_set_host_channel_classification(&self, channel_map: [u8; 5]) -> Result<(), hci::Error> {
+        let params = raw::sdc_hci_cmd_le_set_host_channel_classification_t { channel_map };
+        let ret = unsafe { raw::sdc_hci_cmd_le_set_host_channel_classification(&params) };
+        hci::Status::from(ret).to_result()
+    }
+
+    pub fn le_read_channel_map(&self, conn_handle: hci::ConnHandle) -> Result<[u8; 5], hci::Error> {
+        let params = raw::sdc_hci_cmd_le_read_channel_map_t {
+            conn_handle: conn_handle.to_raw(),
+        };
+        let mut out = raw::sdc_hci_cmd_le_read_channel_map_return_t {
+            conn_handle: 0,
+            channel_map: Default::default(),
+        };
+        let ret = unsafe { raw::sdc_hci_cmd_le_read_channel_map(&params, &mut out) };
+        hci::Status::from(ret).to_result().map(|_| out.channel_map)
+    }
+
+    pub fn le_read_remote_features(&self, conn_handle: hci::ConnHandle) -> Result<(), hci::Error> {
+        let params = raw::sdc_hci_cmd_le_read_remote_features_t {
+            conn_handle: conn_handle.to_raw(),
+        };
+        let ret = unsafe { raw::sdc_hci_cmd_le_read_remote_features(&params) };
+        hci::Status::from(ret).to_result()
+    }
+
+    pub fn le_encrypt(&self, key: [u8; 16], plaintext_data: [u8; 16]) -> Result<[u8; 16], hci::Error> {
+        let params = raw::sdc_hci_cmd_le_encrypt_t { key, plaintext_data };
+        let mut out = raw::sdc_hci_cmd_le_encrypt_return_t {
+            encrypted_data: Default::default(),
+        };
+        let ret = unsafe { raw::sdc_hci_cmd_le_encrypt(&params, &mut out) };
+        hci::Status::from(ret).to_result().map(|_| out.encrypted_data)
+    }
+
+    pub fn le_rand(&self) -> Result<u64, hci::Error> {
+        let mut out = raw::sdc_hci_cmd_le_rand_return_t { random_number: 0 };
+        let ret = unsafe { raw::sdc_hci_cmd_le_rand(&mut out) };
+        hci::Status::from(ret).to_result().map(|_| out.random_number)
+    }
+
+    pub fn le_enable_encryption(
+        &self,
+        conn_handle: hci::ConnHandle,
+        random_number: u64,
+        encrypted_diversifier: u16,
+        long_term_key: [u8; 16],
+    ) -> Result<(), hci::Error> {
+        let params = raw::sdc_hci_cmd_le_enable_encryption_t {
+            conn_handle: conn_handle.to_raw(),
+            random_number: random_number.to_le_bytes(),
+            encrypted_diversifier: encrypted_diversifier.to_le_bytes(),
+            long_term_key,
+        };
+        let ret = unsafe { raw::sdc_hci_cmd_le_enable_encryption(&params) };
+        hci::Status::from(ret).to_result()
+    }
+
+    pub fn le_long_term_key_request_reply(
+        &self,
+        conn_handle: hci::ConnHandle,
+        long_term_key: [u8; 16],
+    ) -> Result<(), hci::Error> {
+        let params = raw::sdc_hci_cmd_le_long_term_key_request_reply_t {
+            conn_handle: conn_handle.to_raw(),
+            long_term_key,
+        };
+        let mut out = raw::sdc_hci_cmd_le_long_term_key_request_reply_return_t { conn_handle: 0 };
+        let ret = unsafe { raw::sdc_hci_cmd_le_long_term_key_request_reply(&params, &mut out) };
+        hci::Status::from(ret).to_result()
+    }
+
+    pub fn le_long_term_key_request_negative_reply(&self, conn_handle: hci::ConnHandle) -> Result<(), hci::Error> {
+        let params = raw::sdc_hci_cmd_le_long_term_key_request_negative_reply_t {
+            conn_handle: conn_handle.to_raw(),
+        };
+        let mut out = raw::sdc_hci_cmd_le_long_term_key_request_negative_reply_return_t { conn_handle: 0 };
+        let ret = unsafe { raw::sdc_hci_cmd_le_long_term_key_request_negative_reply(&params, &mut out) };
+        hci::Status::from(ret).to_result()
+    }
+
+    pub fn le_read_supported_states(&self) -> Result<[u8; 8], hci::Error> {
+        let mut out = raw::sdc_hci_cmd_le_read_supported_states_return_t {
+            le_states: Default::default(),
+        };
+        let ret = unsafe { raw::sdc_hci_cmd_le_read_supported_states(&mut out) };
+        hci::Status::from(ret).to_result().map(|_| out.le_states)
+    }
+
+    pub fn le_test_end(&self) -> Result<u16, hci::Error> {
+        let mut out = raw::sdc_hci_cmd_le_test_end_return_t { num_packets: 0 };
+        let ret = unsafe { raw::sdc_hci_cmd_le_test_end(&mut out) };
+        hci::Status::from(ret).to_result().map(|_| out.num_packets)
+    }
+
+    pub fn le_set_data_length(
+        &self,
+        conn_handle: hci::ConnHandle,
+        tx_octets: u16,
+        tx_time: u16,
+    ) -> Result<(), hci::Error> {
+        let params = raw::sdc_hci_cmd_le_set_data_length_t {
+            conn_handle: conn_handle.to_raw(),
+            tx_octets,
+            tx_time,
+        };
+        let mut out = raw::sdc_hci_cmd_le_set_data_length_return_t { conn_handle: 0 };
+        let ret = unsafe { raw::sdc_hci_cmd_le_set_data_length(&params, &mut out) };
+        hci::Status::from(ret).to_result()
+    }
+
+    pub fn le_read_suggested_default_data_length(
+        &self,
+    ) -> Result<raw::sdc_hci_cmd_le_read_suggested_default_data_length_return_t, hci::Error> {
+        let mut out = raw::sdc_hci_cmd_le_read_suggested_default_data_length_return_t {
+            suggested_max_tx_octets: 0,
+            suggested_max_tx_time: 0,
+        };
+        let ret = unsafe { raw::sdc_hci_cmd_le_read_suggested_default_data_length(&mut out) };
+        hci::Status::from(ret).to_result().map(|_| out)
+    }
+
+    pub fn le_write_suggested_default_data_length(
+        &self,
+        suggested_max_tx_octets: u16,
+        suggested_max_tx_time: u16,
+    ) -> Result<(), hci::Error> {
+        let params = raw::sdc_hci_cmd_le_write_suggested_default_data_length_t {
+            suggested_max_tx_octets,
+            suggested_max_tx_time,
+        };
+        let ret = unsafe { raw::sdc_hci_cmd_le_write_suggested_default_data_length(&params) };
+        hci::Status::from(ret).to_result()
+    }
+
+    pub fn le_add_device_to_resolving_list(
+        &self,
+        peer_identity_address_type: hci::AddressType,
+        peer_identity_address: hci::BdAddr,
+        peer_irk: [u8; 16],
+        local_irk: [u8; 16],
+    ) -> Result<(), hci::Error> {
+        let params = raw::sdc_hci_cmd_le_add_device_to_resolving_list_t {
+            peer_identity_address_type: peer_identity_address_type.to_raw(),
+            peer_identity_address: peer_identity_address.to_raw(),
+            peer_irk,
+            local_irk,
+        };
+        let ret = unsafe { raw::sdc_hci_cmd_le_add_device_to_resolving_list(&params) };
+        hci::Status::from(ret).to_result()
+    }
+
+    pub fn le_remove_device_from_resolving_list(
+        &self,
+        peer_identity_address_type: hci::AddressType,
+        peer_identity_address: hci::BdAddr,
+    ) -> Result<(), hci::Error> {
+        let params = raw::sdc_hci_cmd_le_remove_device_from_resolving_list_t {
+            peer_identity_address_type: peer_identity_address_type.to_raw(),
+            peer_identity_address: peer_identity_address.to_raw(),
+        };
+        let ret = unsafe { raw::sdc_hci_cmd_le_remove_device_from_resolving_list(&params) };
+        hci::Status::from(ret).to_result()
+    }
+
+    pub fn le_clear_resolving_list(&self) -> Result<(), hci::Error> {
+        let ret = unsafe { raw::sdc_hci_cmd_le_clear_resolving_list() };
+        hci::Status::from(ret).to_result()
+    }
+
+    pub fn le_read_resolving_list_size(&self) -> Result<u8, hci::Error> {
+        let mut out = raw::sdc_hci_cmd_le_read_resolving_list_size_return_t { resolving_list_size: 0 };
+        let ret = unsafe { raw::sdc_hci_cmd_le_read_resolving_list_size(&mut out) };
+        hci::Status::from(ret).to_result().map(|_| out.resolving_list_size)
+    }
+
+    pub fn le_set_address_resolution_enable(&self, address_resolution_enable: bool) -> Result<(), hci::Error> {
+        let params = raw::sdc_hci_cmd_le_set_address_resolution_enable_t {
+            address_resolution_enable: address_resolution_enable as u8,
+        };
+        let ret = unsafe { raw::sdc_hci_cmd_le_set_address_resolution_enable(&params) };
+        hci::Status::from(ret).to_result()
+    }
+
+    pub fn le_set_resolvable_private_address_timeout(
+        &self,
+        rpa_timeout: hci::Duration<1600>,
+    ) -> Result<(), hci::Error> {
+        let params = raw::sdc_hci_cmd_le_set_resolvable_private_address_timeout_t {
+            rpa_timeout: rpa_timeout.as_u16(),
+        };
+        let ret = unsafe { raw::sdc_hci_cmd_le_set_resolvable_private_address_timeout(&params) };
+        hci::Status::from(ret).to_result()
+    }
+
+    pub fn le_read_max_data_length(&self) -> Result<raw::sdc_hci_cmd_le_read_max_data_length_return_t, hci::Error> {
+        let mut out = raw::sdc_hci_cmd_le_read_max_data_length_return_t {
+            supported_max_tx_octets: 0,
+            supported_max_tx_time: 0,
+            supported_max_rx_octets: 0,
+            supported_max_rx_time: 0,
+        };
+        let ret = unsafe { raw::sdc_hci_cmd_le_read_max_data_length(&mut out) };
+        hci::Status::from(ret).to_result().map(|_| out)
+    }
+
+    pub fn le_read_phy(&self, conn_handle: hci::ConnHandle) -> Result<(hci::LePhy, hci::LePhy), hci::Error> {
+        let params = raw::sdc_hci_cmd_le_read_phy_t {
+            conn_handle: conn_handle.to_raw(),
+        };
+        let mut out = raw::sdc_hci_cmd_le_read_phy_return_t {
+            conn_handle: 0,
+            tx_phy: 0,
+            rx_phy: 0,
+        };
+        let ret = unsafe { raw::sdc_hci_cmd_le_read_phy(&params, &mut out) };
+        hci::Status::from(ret)
+            .to_result()
+            .map(|_| (hci::LePhy::new(out.tx_phy), hci::LePhy::new(out.rx_phy)))
+    }
+
+    // pub fn le_set_default_phy(&self) -> Result<(), hci::Error> {
+    //     let params = raw::sdc_hci_cmd_le_set_default_phy_t { all_phys: todo!(), tx_phys: todo!(), rx_phys: todo!() };
+    //     let ret = unsafe { raw::sdc_hci_cmd_le_set_default_phy(&params) };
+    //     hci::Status::from(ret).to_result()
+    // }
+    // pub fn le_set_phy(&self) -> Result<(), hci::Error> {
+    //     let params = raw::sdc_hci_cmd_le_set_phy_t {};
+    //     let ret = unsafe { raw::sdc_hci_cmd_le_set_phy(&params) };
+    //     hci::Status::from(ret).to_result()
+    // }
+    // pub fn le_set_adv_set_random_address(&self) -> Result<(), hci::Error> {
+    //     let params = raw::sdc_hci_cmd_le_set_adv_set_random_address_t {};
+    //     let ret = unsafe { raw::sdc_hci_cmd_le_set_adv_set_random_address(&params) };
+    //     hci::Status::from(ret).to_result()
+    // }
+    // pub fn le_set_ext_adv_params(&self) -> Result<(), hci::Error> {
+    //     let params = raw::sdc_hci_cmd_le_set_ext_adv_params_t {};
+    //     let mut out = raw::sdc_hci_cmd_le_set_ext_adv_params_return_t {};
+    //     let ret = unsafe { raw::sdc_hci_cmd_le_set_ext_adv_params(&params, &mut out) };
+    //     hci::Status::from(ret).to_result()
+    // }
+    // pub fn le_set_ext_adv_data(&self) -> Result<(), hci::Error> {
+    //     let params = raw::sdc_hci_cmd_le_set_ext_adv_data_t {};
+    //     let ret = unsafe { raw::sdc_hci_cmd_le_set_ext_adv_data(&params) };
+    //     hci::Status::from(ret).to_result()
+    // }
+    // pub fn le_set_ext_scan_response_data(&self) -> Result<(), hci::Error> {
+    //     let params = raw::sdc_hci_cmd_le_set_ext_scan_response_data_t {};
+    //     let ret = unsafe { raw::sdc_hci_cmd_le_set_ext_scan_response_data(&params) };
+    //     hci::Status::from(ret).to_result()
+    // }
+    // pub fn le_set_ext_adv_enable(&self) -> Result<(), hci::Error> {
+    //     let params = raw::sdc_hci_cmd_le_set_ext_adv_enable_t {};
+    //     let ret = unsafe { raw::sdc_hci_cmd_le_set_ext_adv_enable(&params) };
+    //     hci::Status::from(ret).to_result()
+    // }
+    // pub fn le_read_max_adv_data_length(&self) -> Result<(), hci::Error> {
+    //     let mut out = raw::sdc_hci_cmd_le_read_max_adv_data_length_return_t {};
+    //     let ret = unsafe { raw::sdc_hci_cmd_le_read_max_adv_data_length(&mut out) };
+    //     hci::Status::from(ret).to_result()
+    // }
+    // pub fn le_read_number_of_supported_adv_sets(&self) -> Result<(), hci::Error> {
+    //     let mut out = raw::sdc_hci_cmd_le_read_number_of_supported_adv_sets_return_t {};
+    //     let ret = unsafe { raw::sdc_hci_cmd_le_read_number_of_supported_adv_sets(&mut out) };
+    //     hci::Status::from(ret).to_result()
+    // }
+    // pub fn le_remove_adv_set(&self) -> Result<(), hci::Error> {
+    //     let params = raw::sdc_hci_cmd_le_remove_adv_set_t {};
+    //     let ret = unsafe { raw::sdc_hci_cmd_le_remove_adv_set(&params) };
+    //     hci::Status::from(ret).to_result()
+    // }
+    // pub fn le_clear_adv_sets(&self) -> Result<(), hci::Error> {
+    //     let ret = unsafe { raw::sdc_hci_cmd_le_clear_adv_sets() };
+    //     hci::Status::from(ret).to_result()
+    // }
+    // pub fn le_set_periodic_adv_params(&self) -> Result<(), hci::Error> {
+    //     let params = raw::sdc_hci_cmd_le_set_periodic_adv_params_t {};
+    //     let ret = unsafe { raw::sdc_hci_cmd_le_set_periodic_adv_params(&params) };
+    //     hci::Status::from(ret).to_result()
+    // }
+    // pub fn le_set_periodic_adv_data(&self) -> Result<(), hci::Error> {
+    //     let params = raw::sdc_hci_cmd_le_set_periodic_adv_data_t {};
+    //     let ret = unsafe { raw::sdc_hci_cmd_le_set_periodic_adv_data(&params) };
+    //     hci::Status::from(ret).to_result()
+    // }
+    // pub fn le_set_periodic_adv_enable(&self) -> Result<(), hci::Error> {
+    //     let params = raw::sdc_hci_cmd_le_set_periodic_adv_enable_t {};
+    //     let ret = unsafe { raw::sdc_hci_cmd_le_set_periodic_adv_enable(&params) };
+    //     hci::Status::from(ret).to_result()
+    // }
+    // pub fn le_set_ext_scan_params(&self) -> Result<(), hci::Error> {
+    //     let params = raw::sdc_hci_cmd_le_set_ext_scan_params_t {};
+    //     let ret = unsafe { raw::sdc_hci_cmd_le_set_ext_scan_params(&params) };
+    //     hci::Status::from(ret).to_result()
+    // }
+    // pub fn le_set_ext_scan_enable(&self) -> Result<(), hci::Error> {
+    //     let params = raw::sdc_hci_cmd_le_set_ext_scan_enable_t {};
+    //     let ret = unsafe { raw::sdc_hci_cmd_le_set_ext_scan_enable(&params) };
+    //     hci::Status::from(ret).to_result()
+    // }
+    // pub fn le_ext_create_conn(&self) -> Result<(), hci::Error> {
+    //     let params = raw::sdc_hci_cmd_le_ext_create_conn_t {};
+    //     let ret = unsafe { raw::sdc_hci_cmd_le_ext_create_conn(&params) };
+    //     hci::Status::from(ret).to_result()
+    // }
+    // pub fn le_periodic_adv_create_sync(&self) -> Result<(), hci::Error> {
+    //     let params = raw::sdc_hci_cmd_le_periodic_adv_create_sync_t {};
+    //     let ret = unsafe { raw::sdc_hci_cmd_le_periodic_adv_create_sync(&params) };
+    //     hci::Status::from(ret).to_result()
+    // }
+    // pub fn le_periodic_adv_create_sync_cancel(&self) -> Result<(), hci::Error> {
+    //     let ret = unsafe { raw::sdc_hci_cmd_le_periodic_adv_create_sync_cancel() };
+    //     hci::Status::from(ret).to_result()
+    // }
+    // pub fn le_periodic_adv_terminate_sync(&self) -> Result<(), hci::Error> {
+    //     let params = raw::sdc_hci_cmd_le_periodic_adv_terminate_sync_t {};
+    //     let ret = unsafe { raw::sdc_hci_cmd_le_periodic_adv_terminate_sync(&params) };
+    //     hci::Status::from(ret).to_result()
+    // }
+    // pub fn le_add_device_to_periodic_adv_list(&self) -> Result<(), hci::Error> {
+    //     let params = raw::sdc_hci_cmd_le_add_device_to_periodic_adv_list_t {};
+    //     let ret = unsafe { raw::sdc_hci_cmd_le_add_device_to_periodic_adv_list(&params) };
+    //     hci::Status::from(ret).to_result()
+    // }
+    // pub fn le_remove_device_from_periodic_adv_list(&self) -> Result<(), hci::Error> {
+    //     let params = raw::sdc_hci_cmd_le_remove_device_from_periodic_adv_list_t {};
+    //     let ret = unsafe { raw::sdc_hci_cmd_le_remove_device_from_periodic_adv_list(&params) };
+    //     hci::Status::from(ret).to_result()
+    // }
+    // pub fn le_clear_periodic_adv_list(&self) -> Result<(), hci::Error> {
+    //     let ret = unsafe { raw::sdc_hci_cmd_le_clear_periodic_adv_list() };
+    //     hci::Status::from(ret).to_result()
+    // }
+    // pub fn le_read_periodic_adv_list_size(&self) -> Result<(), hci::Error> {
+    //     let mut out = raw::sdc_hci_cmd_le_read_periodic_adv_list_size_return_t {};
+    //     let ret = unsafe { raw::sdc_hci_cmd_le_read_periodic_adv_list_size(&mut out) };
+    //     hci::Status::from(ret).to_result()
+    // }
+    // pub fn le_read_transmit_power(&self) -> Result<(), hci::Error> {
+    //     let mut out = raw::sdc_hci_cmd_le_read_transmit_power_return_t {};
+    //     let ret = unsafe { raw::sdc_hci_cmd_le_read_transmit_power(&mut out) };
+    //     hci::Status::from(ret).to_result()
+    // }
+    // pub fn le_read_rf_path_compensation(&self) -> Result<(), hci::Error> {
+    //     let mut out = raw::sdc_hci_cmd_le_read_rf_path_compensation_return_t {};
+    //     let ret = unsafe { raw::sdc_hci_cmd_le_read_rf_path_compensation(&mut out) };
+    //     hci::Status::from(ret).to_result()
+    // }
+    // pub fn le_write_rf_path_compensation(&self) -> Result<(), hci::Error> {
+    //     let params = raw::sdc_hci_cmd_le_write_rf_path_compensation_t {};
+    //     let ret = unsafe { raw::sdc_hci_cmd_le_write_rf_path_compensation(&params) };
+    //     hci::Status::from(ret).to_result()
+    // }
+    // pub fn le_set_privacy_mode(&self) -> Result<(), hci::Error> {
+    //     let params = raw::sdc_hci_cmd_le_set_privacy_mode_t {};
+    //     let ret = unsafe { raw::sdc_hci_cmd_le_set_privacy_mode(&params) };
+    //     hci::Status::from(ret).to_result()
+    // }
+    // pub fn le_set_connless_cte_transmit_params(&self) -> Result<(), hci::Error> {
+    //     let params = raw::sdc_hci_cmd_le_set_connless_cte_transmit_params_t {};
+    //     let ret = unsafe { raw::sdc_hci_cmd_le_set_connless_cte_transmit_params(&params) };
+    //     hci::Status::from(ret).to_result()
+    // }
+    // pub fn le_set_connless_cte_transmit_enable(&self) -> Result<(), hci::Error> {
+    //     let params = raw::sdc_hci_cmd_le_set_connless_cte_transmit_enable_t {};
+    //     let ret = unsafe { raw::sdc_hci_cmd_le_set_connless_cte_transmit_enable(&params) };
+    //     hci::Status::from(ret).to_result()
+    // }
+    // pub fn le_set_conn_cte_transmit_params(&self) -> Result<(), hci::Error> {
+    //     let params = raw::sdc_hci_cmd_le_set_conn_cte_transmit_params_t {};
+    //     let mut out = raw::sdc_hci_cmd_le_set_conn_cte_transmit_params_return_t {};
+    //     let ret = unsafe { raw::sdc_hci_cmd_le_set_conn_cte_transmit_params(&params, &mut out) };
+    //     hci::Status::from(ret).to_result()
+    // }
+    // pub fn le_conn_cte_response_enable(&self) -> Result<(), hci::Error> {
+    //     let params = raw::sdc_hci_cmd_le_conn_cte_response_enable_t {};
+    //     let mut out = raw::sdc_hci_cmd_le_conn_cte_response_enable_return_t {};
+    //     let ret = unsafe { raw::sdc_hci_cmd_le_conn_cte_response_enable(&params, &mut out) };
+    //     hci::Status::from(ret).to_result()
+    // }
+    // pub fn le_read_antenna_information(&self) -> Result<(), hci::Error> {
+    //     let mut out = raw::sdc_hci_cmd_le_read_antenna_information_return_t {};
+    //     let ret = unsafe { raw::sdc_hci_cmd_le_read_antenna_information(&mut out) };
+    //     hci::Status::from(ret).to_result()
+    // }
+    // pub fn le_set_periodic_adv_receive_enable(&self) -> Result<(), hci::Error> {
+    //     let params = raw::sdc_hci_cmd_le_set_periodic_adv_receive_enable_t {};
+    //     let ret = unsafe { raw::sdc_hci_cmd_le_set_periodic_adv_receive_enable(&params) };
+    //     hci::Status::from(ret).to_result()
+    // }
+    // pub fn le_periodic_adv_sync_transfer(&self) -> Result<(), hci::Error> {
+    //     let params = raw::sdc_hci_cmd_le_periodic_adv_sync_transfer_t {};
+    //     let mut out = raw::sdc_hci_cmd_le_periodic_adv_sync_transfer_return_t {};
+    //     let ret = unsafe { raw::sdc_hci_cmd_le_periodic_adv_sync_transfer(&params, &mut out) };
+    //     hci::Status::from(ret).to_result()
+    // }
+    // pub fn le_periodic_adv_set_info_transfer(&self) -> Result<(), hci::Error> {
+    //     let params = raw::sdc_hci_cmd_le_periodic_adv_set_info_transfer_t {};
+    //     let mut out = raw::sdc_hci_cmd_le_periodic_adv_set_info_transfer_return_t {};
+    //     let ret = unsafe { raw::sdc_hci_cmd_le_periodic_adv_set_info_transfer(&params, &mut out) };
+    //     hci::Status::from(ret).to_result()
+    // }
+    // pub fn le_set_periodic_adv_sync_transfer_params(&self) -> Result<(), hci::Error> {
+    //     let params = raw::sdc_hci_cmd_le_set_periodic_adv_sync_transfer_params_t {};
+    //     let mut out = raw::sdc_hci_cmd_le_set_periodic_adv_sync_transfer_params_return_t {};
+    //     let ret = unsafe { raw::sdc_hci_cmd_le_set_periodic_adv_sync_transfer_params(&params, &mut out) };
+    //     hci::Status::from(ret).to_result()
+    // }
+    // pub fn le_set_default_periodic_adv_sync_transfer_params(&self) -> Result<(), hci::Error> {
+    //     let params = raw::sdc_hci_cmd_le_set_default_periodic_adv_sync_transfer_params_t {};
+    //     let ret = unsafe { raw::sdc_hci_cmd_le_set_default_periodic_adv_sync_transfer_params(&params) };
+    //     hci::Status::from(ret).to_result()
+    // }
+    // pub fn le_request_peer_sca(&self) -> Result<(), hci::Error> {
+    //     let params = raw::sdc_hci_cmd_le_request_peer_sca_t {};
+    //     let ret = unsafe { raw::sdc_hci_cmd_le_request_peer_sca(&params) };
+    //     hci::Status::from(ret).to_result()
+    // }
+    // pub fn le_enhanced_read_transmit_power_level(&self) -> Result<(), hci::Error> {
+    //     let params = raw::sdc_hci_cmd_le_enhanced_read_transmit_power_level_t {};
+    //     let mut out = raw::sdc_hci_cmd_le_enhanced_read_transmit_power_level_return_t {};
+    //     let ret = unsafe { raw::sdc_hci_cmd_le_enhanced_read_transmit_power_level(&params, &mut out) };
+    //     hci::Status::from(ret).to_result()
+    // }
+    // pub fn le_read_remote_transmit_power_level(&self) -> Result<(), hci::Error> {
+    //     let params = raw::sdc_hci_cmd_le_read_remote_transmit_power_level_t {};
+    //     let ret = unsafe { raw::sdc_hci_cmd_le_read_remote_transmit_power_level(&params) };
+    //     hci::Status::from(ret).to_result()
+    // }
+    // pub fn le_set_path_loss_reporting_params(&self) -> Result<(), hci::Error> {
+    //     let params = raw::sdc_hci_cmd_le_set_path_loss_reporting_params_t {};
+    //     let mut out = raw::sdc_hci_cmd_le_set_path_loss_reporting_params_return_t {};
+    //     let ret = unsafe { raw::sdc_hci_cmd_le_set_path_loss_reporting_params(&params, &mut out) };
+    //     hci::Status::from(ret).to_result()
+    // }
+    // pub fn le_set_path_loss_reporting_enable(&self) -> Result<(), hci::Error> {
+    //     let params = raw::sdc_hci_cmd_le_set_path_loss_reporting_enable_t {};
+    //     let mut out = raw::sdc_hci_cmd_le_set_path_loss_reporting_enable_return_t {};
+    //     let ret = unsafe { raw::sdc_hci_cmd_le_set_path_loss_reporting_enable(&params, &mut out) };
+    //     hci::Status::from(ret).to_result()
+    // }
+    // pub fn le_set_transmit_power_reporting_enable(&self) -> Result<(), hci::Error> {
+    //     let params = raw::sdc_hci_cmd_le_set_transmit_power_reporting_enable_t {};
+    //     let mut out = raw::sdc_hci_cmd_le_set_transmit_power_reporting_enable_return_t {};
+    //     let ret = unsafe { raw::sdc_hci_cmd_le_set_transmit_power_reporting_enable(&params, &mut out) };
+    //     hci::Status::from(ret).to_result()
+    // }
+    // pub fn le_set_data_related_address_changes(&self) -> Result<(), hci::Error> {
+    //     let params = raw::sdc_hci_cmd_le_set_data_related_address_changes_t {};
+    //     let ret = unsafe { raw::sdc_hci_cmd_le_set_data_related_address_changes(&params) };
+    //     hci::Status::from(ret).to_result()
+    // }
 }
 
 /// Bluetooth HCI vendor specific commands

@@ -1074,6 +1074,25 @@ impl LeScanType {
 #[repr(transparent)]
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+pub struct LePhy(u8);
+
+impl LePhy {
+    pub const LE_1M: LePhy = LePhy(0);
+    pub const LE_2M: LePhy = LePhy(1);
+    pub const LE_CODED: LePhy = LePhy(2);
+
+    pub const fn new(val: u8) -> Self {
+        Self(val)
+    }
+
+    pub const fn to_raw(self) -> u8 {
+        self.0
+    }
+}
+
+#[repr(transparent)]
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct ScanningFilterPolicy(u8);
 
 impl ScanningFilterPolicy {
