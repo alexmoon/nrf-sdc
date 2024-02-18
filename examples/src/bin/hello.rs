@@ -1,13 +1,13 @@
 #![no_std]
 #![no_main]
 
+use bt_hci::param::BdAddr;
 use defmt::{info, unwrap};
 use embassy_executor::Spawner;
 use embassy_nrf::bind_interrupts;
 use embassy_nrf::gpio::{Level, Output, OutputDrive};
 use embassy_time::{Duration, Timer};
 use nrf_sdc::{self as sdc, mpsl, pac};
-use sdc::hci::BdAddr;
 use sdc::mpsl::MultiprotocolServiceLayer;
 use sdc::raw::HCI_MSG_BUFFER_MAX_SIZE;
 use sdc::rng_pool::RngPool;

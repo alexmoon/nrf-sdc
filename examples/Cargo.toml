@@ -9,6 +9,7 @@ name = "hello"
 
 [dependencies]
 nrf-sdc = { version = "0.1.0", path = "../nrf-sdc", features = ["defmt", "nrf52840", "peripheral"] }
+bt-hci = { git = "https://github.com/alexmoon/bt-hci.git", features = ["defmt"] }
 
 embassy-executor = { version = "0.5", features = ["task-arena-size-32768", "arch-cortex-m", "executor-thread", "defmt", "integrated-timers", "executor-interrupt"] }
 embassy-time = { version = "0.3.0", features = ["defmt", "defmt-timestamp-uptime"] }
