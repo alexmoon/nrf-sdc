@@ -64,6 +64,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ed570934406eb16438a4e976b1b4500774099c13b8cb96eec99f620f05090ddf"
 
 [[package]]
+name = "bt-hci"
+version = "0.1.0"
+source = "git+https://github.com/alexmoon/bt-hci.git#86f79494f34adc39d9abe00a4f6fb9f3be8e196d"
+dependencies = [
+ "defmt",
+ "embedded-io",
+ "embedded-io-async",
+]
+
+[[package]]
 name = "bytemuck"
 version = "1.13.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -231,9 +241,9 @@ dependencies = [
 
 [[package]]
 name = "doxygen-rs"
-version = "0.3.0"
+version = "0.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a41d6f118e2677830dd731d8d9684beec6e18efd46042f10e52ce78b3a4f6ebb"
+checksum = "02796cce256c1561e0ab1041c2d830ab6a6176dbeade23b5f93a2387858d0d34"
 dependencies = [
  "phf",
 ]
@@ -432,6 +442,9 @@ name = "embedded-io"
 version = "0.6.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "edd0f118536f44f5ccd48bcb8b111bdc3de888b58c74639dfb034a357d0f206d"
+dependencies = [
+ "defmt",
+]
 
 [[package]]
 name = "embedded-io-async"
@@ -439,6 +452,7 @@ version = "0.6.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3ff09972d4073aa8c299395be75161d582e7629cd663171d62af73c8d50dba3f"
 dependencies = [
+ "defmt",
  "embedded-io",
 ]
 
@@ -650,11 +664,14 @@ dependencies = [
 name = "nrf-sdc"
 version = "0.1.0"
 dependencies = [
+ "bt-hci",
  "critical-section",
  "defmt",
  "embassy-hal-internal 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "embassy-nrf",
  "embassy-sync",
+ "embedded-io",
+ "embedded-io-async",
  "log",
  "nrf-mpsl",
  "nrf-sdc-sys",
@@ -665,6 +682,7 @@ dependencies = [
 name = "nrf-sdc-examples"
 version = "0.0.0"
 dependencies = [
+ "bt-hci",
  "cortex-m",
  "cortex-m-rt",
  "defmt",

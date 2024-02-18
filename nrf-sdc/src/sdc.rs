@@ -4,6 +4,7 @@ use core::marker::PhantomData;
 use core::sync::atomic::{AtomicPtr, Ordering};
 use core::task::Poll;
 
+use bt_hci::{AsHciBytes, FixedSizeValue, FromHciBytes};
 use embassy_nrf::{peripherals, Peripheral, PeripheralRef};
 use embassy_sync::blocking_mutex::raw::ThreadModeRawMutex;
 use embassy_sync::signal::Signal;
@@ -15,7 +16,7 @@ use raw::{
 };
 
 use crate::rng_pool::RngPool;
-use crate::{hci, pac, raw, Error, RetVal};
+use crate::{pac, raw, Error, RetVal};
 
 static WAKER: AtomicWaker = AtomicWaker::new();
 static FLASH_STATUS: Signal<ThreadModeRawMutex, Result<(), Error>> = Signal::new();
@@ -442,6 +443,12 @@ impl<'d> Drop for SoftdeviceController<'d> {
     }
 }
 
+#[inline(always)]
+unsafe fn bytes_of<T: Copy>(t: &T) -> &[u8] {
+    let len = core::mem::size_of::<T>();
+    core::slice::from_raw_parts(t as *const _ as *const u8, len)
+}
+
 impl<'d> SoftdeviceController<'d> {
     pub fn build_revision() -> Result<[u8; raw::SDC_BUILD_REVISION_SIZE as usize], Error> {
         let mut rev = [0; raw::SDC_BUILD_REVISION_SIZE as usize];
@@ -463,18 +470,18 @@ impl<'d> SoftdeviceController<'d> {
             .and(Ok(()))
     }
 
-    pub fn try_hci_get(&self, buf: &mut [u8]) -> Result<hci::MsgKind, Error> {
+    pub fn try_hci_get(&self, buf: &mut [u8]) -> Result<bt_hci::PacketKind, Error> {
         assert!(buf.len() >= raw::HCI_MSG_BUFFER_MAX_SIZE as usize);
         let mut msg_type: raw::sdc_hci_msg_type_t = 0;
         let ret = unsafe { raw::sdc_hci_get(buf.as_mut_ptr(), &mut msg_type) };
         RetVal::from(ret).to_result().map(|_| match msg_type {
-            raw::SDC_HCI_MSG_TYPE_DATA => hci::MsgKind::Data,
-            raw::SDC_HCI_MSG_TYPE_EVT => hci::MsgKind::Event,
+            raw::SDC_HCI_MSG_TYPE_DATA => bt_hci::PacketKind::AclData,
+            raw::SDC_HCI_MSG_TYPE_EVT => bt_hci::PacketKind::Event,
             _ => unreachable!(),
         })
     }
 
-    pub async fn hci_get(&self, buf: &mut [u8]) -> Result<hci::MsgKind, Error> {
+    pub async fn hci_get(&self, buf: &mut [u8]) -> Result<bt_hci::PacketKind, Error> {
         poll_fn(|ctx| match self.try_hci_get(buf) {
             Err(Error::EAGAIN) => {
                 WAKER.register(ctx.waker());
@@ -507,818 +514,561 @@ impl<'d> SoftdeviceController<'d> {
         let ret = unsafe { raw::sdc_soc_ecb_block_encrypt(key.as_ptr(), cleartext.as_ptr(), ciphertext.as_mut_ptr()) };
         RetVal::from(ret).to_result().and(Ok(()))
     }
-}
 
-/// Bluetooth HCI Link Control commands (§7.1)
-impl<'d> SoftdeviceController<'d> {
-    pub fn disconnect(&self, conn_handle: hci::ConnHandle, reason: hci::Error) -> Result<(), hci::Error> {
-        let params = raw::sdc_hci_cmd_lc_disconnect_t {
-            conn_handle: conn_handle.to_raw(),
-            reason: reason.into(),
-        };
-        let ret = unsafe { raw::sdc_hci_cmd_lc_disconnect(&params) };
-        hci::Status::from(ret).to_result()
+    #[inline(always)]
+    unsafe fn raw_cmd(&self, f: unsafe extern "C" fn() -> u8) -> Result<(), bt_hci::param::Error> {
+        bt_hci::param::Status::from(f()).to_result()
     }
 
-    pub fn read_remote_version_information(&self, conn_handle: hci::ConnHandle) -> Result<(), hci::Error> {
-        let params = raw::sdc_hci_cmd_lc_read_remote_version_information_t {
-            conn_handle: conn_handle.to_raw(),
-        };
-        let ret = unsafe { raw::sdc_hci_cmd_lc_read_remote_version_information(&params) };
-        hci::Status::from(ret).to_result()
-    }
-}
-
-/// Bluetooth HCI Controller & Baseband commands (§7.3)
-impl<'d> SoftdeviceController<'d> {
-    pub fn set_event_mask(&self, mask: hci::EventMask) -> Result<(), hci::Error> {
-        let params = raw::sdc_hci_cmd_cb_set_event_mask_t { raw: mask.to_raw() };
-        let ret = unsafe { raw::sdc_hci_cmd_cb_set_event_mask(&params) };
-        hci::Status::from(ret).to_result()
-    }
-
-    pub fn reset(&self) -> Result<(), hci::Error> {
-        let ret = unsafe { raw::sdc_hci_cmd_cb_reset() };
-        hci::Status::from(ret).to_result()
-    }
-
-    pub fn read_transmit_power_level(&self, conn_handle: hci::ConnHandle, maximum: bool) -> Result<i8, hci::Error> {
-        let params = raw::sdc_hci_cmd_cb_read_transmit_power_level_t {
-            conn_handle: conn_handle.to_raw(),
-            type_: u8::from(maximum),
-        };
-        let mut out = raw::sdc_hci_cmd_cb_read_transmit_power_level_return_t {
-            conn_handle: 0,
-            tx_power_level: 0,
-        };
-        let ret = unsafe { raw::sdc_hci_cmd_cb_read_transmit_power_level(&params, &mut out) };
-        hci::Status::from(ret).to_result().map(|_| out.tx_power_level)
-    }
-
-    pub fn set_controller_to_host_flow_control(&self, enable: bool) -> Result<(), hci::Error> {
-        let params = raw::sdc_hci_cmd_cb_set_controller_to_host_flow_control_t {
-            flow_control_enable: u8::from(enable),
-        };
-        let ret = unsafe { raw::sdc_hci_cmd_cb_set_controller_to_host_flow_control(&params) };
-        hci::Status::from(ret).to_result()
-    }
-
-    pub fn host_buffer_size(
+    #[inline(always)]
+    unsafe fn raw_cmd_params<P1: FixedSizeValue, P2: Copy>(
         &self,
-        host_acl_data_packet_length: u16,
-        host_sync_data_packet_length: u8,
-        host_total_num_acl_data_packets: u16,
-        host_total_num_sync_data_packets: u16,
-    ) -> Result<(), hci::Error> {
-        let params = raw::sdc_hci_cmd_cb_host_buffer_size_t {
-            host_acl_data_packet_length,
-            host_sync_data_packet_length,
-            host_total_num_acl_data_packets,
-            host_total_num_sync_data_packets,
-        };
-        let ret = unsafe { raw::sdc_hci_cmd_cb_host_buffer_size(&params) };
-        hci::Status::from(ret).to_result()
+        f: unsafe extern "C" fn(*const P2) -> u8,
+        params: P1,
+    ) -> Result<(), bt_hci::param::Error> {
+        debug_assert_eq!(core::mem::size_of::<P1>(), core::mem::size_of::<P2>());
+        bt_hci::param::Status::from(f(params.as_hci_bytes().as_ptr() as *const _)).to_result()
     }
 
-    // NOTE: sdc_hci_cmd_cb_host_number_of_completed_packets not supported due to variable array parameter
-
-    pub fn set_event_mask_page_2(&self, mask: hci::EventMaskPage2) -> Result<(), hci::Error> {
-        let params = raw::sdc_hci_cmd_cb_set_event_mask_page_2_t { raw: mask.to_raw() };
-        let ret = unsafe { raw::sdc_hci_cmd_cb_set_event_mask_page_2(&params) };
-        hci::Status::from(ret).to_result()
-    }
-
-    pub fn read_authenticated_payload_timeout(&self, conn_handle: hci::ConnHandle) -> Result<u16, hci::Error> {
-        let params = raw::sdc_hci_cmd_cb_read_authenticated_payload_timeout_t {
-            conn_handle: conn_handle.to_raw(),
-        };
-        let mut out = raw::sdc_hci_cmd_cb_read_authenticated_payload_timeout_return_t {
-            conn_handle: 0,
-            authenticated_payload_timeout: 0,
-        };
-        let ret = unsafe { raw::sdc_hci_cmd_cb_read_authenticated_payload_timeout(&params, &mut out) };
-        hci::Status::from(ret)
-            .to_result()
-            .map(|_| out.authenticated_payload_timeout)
-    }
-
-    pub fn write_authenticated_payload_timeout(
+    #[inline(always)]
+    unsafe fn raw_cmd_return<R1: FixedSizeValue, R2: Copy>(
         &self,
-        conn_handle: hci::ConnHandle,
-        authenticated_payload_timeout: u16,
-    ) -> Result<(), hci::Error> {
-        let params = raw::sdc_hci_cmd_cb_write_authenticated_payload_timeout_t {
-            conn_handle: conn_handle.to_raw(),
-            authenticated_payload_timeout,
-        };
-        let mut out = raw::sdc_hci_cmd_cb_write_authenticated_payload_timeout_return_t { conn_handle: 0 };
-        let ret = unsafe { raw::sdc_hci_cmd_cb_write_authenticated_payload_timeout(&params, &mut out) };
-        hci::Status::from(ret).to_result()
+        f: unsafe extern "C" fn(*mut R2) -> u8,
+    ) -> Result<R1, bt_hci::param::Error> {
+        debug_assert_eq!(core::mem::size_of::<R1>(), core::mem::size_of::<R2>());
+        let mut ret = core::mem::zeroed();
+        bt_hci::param::Status::from(f(&mut ret)).to_result()?;
+        Ok(unwrap!(R1::from_hci_bytes_complete(bytes_of(&ret))))
+    }
+
+    #[inline(always)]
+    unsafe fn raw_cmd_params_return<P1: FixedSizeValue, R1: FixedSizeValue, P2: Copy, R2: Copy>(
+        &self,
+        f: unsafe extern "C" fn(*const P2, *mut R2) -> u8,
+        params: P1,
+    ) -> Result<R1, bt_hci::param::Error> {
+        debug_assert_eq!(core::mem::size_of::<P1>(), core::mem::size_of::<P2>());
+        debug_assert_eq!(core::mem::size_of::<R1>(), core::mem::size_of::<R2>());
+
+        let mut ret = core::mem::zeroed();
+        bt_hci::param::Status::from(f(params.as_hci_bytes().as_ptr() as *const _, &mut ret)).to_result()?;
+        Ok(unwrap!(R1::from_hci_bytes_complete(bytes_of(&ret))))
     }
 }
 
-/// Bluetooth HCI Informational parameters (§7.4)
-impl<'d> SoftdeviceController<'d> {
-    pub fn read_local_version_information(&self) -> Result<hci::LocalVersionInformation, hci::Error> {
-        let mut out = raw::sdc_hci_cmd_ip_read_local_version_information_return_t {
-            hci_version: 0,
-            hci_subversion: 0,
-            lmp_version: 0,
-            company_identifier: 0,
-            lmp_subversion: 0,
-        };
-        let ret = unsafe { raw::sdc_hci_cmd_ip_read_local_version_information(&mut out) };
-        hci::Status::from(ret).to_result().map(|_| {
-            hci::LocalVersionInformation::new(
-                out.hci_version,
-                out.hci_subversion,
-                out.lmp_version,
-                out.company_identifier,
-                out.lmp_subversion,
-            )
-        })
-    }
+macro_rules! sdc_cmd {
+    ($name:ident => $raw:ident::<$cmd:ty>()) => {
+        pub fn $name(&self) -> Result<(), Error> {
+            unsafe { self.raw_cmd(raw::$raw) }
+        }
+    };
 
-    pub fn read_local_supported_commands(&self) -> Result<hci::CmdMask, hci::Error> {
-        let mut out = raw::sdc_hci_cmd_ip_read_local_supported_commands_return_t { raw: [0; 64] };
-        let ret = unsafe { raw::sdc_hci_cmd_ip_read_local_supported_commands(&mut out) };
-        hci::Status::from(ret)
-            .to_result()
-            .map(|_| hci::CmdMask::new(unsafe { out.raw }))
-    }
+    ($name:ident => $raw:ident::<$cmd:ty>($param:ident)) => {
+        pub fn $name(&self, params: <$cmd as bt_hci::cmd::Cmd>::Params) -> Result<(), Error> {
+            unsafe { self.raw_cmd_params(raw::$raw, params) }
+        }
+    };
 
-    pub fn read_local_supported_features(&self) -> Result<hci::LmpFeatureMask, hci::Error> {
-        let mut out = raw::sdc_hci_cmd_ip_read_local_supported_features_return_t { raw: [0; 8] };
-        let ret = unsafe { raw::sdc_hci_cmd_ip_read_local_supported_features(&mut out) };
-        hci::Status::from(ret)
-            .to_result()
-            .map(|_| hci::LmpFeatureMask::new(unsafe { out.raw }))
-    }
+    ($name:ident => $raw:ident::<$cmd:ty>() -> $ret:ident) => {
+        pub fn $name(&self) -> Result<<$cmd as bt_hci::cmd::SyncCmd>::Return<'static>, Error> {
+            unsafe { self.raw_cmd_return(raw::$raw) }
+        }
+    };
 
-    pub fn read_bd_addr(&self) -> Result<hci::BdAddr, hci::Error> {
-        let mut out = raw::sdc_hci_cmd_ip_read_bd_addr_return_t { bd_addr: [0; 6] };
-        let ret = unsafe { raw::sdc_hci_cmd_ip_read_bd_addr(&mut out) };
-        hci::Status::from(ret)
-            .to_result()
-            .map(|_| hci::BdAddr::new(out.bd_addr))
+    ($name:ident => $raw:ident::<$cmd:ty>($param:ident) -> $ret:ident) => {
+        pub fn $name(&self, params: <$cmd as bt_hci::cmd::Cmd>::Params) -> Result<<$cmd as bt_hci::cmd::SyncCmd>::Return<'static>, Error> {
+            unsafe { self.raw_cmd_params_return(raw::$raw, params) }
+        }
+    };
+
+    ($($name:ident => $raw:ident::<$cmd:ty>($($param:ident)?) $(-> $ret:ident)?),+ $(,)?) => {
+        $(sdc_cmd! { $name => $raw::<$cmd>($($param)?) $(-> $ret)? })+
+    };
+}
+
+mod link_control {
+    use crate::raw;
+    use bt_hci::cmd::link_control::*;
+    use bt_hci::param::Error;
+
+    /// Bluetooth HCI Link Control commands (§7.1)
+    impl<'d> super::SoftdeviceController<'d> {
+        sdc_cmd! {
+            disconnect => sdc_hci_cmd_lc_disconnect::<Disconnect>(x),
+            read_remote_version_information => sdc_hci_cmd_lc_read_remote_version_information::<ReadRemoteVersionInformation>(x),
+        }
     }
 }
 
-/// Bluetooth HCI Status parameters (§7.5)
-impl<'d> SoftdeviceController<'d> {
-    pub fn read_rssi(&self, conn_handle: hci::ConnHandle) -> Result<i8, hci::Error> {
-        let params = raw::sdc_hci_cmd_sp_read_rssi_t {
-            handle: conn_handle.to_raw(),
-        };
-        let mut out = raw::sdc_hci_cmd_sp_read_rssi_return_t { handle: 0, rssi: 0 };
-        let ret = unsafe { raw::sdc_hci_cmd_sp_read_rssi(&params, &mut out) };
-        hci::Status::from(ret).to_result().map(|_| out.rssi)
+mod controller_baseband {
+    use crate::raw;
+    use bt_hci::cmd::controller_baseband::*;
+    use bt_hci::param::Error;
+
+    /// Bluetooth HCI Controller & Baseband commands (§7.3)
+    impl<'d> super::SoftdeviceController<'d> {
+        sdc_cmd! {
+            set_event_mask => sdc_hci_cmd_cb_set_event_mask::<SetEventMask>(x),
+            reset => sdc_hci_cmd_cb_reset::<Reset>(),
+            read_transmit_power_level => sdc_hci_cmd_cb_read_transmit_power_level::<ReadTransmitPowerLevel>(x) -> y,
+            set_controller_to_host_flow_control => sdc_hci_cmd_cb_set_controller_to_host_flow_control::<SetControllerToHostFlowControl>(x),
+            host_buffer_size => sdc_hci_cmd_cb_host_buffer_size::<HostBufferSize>(x),
+            set_event_mask_page_2 => sdc_hci_cmd_cb_set_event_mask_page_2::<SetEventMaskPage2>(x),
+            read_authenticated_payload_timeout => sdc_hci_cmd_cb_read_authenticated_payload_timeout::<ReadAuthenticatedPayloadTimeout>(x) -> y,
+            write_authenticated_payload_timeout => sdc_hci_cmd_cb_write_authenticated_payload_timeout::<WriteAuthenticatedPayloadTimeout>(x) -> y,
+        }
+
+        // TODO:
+        // pub fn host_number_of_completed_packets(
+        //     &self,
+        //     params: <HostNumberOfCompletedPackets as bt_hci::cmd::Cmd>::Params,
+        // ) -> Result<(), Error> {
+        //     unsafe { self.raw_cmd_params(raw::sdc_hci_cmd_cb_host_number_of_completed_packets, params) }
+        // }
     }
 }
 
-/// Bluetooth HCI LE Controller commands (§7.8)
-#[allow(clippy::too_many_arguments)]
-impl<'d> SoftdeviceController<'d> {
-    pub fn le_set_event_mask(&self, mask: hci::LeEventMask) -> Result<(), hci::Error> {
-        let params = raw::sdc_hci_cmd_le_set_event_mask_t { raw: mask.to_raw() };
-        let ret = unsafe { raw::sdc_hci_cmd_le_set_event_mask(&params) };
-        hci::Status::from(ret).to_result()
-    }
+mod info {
+    use crate::raw;
+    use bt_hci::cmd::info::*;
+    use bt_hci::param::Error;
 
-    pub fn le_read_buffer_size(&self) -> Result<hci::LeReadBufferSize, hci::Error> {
-        let mut out = raw::sdc_hci_cmd_le_read_buffer_size_return_t {
-            le_acl_data_packet_length: 0,
-            total_num_le_acl_data_packets: 0,
-        };
-        let ret = unsafe { raw::sdc_hci_cmd_le_read_buffer_size(&mut out) };
-        hci::Status::from(ret)
-            .to_result()
-            .map(|_| hci::LeReadBufferSize::new(out.le_acl_data_packet_length, out.total_num_le_acl_data_packets, 0, 0))
+    /// Bluetooth HCI Informational parameters (§7.4)
+    impl<'d> super::SoftdeviceController<'d> {
+        sdc_cmd! {
+            read_local_version_information => sdc_hci_cmd_ip_read_local_version_information::<ReadLocalVersionInformation>() -> y,
+            read_local_supported_commands => sdc_hci_cmd_ip_read_local_supported_commands::<ReadLocalSupportedCmds>() -> y,
+            read_local_supported_features => sdc_hci_cmd_ip_read_local_supported_features::<ReadLocalSupportedFeatures>() -> y,
+            read_bd_addr => sdc_hci_cmd_ip_read_bd_addr::<ReadBdAddr>() -> y,
+        }
     }
-
-    pub fn le_read_local_supported_features(&self) -> Result<hci::LeFeatureMask, hci::Error> {
-        let mut out = raw::sdc_hci_cmd_le_read_local_supported_features_return_t { raw: [0; 8] };
-        let ret = unsafe { raw::sdc_hci_cmd_le_read_local_supported_features(&mut out) };
-        hci::Status::from(ret)
-            .to_result()
-            .map(|_| hci::LeFeatureMask::new(unsafe { out.raw }))
-    }
-
-    pub fn le_set_random_address(&self, random_address: hci::BdAddr) -> Result<(), hci::Error> {
-        let params = raw::sdc_hci_cmd_le_set_random_address_t {
-            random_address: random_address.to_raw(),
-        };
-        let ret = unsafe { raw::sdc_hci_cmd_le_set_random_address(&params) };
-        hci::Status::from(ret).to_result()
-    }
-
-    pub fn le_set_adv_params(
-        &self,
-        adv_interval_min: hci::Duration,
-        adv_interval_max: hci::Duration,
-        adv_type: hci::AdvertisingType,
-        own_address_type: hci::AddressType,
-        peer_address_type: hci::AddressType,
-        peer_address: hci::BdAddr,
-        adv_channel_map: hci::AdvertisingChannelMap,
-        adv_filter_policy: hci::AdvertisingFilterPolicy,
-    ) -> Result<(), hci::Error> {
-        let params = raw::sdc_hci_cmd_le_set_adv_params_t {
-            adv_interval_min: adv_interval_min.as_u16(),
-            adv_interval_max: adv_interval_max.as_u16(),
-            adv_type: adv_type.to_raw(),
-            own_address_type: own_address_type.to_raw(),
-            peer_address_type: peer_address_type.to_raw(),
-            peer_address: peer_address.to_raw(),
-            adv_channel_map: adv_channel_map.to_raw(),
-            adv_filter_policy: adv_filter_policy.to_raw(),
-        };
-        let ret = unsafe { raw::sdc_hci_cmd_le_set_adv_params(&params) };
-        hci::Status::from(ret).to_result()
-    }
-
-    pub fn le_read_adv_physical_channel_tx_power(&self) -> Result<i8, hci::Error> {
-        let mut out = raw::sdc_hci_cmd_le_read_adv_physical_channel_tx_power_return_t { tx_power_level: 0 };
-        let ret = unsafe { raw::sdc_hci_cmd_le_read_adv_physical_channel_tx_power(&mut out) };
-        hci::Status::from(ret).to_result().map(|_| out.tx_power_level)
-    }
-
-    pub fn le_set_adv_data(&self, adv_data: &[u8]) -> Result<(), hci::Error> {
-        assert!(adv_data.len() <= 31);
-        let mut params = raw::sdc_hci_cmd_le_set_adv_data_t {
-            adv_data_length: adv_data.len() as u8,
-            adv_data: [0; 31],
-        };
-        params.adv_data[..adv_data.len()].copy_from_slice(adv_data);
-        let ret = unsafe { raw::sdc_hci_cmd_le_set_adv_data(&params) };
-        hci::Status::from(ret).to_result()
-    }
-
-    pub fn le_set_scan_response_data(&self, scan_response_data: &[u8]) -> Result<(), hci::Error> {
-        assert!(scan_response_data.len() <= 31);
-        let mut params = raw::sdc_hci_cmd_le_set_scan_response_data_t {
-            scan_response_data_length: scan_response_data.len() as u8,
-            scan_response_data: [0; 31],
-        };
-        params.scan_response_data[..scan_response_data.len()].copy_from_slice(scan_response_data);
-        let ret = unsafe { raw::sdc_hci_cmd_le_set_scan_response_data(&params) };
-        hci::Status::from(ret).to_result()
-    }
-
-    pub fn le_set_adv_enable(&self, adv_enable: bool) -> Result<(), hci::Error> {
-        let params = raw::sdc_hci_cmd_le_set_adv_enable_t {
-            adv_enable: u8::from(adv_enable),
-        };
-        let ret = unsafe { raw::sdc_hci_cmd_le_set_adv_enable(&params) };
-        hci::Status::from(ret).to_result()
-    }
-
-    pub fn le_set_scan_params(
-        &self,
-        le_scan_type: hci::LeScanType,
-        le_scan_interval: hci::Duration,
-        le_scan_window: hci::Duration,
-        own_address_type: hci::AddressType,
-        scanning_filter_policy: hci::ScanningFilterPolicy,
-    ) -> Result<(), hci::Error> {
-        let params = raw::sdc_hci_cmd_le_set_scan_params_t {
-            le_scan_type: le_scan_type.to_raw(),
-            le_scan_interval: le_scan_interval.as_u16(),
-            le_scan_window: le_scan_window.as_u16(),
-            own_address_type: own_address_type.to_raw(),
-            scanning_filter_policy: scanning_filter_policy.to_raw(),
-        };
-        let ret = unsafe { raw::sdc_hci_cmd_le_set_scan_params(&params) };
-        hci::Status::from(ret).to_result()
-    }
-
-    pub fn le_set_scan_enable(&self, le_scan_enable: bool, filter_duplicates: bool) -> Result<(), hci::Error> {
-        let params = raw::sdc_hci_cmd_le_set_scan_enable_t {
-            le_scan_enable: u8::from(le_scan_enable),
-            filter_duplicates: u8::from(filter_duplicates),
-        };
-        let ret = unsafe { raw::sdc_hci_cmd_le_set_scan_enable(&params) };
-        hci::Status::from(ret).to_result()
-    }
-
-    pub fn le_create_conn(
-        &self,
-        le_scan_interval: hci::Duration,
-        le_scan_window: hci::Duration,
-        initiator_filter_policy: bool,
-        peer_address_type: hci::AddressType,
-        peer_address: hci::BdAddr,
-        own_address_type: hci::AddressType,
-        conn_interval_min: hci::Duration<2048>,
-        conn_interval_max: hci::Duration<2048>,
-        max_latency: u16,
-        supervision_timeout: hci::Duration<16>,
-        min_ce_len: hci::Duration,
-        max_ce_len: hci::Duration,
-    ) -> Result<(), hci::Error> {
-        let params = raw::sdc_hci_cmd_le_create_conn_t {
-            le_scan_interval: le_scan_interval.as_u16(),
-            le_scan_window: le_scan_window.as_u16(),
-            initiator_filter_policy: u8::from(initiator_filter_policy),
-            peer_address_type: peer_address_type.to_raw(),
-            peer_address: peer_address.to_raw(),
-            own_address_type: own_address_type.to_raw(),
-            conn_interval_min: conn_interval_min.as_u16(),
-            conn_interval_max: conn_interval_max.as_u16(),
-            max_latency,
-            supervision_timeout: supervision_timeout.as_u16(),
-            min_ce_length: min_ce_len.as_u16(),
-            max_ce_length: max_ce_len.as_u16(),
-        };
-        let ret = unsafe { raw::sdc_hci_cmd_le_create_conn(&params) };
-        hci::Status::from(ret).to_result()
-    }
-
-    pub fn le_create_conn_cancel(&self) -> Result<(), hci::Error> {
-        let ret = unsafe { raw::sdc_hci_cmd_le_create_conn_cancel() };
-        hci::Status::from(ret).to_result()
-    }
-
-    pub fn le_read_filter_accept_list_size(&self) -> Result<u8, hci::Error> {
-        let mut out = raw::sdc_hci_cmd_le_read_filter_accept_list_size_return_t {
-            filter_accept_list_size: 0,
-        };
-        let ret = unsafe { raw::sdc_hci_cmd_le_read_filter_accept_list_size(&mut out) };
-        hci::Status::from(ret).to_result().map(|_| out.filter_accept_list_size)
-    }
-
-    pub fn le_clear_filter_accept_list(&self) -> Result<(), hci::Error> {
-        let ret = unsafe { raw::sdc_hci_cmd_le_clear_filter_accept_list() };
-        hci::Status::from(ret).to_result()
-    }
-
-    pub fn le_add_device_to_filter_accept_list(
-        &self,
-        address_type: hci::AddressType,
-        address: hci::BdAddr,
-    ) -> Result<(), hci::Error> {
-        let params = raw::sdc_hci_cmd_le_add_device_to_filter_accept_list_t {
-            address_type: address_type.to_raw(),
-            address: address.to_raw(),
-        };
-        let ret = unsafe { raw::sdc_hci_cmd_le_add_device_to_filter_accept_list(&params) };
-        hci::Status::from(ret).to_result()
-    }
-
-    pub fn le_remove_device_from_filter_accept_list(
-        &self,
-        address_type: hci::AddressType,
-        address: hci::BdAddr,
-    ) -> Result<(), hci::Error> {
-        let params = raw::sdc_hci_cmd_le_remove_device_from_filter_accept_list_t {
-            address_type: address_type.to_raw(),
-            address: address.to_raw(),
-        };
-        let ret = unsafe { raw::sdc_hci_cmd_le_remove_device_from_filter_accept_list(&params) };
-        hci::Status::from(ret).to_result()
-    }
-
-    pub fn le_conn_update(
-        &self,
-        conn_handle: hci::ConnHandle,
-        conn_interval_min: hci::Duration,
-        conn_interval_max: hci::Duration,
-        max_latency: u16,
-        supervision_timeout: hci::Duration<16>,
-        min_ce_len: hci::Duration,
-        max_ce_len: hci::Duration,
-    ) -> Result<(), hci::Error> {
-        let params = raw::sdc_hci_cmd_le_conn_update_t {
-            conn_handle: conn_handle.to_raw(),
-            conn_interval_min: conn_interval_min.as_u16(),
-            conn_interval_max: conn_interval_max.as_u16(),
-            max_latency,
-            supervision_timeout: supervision_timeout.as_u16(),
-            min_ce_length: min_ce_len.as_u16(),
-            max_ce_length: max_ce_len.as_u16(),
-        };
-        let ret = unsafe { raw::sdc_hci_cmd_le_conn_update(&params) };
-        hci::Status::from(ret).to_result()
-    }
-    //     pub fn le_set_host_channel_classification(&self,
-    //         p_params: *const sdc_hci_cmd_le_set_host_channel_classification_t,
-    //     ) -> Result<(), hci::Error> {
-    //         raw::sdc_hci_cmd_le_set_host_channel_classification(
-    //             p_params: *const sdc_hci_cmd_le_set_host_channel_classification_t,
-    //         )
-    //     }
-    //     pub fn le_read_channel_map(&self,
-    //         p_params: *const sdc_hci_cmd_le_read_channel_map_t,
-    //         p_return: *mut sdc_hci_cmd_le_read_channel_map_return_t,
-    //     ) -> Result<(), hci::Error> {
-    //         raw::sdc_hci_cmd_le_read_channel_map(
-    //             p_params: *const sdc_hci_cmd_le_read_channel_map_t,
-    //             p_return: *mut sdc_hci_cmd_le_read_channel_map_return_t,
-    //         )
-    //     }
-    //     pub fn le_read_remote_features(&self, p_params: *const sdc_hci_cmd_le_read_remote_features_t) -> Result<(), hci::Error> {
-    //         raw::sdc_hci_cmd_le_read_remote_features(p_params: *const sdc_hci_cmd_le_read_remote_features_t)
-    //     }
-    //     pub fn le_encrypt(&self,
-    //         p_params: *const sdc_hci_cmd_le_encrypt_t,
-    //         p_return: *mut sdc_hci_cmd_le_encrypt_return_t,
-    //     ) -> Result<(), hci::Error> {
-    //         raw::sdc_hci_cmd_le_encrypt(
-    //             p_params: *const sdc_hci_cmd_le_encrypt_t,
-    //             p_return: *mut sdc_hci_cmd_le_encrypt_return_t,
-    //         )
-    //     }
-    //     pub fn le_rand(&self, p_return: *mut sdc_hci_cmd_le_rand_return_t) -> Result<(), hci::Error> {
-    //         raw::sdc_hci_cmd_le_rand(p_return: *mut sdc_hci_cmd_le_rand_return_t)
-    //     }
-    //     pub fn le_enable_encryption(&self, p_params: *const sdc_hci_cmd_le_enable_encryption_t) -> Result<(), hci::Error> {
-    //         raw::sdc_hci_cmd_le_enable_encryption(p_params: *const sdc_hci_cmd_le_enable_encryption_t)
-    //     }
-    //     pub fn le_long_term_key_request_reply(&self,
-    //         p_params: *const sdc_hci_cmd_le_long_term_key_request_reply_t,
-    //         p_return: *mut sdc_hci_cmd_le_long_term_key_request_reply_return_t,
-    //     ) -> Result<(), hci::Error> {
-    //         raw::sdc_hci_cmd_le_long_term_key_request_reply(
-    //             p_params: *const sdc_hci_cmd_le_long_term_key_request_reply_t,
-    //             p_return: *mut sdc_hci_cmd_le_long_term_key_request_reply_return_t,
-    //         )
-    //     }
-    //     pub fn le_long_term_key_request_negative_reply(&self,
-    //         p_params: *const sdc_hci_cmd_le_long_term_key_request_negative_reply_t,
-    //         p_return: *mut sdc_hci_cmd_le_long_term_key_request_negative_reply_return_t,
-    //     ) -> Result<(), hci::Error> {
-    //         raw::sdc_hci_cmd_le_long_term_key_request_negative_reply(
-    //             p_params: *const sdc_hci_cmd_le_long_term_key_request_negative_reply_t,
-    //             p_return: *mut sdc_hci_cmd_le_long_term_key_request_negative_reply_return_t,
-    //         )
-    //     }
-    //     pub fn le_read_supported_states(&self,
-    //         p_return: *mut sdc_hci_cmd_le_read_supported_states_return_t,
-    //     ) -> Result<(), hci::Error> {
-    //         raw::sdc_hci_cmd_le_read_supported_states(p_return: *mut sdc_hci_cmd_le_read_supported_states_return_t)
-    //     }
-    //     pub fn le_test_end(&self, p_return: *mut sdc_hci_cmd_le_test_end_return_t) -> Result<(), hci::Error> {
-    //         raw::sdc_hci_cmd_le_test_end(p_return: *mut sdc_hci_cmd_le_test_end_return_t)
-    //     }
-    //     pub fn le_set_data_length(&self,
-    //         p_params: *const sdc_hci_cmd_le_set_data_length_t,
-    //         p_return: *mut sdc_hci_cmd_le_set_data_length_return_t,
-    //     ) -> Result<(), hci::Error> {
-    //         raw::sdc_hci_cmd_le_set_data_length(
-    //             p_params: *const sdc_hci_cmd_le_set_data_length_t,
-    //             p_return: *mut sdc_hci_cmd_le_set_data_length_return_t,
-    //         )
-    //     }
-    //     pub fn le_read_suggested_default_data_length(&self,
-    //         p_return: *mut sdc_hci_cmd_le_read_suggested_default_data_length_return_t,
-    //     ) -> Result<(), hci::Error> {
-    //         raw::sdc_hci_cmd_le_read_suggested_default_data_length(
-    //             p_return: *mut sdc_hci_cmd_le_read_suggested_default_data_length_return_t,
-    //         )
-    //     }
-    //     pub fn le_write_suggested_default_data_length(&self,
-    //         p_params: *const sdc_hci_cmd_le_write_suggested_default_data_length_t,
-    //     ) -> Result<(), hci::Error> {
-    //         raw::sdc_hci_cmd_le_write_suggested_default_data_length(
-    //             p_params: *const sdc_hci_cmd_le_write_suggested_default_data_length_t,
-    //         )
-    //     }
-    //     pub fn le_add_device_to_resolving_list(&self,
-    //         p_params: *const sdc_hci_cmd_le_add_device_to_resolving_list_t,
-    //     ) -> Result<(), hci::Error> {
-    //         raw::sdc_hci_cmd_le_add_device_to_resolving_list(p_params: *const sdc_hci_cmd_le_add_device_to_resolving_list_t)
-    //     }
-    //     pub fn le_remove_device_from_resolving_list(&self,
-    //         p_params: *const sdc_hci_cmd_le_remove_device_from_resolving_list_t,
-    //     ) -> Result<(), hci::Error> {
-    //         raw::sdc_hci_cmd_le_remove_device_from_resolving_list(
-    //             p_params: *const sdc_hci_cmd_le_remove_device_from_resolving_list_t,
-    //         )
-    //     }
-    //     pub fn le_clear_resolving_list(&self, ) -> Result<(), hci::Error> {
-    //         raw::sdc_hci_cmd_le_clear_resolving_list()
-    //     }
-    //     pub fn le_read_resolving_list_size(&self,
-    //         p_return: *mut sdc_hci_cmd_le_read_resolving_list_size_return_t,
-    //     ) -> Result<(), hci::Error> {
-    //         raw::sdc_hci_cmd_le_read_resolving_list_size(p_return: *mut sdc_hci_cmd_le_read_resolving_list_size_return_t)
-    //     }
-    //     pub fn le_set_address_resolution_enable(&self,
-    //         p_params: *const sdc_hci_cmd_le_set_address_resolution_enable_t,
-    //     ) -> Result<(), hci::Error> {
-    //         raw::sdc_hci_cmd_le_set_address_resolution_enable(
-    //             p_params: *const sdc_hci_cmd_le_set_address_resolution_enable_t,
-    //         )
-    //     }
-    //     pub fn le_set_resolvable_private_address_timeout(&self,
-    //         p_params: *const sdc_hci_cmd_le_set_resolvable_private_address_timeout_t,
-    //     ) -> Result<(), hci::Error> {
-    //         raw::sdc_hci_cmd_le_set_resolvable_private_address_timeout(
-    //             p_params: *const sdc_hci_cmd_le_set_resolvable_private_address_timeout_t,
-    //         )
-    //     }
-    //     pub fn le_read_max_data_length(&self,
-    //         p_return: *mut sdc_hci_cmd_le_read_max_data_length_return_t,
-    //     ) -> Result<(), hci::Error> {
-    //         raw::sdc_hci_cmd_le_read_max_data_length(p_return: *mut sdc_hci_cmd_le_read_max_data_length_return_t)
-    //     }
-    //     pub fn le_read_phy(&self,
-    //         p_params: *const sdc_hci_cmd_le_read_phy_t,
-    //         p_return: *mut sdc_hci_cmd_le_read_phy_return_t,
-    //     ) -> Result<(), hci::Error> {
-    //         raw::sdc_hci_cmd_le_read_phy(
-    //             p_params: *const sdc_hci_cmd_le_read_phy_t,
-    //             p_return: *mut sdc_hci_cmd_le_read_phy_return_t,
-    //         )
-    //     }
-    //     pub fn le_set_default_phy(&self, p_params: *const sdc_hci_cmd_le_set_default_phy_t) -> Result<(), hci::Error> {
-    //         raw::sdc_hci_cmd_le_set_default_phy(p_params: *const sdc_hci_cmd_le_set_default_phy_t)
-    //     }
-    //     pub fn le_set_phy(&self, p_params: *const sdc_hci_cmd_le_set_phy_t) -> Result<(), hci::Error> {
-    //         raw::sdc_hci_cmd_le_set_phy(p_params: *const sdc_hci_cmd_le_set_phy_t)
-    //     }
-    //     pub fn le_set_adv_set_random_address(&self,
-    //         p_params: *const sdc_hci_cmd_le_set_adv_set_random_address_t,
-    //     ) -> Result<(), hci::Error> {
-    //         raw::sdc_hci_cmd_le_set_adv_set_random_address(p_params: *const sdc_hci_cmd_le_set_adv_set_random_address_t)
-    //     }
-    //     pub fn le_set_ext_adv_params(&self,
-    //         p_params: *const sdc_hci_cmd_le_set_ext_adv_params_t,
-    //         p_return: *mut sdc_hci_cmd_le_set_ext_adv_params_return_t,
-    //     ) -> Result<(), hci::Error> {
-    //         raw::sdc_hci_cmd_le_set_ext_adv_params(
-    //             p_params: *const sdc_hci_cmd_le_set_ext_adv_params_t,
-    //             p_return: *mut sdc_hci_cmd_le_set_ext_adv_params_return_t,
-    //         )
-    //     }
-    //     pub fn le_set_ext_adv_data(&self, p_params: *const sdc_hci_cmd_le_set_ext_adv_data_t) -> Result<(), hci::Error> {
-    //         raw::sdc_hci_cmd_le_set_ext_adv_data(p_params: *const sdc_hci_cmd_le_set_ext_adv_data_t)
-    //     }
-    //     pub fn le_set_ext_scan_response_data(&self,
-    //         p_params: *const sdc_hci_cmd_le_set_ext_scan_response_data_t,
-    //     ) -> Result<(), hci::Error> {
-    //         raw::sdc_hci_cmd_le_set_ext_scan_response_data(p_params: *const sdc_hci_cmd_le_set_ext_scan_response_data_t)
-    //     }
-    //     pub fn le_set_ext_adv_enable(&self, p_params: *const sdc_hci_cmd_le_set_ext_adv_enable_t) -> Result<(), hci::Error> {
-    //         raw::sdc_hci_cmd_le_set_ext_adv_enable(p_params: *const sdc_hci_cmd_le_set_ext_adv_enable_t)
-    //     }
-    //     pub fn le_read_max_adv_data_length(&self,
-    //         p_return: *mut sdc_hci_cmd_le_read_max_adv_data_length_return_t,
-    //     ) -> Result<(), hci::Error> {
-    //         raw::sdc_hci_cmd_le_read_max_adv_data_length(p_return: *mut sdc_hci_cmd_le_read_max_adv_data_length_return_t)
-    //     }
-    //     pub fn le_read_number_of_supported_adv_sets(&self,
-    //         p_return: *mut sdc_hci_cmd_le_read_number_of_supported_adv_sets_return_t,
-    //     ) -> Result<(), hci::Error> {
-    //         raw::sdc_hci_cmd_le_read_number_of_supported_adv_sets(
-    //             p_return: *mut sdc_hci_cmd_le_read_number_of_supported_adv_sets_return_t,
-    //         )
-    //     }
-    //     pub fn le_remove_adv_set(&self, p_params: *const sdc_hci_cmd_le_remove_adv_set_t) -> Result<(), hci::Error> {
-    //         raw::sdc_hci_cmd_le_remove_adv_set(p_params: *const sdc_hci_cmd_le_remove_adv_set_t)
-    //     }
-    //     pub fn le_clear_adv_sets(&self, ) -> Result<(), hci::Error> {
-    //         raw::sdc_hci_cmd_le_clear_adv_sets()
-    //     }
-    //     pub fn le_set_periodic_adv_params(&self,
-    //         p_params: *const sdc_hci_cmd_le_set_periodic_adv_params_t,
-    //     ) -> Result<(), hci::Error> {
-    //         raw::sdc_hci_cmd_le_set_periodic_adv_params(p_params: *const sdc_hci_cmd_le_set_periodic_adv_params_t)
-    //     }
-    //     pub fn le_set_periodic_adv_data(&self, p_params: *const sdc_hci_cmd_le_set_periodic_adv_data_t) -> Result<(), hci::Error> {
-    //         raw::sdc_hci_cmd_le_set_periodic_adv_data(p_params: *const sdc_hci_cmd_le_set_periodic_adv_data_t)
-    //     }
-    //     pub fn le_set_periodic_adv_enable(&self,
-    //         p_params: *const sdc_hci_cmd_le_set_periodic_adv_enable_t,
-    //     ) -> Result<(), hci::Error> {
-    //         raw::sdc_hci_cmd_le_set_periodic_adv_enable(p_params: *const sdc_hci_cmd_le_set_periodic_adv_enable_t)
-    //     }
-    //     pub fn le_set_ext_scan_params(&self, p_params: *const sdc_hci_cmd_le_set_ext_scan_params_t) -> Result<(), hci::Error> {
-    //         raw::sdc_hci_cmd_le_set_ext_scan_params(p_params: *const sdc_hci_cmd_le_set_ext_scan_params_t)
-    //     }
-    //     pub fn le_set_ext_scan_enable(&self, p_params: *const sdc_hci_cmd_le_set_ext_scan_enable_t) -> Result<(), hci::Error> {
-    //         raw::sdc_hci_cmd_le_set_ext_scan_enable(p_params: *const sdc_hci_cmd_le_set_ext_scan_enable_t)
-    //     }
-    //     pub fn le_ext_create_conn(&self, p_params: *const sdc_hci_cmd_le_ext_create_conn_t) -> Result<(), hci::Error> {
-    //         raw::sdc_hci_cmd_le_ext_create_conn(p_params: *const sdc_hci_cmd_le_ext_create_conn_t)
-    //     }
-    //     pub fn le_periodic_adv_create_sync(&self,
-    //         p_params: *const sdc_hci_cmd_le_periodic_adv_create_sync_t,
-    //     ) -> Result<(), hci::Error> {
-    //         raw::sdc_hci_cmd_le_periodic_adv_create_sync(p_params: *const sdc_hci_cmd_le_periodic_adv_create_sync_t)
-    //     }
-    //     pub fn le_periodic_adv_create_sync_cancel(&self, ) -> Result<(), hci::Error> {
-    //         raw::sdc_hci_cmd_le_periodic_adv_create_sync_cancel()
-    //     }
-    //     pub fn le_periodic_adv_terminate_sync(&self,
-    //         p_params: *const sdc_hci_cmd_le_periodic_adv_terminate_sync_t,
-    //     ) -> Result<(), hci::Error> {
-    //         raw::sdc_hci_cmd_le_periodic_adv_terminate_sync(p_params: *const sdc_hci_cmd_le_periodic_adv_terminate_sync_t)
-    //     }
-    //     pub fn le_add_device_to_periodic_adv_list(&self,
-    //         p_params: *const sdc_hci_cmd_le_add_device_to_periodic_adv_list_t,
-    //     ) -> Result<(), hci::Error> {
-    //         raw::sdc_hci_cmd_le_add_device_to_periodic_adv_list(
-    //             p_params: *const sdc_hci_cmd_le_add_device_to_periodic_adv_list_t,
-    //         )
-    //     }
-    //     pub fn le_remove_device_from_periodic_adv_list(&self,
-    //         p_params: *const sdc_hci_cmd_le_remove_device_from_periodic_adv_list_t,
-    //     ) -> Result<(), hci::Error> {
-    //         raw::sdc_hci_cmd_le_remove_device_from_periodic_adv_list(
-    //             p_params: *const sdc_hci_cmd_le_remove_device_from_periodic_adv_list_t,
-    //         )
-    //     }
-    //     pub fn le_clear_periodic_adv_list(&self, ) -> Result<(), hci::Error> {
-    //         raw::sdc_hci_cmd_le_clear_periodic_adv_list()
-    //     }
-    //     pub fn le_read_periodic_adv_list_size(&self,
-    //         p_return: *mut sdc_hci_cmd_le_read_periodic_adv_list_size_return_t,
-    //     ) -> Result<(), hci::Error> {
-    //         raw::sdc_hci_cmd_le_read_periodic_adv_list_size(
-    //             p_return: *mut sdc_hci_cmd_le_read_periodic_adv_list_size_return_t,
-    //         )
-    //     }
-    //     pub fn le_read_transmit_power(&self,
-    //         p_return: *mut sdc_hci_cmd_le_read_transmit_power_return_t,
-    //     ) -> Result<(), hci::Error> {
-    //         raw::sdc_hci_cmd_le_read_transmit_power(p_return: *mut sdc_hci_cmd_le_read_transmit_power_return_t)
-    //     }
-    //     pub fn le_read_rf_path_compensation(&self,
-    //         p_return: *mut sdc_hci_cmd_le_read_rf_path_compensation_return_t,
-    //     ) -> Result<(), hci::Error> {
-    //         raw::sdc_hci_cmd_le_read_rf_path_compensation(p_return: *mut sdc_hci_cmd_le_read_rf_path_compensation_return_t)
-    //     }
-    //     pub fn le_write_rf_path_compensation(&self,
-    //         p_params: *const sdc_hci_cmd_le_write_rf_path_compensation_t,
-    //     ) -> Result<(), hci::Error> {
-    //         raw::sdc_hci_cmd_le_write_rf_path_compensation(p_params: *const sdc_hci_cmd_le_write_rf_path_compensation_t)
-    //     }
-    //     pub fn le_set_privacy_mode(&self, p_params: *const sdc_hci_cmd_le_set_privacy_mode_t) -> Result<(), hci::Error> {
-    //         raw::sdc_hci_cmd_le_set_privacy_mode(p_params: *const sdc_hci_cmd_le_set_privacy_mode_t)
-    //     }
-    //     pub fn le_set_connless_cte_transmit_params(&self,
-    //         p_params: *const sdc_hci_cmd_le_set_connless_cte_transmit_params_t,
-    //     ) -> Result<(), hci::Error> {
-    //         raw::sdc_hci_cmd_le_set_connless_cte_transmit_params(
-    //             p_params: *const sdc_hci_cmd_le_set_connless_cte_transmit_params_t,
-    //         )
-    //     }
-    //     pub fn le_set_connless_cte_transmit_enable(&self,
-    //         p_params: *const sdc_hci_cmd_le_set_connless_cte_transmit_enable_t,
-    //     ) -> Result<(), hci::Error> {
-    //         raw::sdc_hci_cmd_le_set_connless_cte_transmit_enable(
-    //             p_params: *const sdc_hci_cmd_le_set_connless_cte_transmit_enable_t,
-    //         )
-    //     }
-    //     pub fn le_set_conn_cte_transmit_params(&self,
-    //         p_params: *const sdc_hci_cmd_le_set_conn_cte_transmit_params_t,
-    //         p_return: *mut sdc_hci_cmd_le_set_conn_cte_transmit_params_return_t,
-    //     ) -> Result<(), hci::Error> {
-    //         raw::sdc_hci_cmd_le_set_conn_cte_transmit_params(
-    //             p_params: *const sdc_hci_cmd_le_set_conn_cte_transmit_params_t,
-    //             p_return: *mut sdc_hci_cmd_le_set_conn_cte_transmit_params_return_t,
-    //         )
-    //     }
-    //     pub fn le_conn_cte_response_enable(&self,
-    //         p_params: *const sdc_hci_cmd_le_conn_cte_response_enable_t,
-    //         p_return: *mut sdc_hci_cmd_le_conn_cte_response_enable_return_t,
-    //     ) -> Result<(), hci::Error> {
-    //         raw::sdc_hci_cmd_le_conn_cte_response_enable(
-    //             p_params: *const sdc_hci_cmd_le_conn_cte_response_enable_t,
-    //             p_return: *mut sdc_hci_cmd_le_conn_cte_response_enable_return_t,
-    //         )
-    //     }
-    //     pub fn le_read_antenna_information(&self,
-    //         p_return: *mut sdc_hci_cmd_le_read_antenna_information_return_t,
-    //     ) -> Result<(), hci::Error> {
-    //         raw::sdc_hci_cmd_le_read_antenna_information(p_return: *mut sdc_hci_cmd_le_read_antenna_information_return_t)
-    //     }
-    //     pub fn le_set_periodic_adv_receive_enable(&self,
-    //         p_params: *const sdc_hci_cmd_le_set_periodic_adv_receive_enable_t,
-    //     ) -> Result<(), hci::Error> {
-    //         raw::sdc_hci_cmd_le_set_periodic_adv_receive_enable(
-    //             p_params: *const sdc_hci_cmd_le_set_periodic_adv_receive_enable_t,
-    //         )
-    //     }
-    //     pub fn le_periodic_adv_sync_transfer(&self,
-    //         p_params: *const sdc_hci_cmd_le_periodic_adv_sync_transfer_t,
-    //         p_return: *mut sdc_hci_cmd_le_periodic_adv_sync_transfer_return_t,
-    //     ) -> Result<(), hci::Error> {
-    //         raw::sdc_hci_cmd_le_periodic_adv_sync_transfer(
-    //             p_params: *const sdc_hci_cmd_le_periodic_adv_sync_transfer_t,
-    //             p_return: *mut sdc_hci_cmd_le_periodic_adv_sync_transfer_return_t,
-    //         )
-    //     }
-    //     pub fn le_periodic_adv_set_info_transfer(&self,
-    //         p_params: *const sdc_hci_cmd_le_periodic_adv_set_info_transfer_t,
-    //         p_return: *mut sdc_hci_cmd_le_periodic_adv_set_info_transfer_return_t,
-    //     ) -> Result<(), hci::Error> {
-    //         raw::sdc_hci_cmd_le_periodic_adv_set_info_transfer(
-    //             p_params: *const sdc_hci_cmd_le_periodic_adv_set_info_transfer_t,
-    //             p_return: *mut sdc_hci_cmd_le_periodic_adv_set_info_transfer_return_t,
-    //         )
-    //     }
-    //     pub fn le_set_periodic_adv_sync_transfer_params(&self,
-    //         p_params: *const sdc_hci_cmd_le_set_periodic_adv_sync_transfer_params_t,
-    //         p_return: *mut sdc_hci_cmd_le_set_periodic_adv_sync_transfer_params_return_t,
-    //     ) -> Result<(), hci::Error> {
-    //         raw::sdc_hci_cmd_le_set_periodic_adv_sync_transfer_params(
-    //             p_params: *const sdc_hci_cmd_le_set_periodic_adv_sync_transfer_params_t,
-    //             p_return: *mut sdc_hci_cmd_le_set_periodic_adv_sync_transfer_params_return_t,
-    //         )
-    //     }
-    //     pub fn le_set_default_periodic_adv_sync_transfer_params(&self,
-    //         p_params: *const sdc_hci_cmd_le_set_default_periodic_adv_sync_transfer_params_t,
-    //     ) -> Result<(), hci::Error> {
-    //         raw::sdc_hci_cmd_le_set_default_periodic_adv_sync_transfer_params(
-    //             p_params: *const sdc_hci_cmd_le_set_default_periodic_adv_sync_transfer_params_t,
-    //         )
-    //     }
-    //     pub fn le_request_peer_sca(&self, p_params: *const sdc_hci_cmd_le_request_peer_sca_t) -> Result<(), hci::Error> {
-    //         raw::sdc_hci_cmd_le_request_peer_sca(p_params: *const sdc_hci_cmd_le_request_peer_sca_t)
-    //     }
-    //     pub fn le_enhanced_read_transmit_power_level(&self,
-    //         p_params: *const sdc_hci_cmd_le_enhanced_read_transmit_power_level_t,
-    //         p_return: *mut sdc_hci_cmd_le_enhanced_read_transmit_power_level_return_t,
-    //     ) -> Result<(), hci::Error> {
-    //         raw::sdc_hci_cmd_le_enhanced_read_transmit_power_level(
-    //             p_params: *const sdc_hci_cmd_le_enhanced_read_transmit_power_level_t,
-    //             p_return: *mut sdc_hci_cmd_le_enhanced_read_transmit_power_level_return_t,
-    //         )
-    //     }
-    //     pub fn le_read_remote_transmit_power_level(&self,
-    //         p_params: *const sdc_hci_cmd_le_read_remote_transmit_power_level_t,
-    //     ) -> Result<(), hci::Error> {
-    //         raw::sdc_hci_cmd_le_read_remote_transmit_power_level(
-    //             p_params: *const sdc_hci_cmd_le_read_remote_transmit_power_level_t,
-    //         )
-    //     }
-    //     pub fn le_set_path_loss_reporting_params(&self,
-    //         p_params: *const sdc_hci_cmd_le_set_path_loss_reporting_params_t,
-    //         p_return: *mut sdc_hci_cmd_le_set_path_loss_reporting_params_return_t,
-    //     ) -> Result<(), hci::Error> {
-    //         raw::sdc_hci_cmd_le_set_path_loss_reporting_params(
-    //             p_params: *const sdc_hci_cmd_le_set_path_loss_reporting_params_t,
-    //             p_return: *mut sdc_hci_cmd_le_set_path_loss_reporting_params_return_t,
-    //         )
-    //     }
-    //     pub fn le_set_path_loss_reporting_enable(&self,
-    //         p_params: *const sdc_hci_cmd_le_set_path_loss_reporting_enable_t,
-    //         p_return: *mut sdc_hci_cmd_le_set_path_loss_reporting_enable_return_t,
-    //     ) -> Result<(), hci::Error> {
-    //         raw::sdc_hci_cmd_le_set_path_loss_reporting_enable(
-    //             p_params: *const sdc_hci_cmd_le_set_path_loss_reporting_enable_t,
-    //             p_return: *mut sdc_hci_cmd_le_set_path_loss_reporting_enable_return_t,
-    //         )
-    //     }
-    //     pub fn le_set_transmit_power_reporting_enable(&self,
-    //         p_params: *const sdc_hci_cmd_le_set_transmit_power_reporting_enable_t,
-    //         p_return: *mut sdc_hci_cmd_le_set_transmit_power_reporting_enable_return_t,
-    //     ) -> Result<(), hci::Error> {
-    //         raw::sdc_hci_cmd_le_set_transmit_power_reporting_enable(
-    //             p_params: *const sdc_hci_cmd_le_set_transmit_power_reporting_enable_t,
-    //             p_return: *mut sdc_hci_cmd_le_set_transmit_power_reporting_enable_return_t,
-    //         )
-    //     }
-    //     pub fn le_set_data_related_address_changes(&self,
-    //         p_params: *const sdc_hci_cmd_le_set_data_related_address_changes_t,
-    //     ) -> Result<(), hci::Error> {
-    //         raw::sdc_hci_cmd_le_set_data_related_address_changes(
-    //             p_params: *const sdc_hci_cmd_le_set_data_related_address_changes_t,
-    //         )
-    //     }
 }
 
-/// Bluetooth HCI vendor specific commands
-impl<'d> SoftdeviceController<'d> {
-    // TODO
-    // fn zephyr_read_version_info(p_return: *mut sdc_hci_cmd_vs_zephyr_read_version_info_return_t) -> u8;
-    // fn zephyr_read_supported_commands( p_return: *mut sdc_hci_cmd_vs_zephyr_read_supported_commands_return_t, ) -> u8;
-    pub fn zephyr_write_bd_addr(&self, bd_addr: hci::BdAddr) -> Result<(), hci::Error> {
-        let ret = unsafe {
-            raw::sdc_hci_cmd_vs_zephyr_write_bd_addr(&raw::sdc_hci_cmd_vs_zephyr_write_bd_addr_t {
-                bd_addr: bd_addr.to_raw(),
-            })
-        };
-        hci::Status::from(ret).to_result()
+mod status {
+    use crate::raw;
+    use bt_hci::cmd::status::*;
+    use bt_hci::param::Error;
+
+    /// Bluetooth HCI Status parameters (§7.5)
+    impl<'d> super::SoftdeviceController<'d> {
+        sdc_cmd!(read_rssi => sdc_hci_cmd_sp_read_rssi::<ReadRssi>(x) -> y);
     }
-    // fn zephyr_read_static_addresses( p_return: *mut sdc_hci_cmd_vs_zephyr_read_static_addresses_return_t, ) -> u8;
-    // fn zephyr_read_key_hierarchy_roots( p_return: *mut sdc_hci_cmd_vs_zephyr_read_key_hierarchy_roots_return_t, ) -> u8;
-    // fn zephyr_read_chip_temp(p_return: *mut sdc_hci_cmd_vs_zephyr_read_chip_temp_return_t) -> u8;
-    // fn zephyr_write_tx_power( p_params: *const sdc_hci_cmd_vs_zephyr_write_tx_power_t, p_return: *mut sdc_hci_cmd_vs_zephyr_write_tx_power_return_t, ) -> u8;
-    // fn zephyr_read_tx_power( p_params: *const sdc_hci_cmd_vs_zephyr_read_tx_power_t, p_return: *mut sdc_hci_cmd_vs_zephyr_read_tx_power_return_t, ) -> u8;
-    // fn read_supported_vs_commands( p_return: *mut sdc_hci_cmd_vs_read_supported_vs_commands_return_t, ) -> u8;
-    // fn llpm_mode_set(p_params: *const sdc_hci_cmd_vs_llpm_mode_set_t) -> u8;
-    // fn conn_update(p_params: *const sdc_hci_cmd_vs_conn_update_t) -> u8;
-    // fn conn_event_extend(p_params: *const sdc_hci_cmd_vs_conn_event_extend_t) -> u8;
-    // fn qos_conn_event_report_enable( p_params: *const sdc_hci_cmd_vs_qos_conn_event_report_enable_t, ) -> u8;
-    // fn event_length_set(p_params: *const sdc_hci_cmd_vs_event_length_set_t) -> u8;
-    // fn periodic_adv_event_length_set( p_params: *const sdc_hci_cmd_vs_periodic_adv_event_length_set_t, ) -> u8;
-    // fn coex_scan_mode_config(p_params: *const sdc_hci_cmd_vs_coex_scan_mode_config_t) -> u8;
-    // fn coex_priority_config(p_params: *const sdc_hci_cmd_vs_coex_priority_config_t) -> u8;
-    // fn peripheral_latency_mode_set(p_params: *const sdc_hci_cmd_vs_peripheral_latency_mode_set_t) -> u8;
-    // fn write_remote_tx_power(p_params: *const sdc_hci_cmd_vs_write_remote_tx_power_t) -> u8;
-    // fn set_auto_power_control_request_param( p_params: *const sdc_hci_cmd_vs_set_auto_power_control_request_param_t, ) -> u8;
-    // fn set_adv_randomness(p_params: *const sdc_hci_cmd_vs_set_adv_randomness_t) -> u8;
+}
+
+mod le {
+    use crate::raw;
+    use bt_hci::cmd::le::*;
+    use bt_hci::param::Error;
+
+    /// Bluetooth HCI LE Controller commands (§7.8)
+    impl<'d> super::SoftdeviceController<'d> {
+        sdc_cmd! {
+            le_set_event_mask => sdc_hci_cmd_le_set_event_mask::<LeSetEventMask>(x),
+            le_read_buffer_size => sdc_hci_cmd_le_read_buffer_size::<LeReadBufferSize>() -> y,
+            le_read_local_supported_features => sdc_hci_cmd_le_read_local_supported_features::<LeReadLocalSupportedFeatures>() -> y,
+            le_set_random_address => sdc_hci_cmd_le_set_random_address::<LeSetRandomAddr>(x),
+            le_set_adv_params => sdc_hci_cmd_le_set_adv_params::<LeSetAdvParams>(x),
+            le_read_adv_physical_channel_tx_power => sdc_hci_cmd_le_read_adv_physical_channel_tx_power::<LeReadAdvPhysicalChannelTxPower>() -> y,
+            le_set_adv_data => sdc_hci_cmd_le_set_adv_data::<LeSetAdvData>(x),
+            le_set_scan_response_data => sdc_hci_cmd_le_set_scan_response_data::<LeSetScanResponseData>(x),
+            le_set_adv_enable => sdc_hci_cmd_le_set_adv_enable::<LeSetAdvEnable>(x),
+            le_set_scan_params => sdc_hci_cmd_le_set_scan_params::<LeSetScanParams>(x),
+            le_set_scan_enable => sdc_hci_cmd_le_set_scan_enable::<LeSetScanEnable>(x),
+            le_create_conn => sdc_hci_cmd_le_create_conn::<LeCreateConn>(x),
+            le_create_conn_cancel => sdc_hci_cmd_le_create_conn_cancel::<LeCreateConnCancel>(),
+            le_read_filter_accept_list_size => sdc_hci_cmd_le_read_filter_accept_list_size::<LeReadFilterAcceptListSize>() -> y,
+            le_clear_filter_accept_list => sdc_hci_cmd_le_clear_filter_accept_list::<LeClearFilterAcceptList>(),
+            le_add_device_to_filter_accept_list => sdc_hci_cmd_le_add_device_to_filter_accept_list::<LeAddDeviceToFilterAcceptList>(x),
+            le_remove_device_from_filter_accept_list => sdc_hci_cmd_le_remove_device_from_filter_accept_list::<LeRemoveDeviceFromFilterAcceptList>(x),
+            le_conn_update => sdc_hci_cmd_le_conn_update::<LeConnUpdate>(x),
+            le_set_host_channel_classification => sdc_hci_cmd_le_set_host_channel_classification::<LeSetHostChannelClassification>(x),
+            le_read_channel_map => sdc_hci_cmd_le_read_channel_map::<LeReadChannelMap>(x) -> y,
+            le_read_remote_features => sdc_hci_cmd_le_read_remote_features::<LeReadRemoteFeatures>(x),
+            le_encrypt => sdc_hci_cmd_le_encrypt::<LeEncrypt>(x) -> y,
+            le_rand => sdc_hci_cmd_le_rand::<LeRand>() -> y,
+            le_enable_encryption => sdc_hci_cmd_le_enable_encryption::<LeEnableEncryption>(x),
+            le_long_term_key_request_reply => sdc_hci_cmd_le_long_term_key_request_reply::<LeLongTermKeyRequestReply>(x) -> y,
+            le_long_term_key_request_negative_reply => sdc_hci_cmd_le_long_term_key_request_negative_reply::<LeLongTermKeyRequestNegativeReply>(x) -> y,
+            le_read_supported_states => sdc_hci_cmd_le_read_supported_states::<LeReadSupportedStates>() -> y,
+            le_test_end => sdc_hci_cmd_le_test_end::<LeTestEnd>() -> y,
+            le_set_data_length => sdc_hci_cmd_le_set_data_length::<LeSetDataLength>(x) -> y,
+            le_read_suggested_default_data_length => sdc_hci_cmd_le_read_suggested_default_data_length::<LeReadSuggestedDefaultDataLength>() -> y,
+            le_write_suggested_default_data_length => sdc_hci_cmd_le_write_suggested_default_data_length::<LeWriteSuggestedDefaultDataLength>(x),
+            le_add_device_to_resolving_list => sdc_hci_cmd_le_add_device_to_resolving_list::<LeAddDeviceToResolvingList>(x),
+            le_remove_device_from_resolving_list => sdc_hci_cmd_le_remove_device_from_resolving_list::<LeRemoveDeviceFromResolvingList>(x),
+            le_clear_resolving_list => sdc_hci_cmd_le_clear_resolving_list::<LeClearResolvingList>(),
+            le_read_resolving_list_size => sdc_hci_cmd_le_read_resolving_list_size::<LeReadResolvingListSize>() -> y,
+            le_set_address_resolution_enable => sdc_hci_cmd_le_set_address_resolution_enable::<LeSetAddrResolutionEnable>(x),
+            le_set_resolvable_private_address_timeout => sdc_hci_cmd_le_set_resolvable_private_address_timeout::<LeSetResolvablePrivateAddrTimeout>(x),
+            le_read_max_data_length => sdc_hci_cmd_le_read_max_data_length::<LeReadMaxDataLength>() -> y,
+            le_read_phy => sdc_hci_cmd_le_read_phy::<LeReadPhy>(x) -> y,
+            le_set_default_phy => sdc_hci_cmd_le_set_default_phy::<LeSetDefaultPhy>(x),
+            le_set_phy => sdc_hci_cmd_le_set_phy::<LeSetPhy>(x),
+            le_set_adv_set_random_address => sdc_hci_cmd_le_set_adv_set_random_address::<LeSetAdvSetRandomAddr>(x),
+            le_set_ext_adv_params => sdc_hci_cmd_le_set_ext_adv_params::<LeSetExtAdvParams>(x) -> y,
+            // le_set_ext_adv_data => sdc_hci_cmd_le_set_ext_adv_data(LeSetExtAdvData), // TODO
+            // le_set_ext_scan_response_data => sdc_hci_cmd_le_set_ext_scan_response_data(LeSetExtScanResponseData), // TODO
+            // le_set_ext_adv_enable => sdc_hci_cmd_le_set_ext_adv_enable(LeSetExtAdvEnable), // TODO
+            le_read_max_adv_data_length => sdc_hci_cmd_le_read_max_adv_data_length::<LeReadMaxAdvDataLength>() -> y,
+            le_read_number_of_supported_adv_sets => sdc_hci_cmd_le_read_number_of_supported_adv_sets::<LeReadNumberOfSupportedAdvSets>() -> y,
+            le_remove_adv_set => sdc_hci_cmd_le_remove_adv_set::<LeRemoveAdvSet>(x),
+            le_clear_adv_sets => sdc_hci_cmd_le_clear_adv_sets::<LeClearAdvSets>(),
+            le_set_periodic_adv_params => sdc_hci_cmd_le_set_periodic_adv_params::<LeSetPeriodicAdvParams>(x),
+            // le_set_periodic_adv_data => sdc_hci_cmd_le_set_periodic_adv_data(LeSetPeriodicAdvData), // TODO
+            le_set_periodic_adv_enable => sdc_hci_cmd_le_set_periodic_adv_enable::<LeSetPeriodicAdvEnable>(x),
+            // le_set_ext_scan_params => sdc_hci_cmd_le_set_ext_scan_params(LeSetExtScanParams), // TODO
+            le_set_ext_scan_enable => sdc_hci_cmd_le_set_ext_scan_enable::<LeSetExtScanEnable>(x),
+            // le_ext_create_conn => sdc_hci_cmd_le_ext_create_conn(LeExtCreateConn), // TODO
+            le_periodic_adv_create_sync => sdc_hci_cmd_le_periodic_adv_create_sync::<LePeriodicAdvCreateSync>(x),
+            le_periodic_adv_create_sync_cancel => sdc_hci_cmd_le_periodic_adv_create_sync_cancel::<LePeriodicAdvCreateSyncCancel>(),
+            le_periodic_adv_terminate_sync => sdc_hci_cmd_le_periodic_adv_terminate_sync::<LePeriodicAdvTerminateSync>(x),
+            le_add_device_to_periodic_adv_list => sdc_hci_cmd_le_add_device_to_periodic_adv_list::<LeAddDeviceToPeriodicAdvList>(x),
+            le_remove_device_from_periodic_adv_list => sdc_hci_cmd_le_remove_device_from_periodic_adv_list::<LeRemoveDeviceFromPeriodicAdvList>(x),
+            le_clear_periodic_adv_list => sdc_hci_cmd_le_clear_periodic_adv_list::<LeClearPeriodicAdvList>(),
+            le_read_periodic_adv_list_size => sdc_hci_cmd_le_read_periodic_adv_list_size::<LeReadPeriodicAdvListSize>() -> y,
+            le_read_transmit_power => sdc_hci_cmd_le_read_transmit_power::<LeReadTransmitPower>() -> y,
+            le_read_rf_path_compensation => sdc_hci_cmd_le_read_rf_path_compensation::<LeReadRfPathCompensation>() -> y,
+            le_write_rf_path_compensation => sdc_hci_cmd_le_write_rf_path_compensation::<LeWriteRfPathCompensation>(x),
+            le_set_privacy_mode => sdc_hci_cmd_le_set_privacy_mode::<LeSetPrivacyMode>(x),
+            // le_set_connless_cte_transmit_params => sdc_hci_cmd_le_set_connless_cte_transmit_params(LeSetConnectionlessCteTransmitParams), // TODO
+            le_set_connless_cte_transmit_enable => sdc_hci_cmd_le_set_connless_cte_transmit_enable::<LeSetConnectionlessCteTransmitEnable>(x),
+            // le_set_conn_cte_transmit_params => sdc_hci_cmd_le_set_conn_cte_transmit_params(LeSetConnCteTransmitParams), // TODO
+            le_conn_cte_response_enable => sdc_hci_cmd_le_conn_cte_response_enable::<LeConnCteResponseEnable>(x) -> y,
+            le_read_antenna_information => sdc_hci_cmd_le_read_antenna_information::<LeReadAntennaInformation>() -> y,
+            le_set_periodic_adv_receive_enable => sdc_hci_cmd_le_set_periodic_adv_receive_enable::<LeSetPeriodicAdvReceiveEnable>(x),
+            le_periodic_adv_sync_transfer => sdc_hci_cmd_le_periodic_adv_sync_transfer::<LePeriodicAdvSyncTransfer>(x) -> y,
+            le_periodic_adv_set_info_transfer => sdc_hci_cmd_le_periodic_adv_set_info_transfer::<LePeriodicAdvSetInfoTransfer>(x) -> y,
+            le_set_periodic_adv_sync_transfer_params => sdc_hci_cmd_le_set_periodic_adv_sync_transfer_params::<LeSetPeriodicAdvSyncTransferParams>(x) -> y,
+            le_set_default_periodic_adv_sync_transfer_params => sdc_hci_cmd_le_set_default_periodic_adv_sync_transfer_params::<LeSetDefaultPeriodicAdvSyncTransferParams>(x),
+            le_request_peer_sca => sdc_hci_cmd_le_request_peer_sca::<LeRequestPeerSca>(x),
+            le_enhanced_read_transmit_power_level => sdc_hci_cmd_le_enhanced_read_transmit_power_level::<LeEnhancedReadTransmitPowerLevel>(x) -> y,
+            le_read_remote_transmit_power_level => sdc_hci_cmd_le_read_remote_transmit_power_level::<LeReadRemoteTransmitPowerLevel>(x),
+            le_set_path_loss_reporting_params => sdc_hci_cmd_le_set_path_loss_reporting_params::<LeSetPathLossReportingParams>(x) -> y,
+            le_set_path_loss_reporting_enable => sdc_hci_cmd_le_set_path_loss_reporting_enable::<LeSetPathLossReportingEnable>(x) -> y,
+            le_set_transmit_power_reporting_enable => sdc_hci_cmd_le_set_transmit_power_reporting_enable::<LeSetTransmitPowerReportingEnable>(x) -> y,
+            le_set_data_related_address_changes => sdc_hci_cmd_le_set_data_related_address_changes::<LeSetDataRelatedAddrChanges>(x),
+        }
+    }
+}
+
+pub mod vendor {
+    use crate::raw;
+    use bt_hci::param::{BdAddr, ConnHandle, Duration, Error};
+    use bt_hci::{cmd, param, FromHciBytes};
+
+    param!(
+        #[repr(C, packed)]
+        struct ZephyrStaticAddr {
+            addr: BdAddr,
+            identity_root: [u8; 16],
+        }
+    );
+
+    #[repr(transparent)]
+    #[derive(Default, Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+    // #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+    pub struct ZephyrStaticAddrs<'a>(&'a [ZephyrStaticAddr]);
+
+    impl<'a> core::ops::Deref for ZephyrStaticAddrs<'a> {
+        type Target = [ZephyrStaticAddr];
+
+        fn deref(&self) -> &Self::Target {
+            self.0
+        }
+    }
+
+    impl<'de> bt_hci::FromHciBytes<'de> for ZephyrStaticAddrs<'de> {
+        fn from_hci_bytes(data: &'de [u8]) -> Result<(Self, &'de [u8]), bt_hci::FromHciBytesError> {
+            let (len, rest) = u8::from_hci_bytes(data)?;
+            let len = usize::from(len);
+            let bytes = len * core::mem::size_of::<ZephyrStaticAddr>();
+            if rest.len() < bytes {
+                return Err(bt_hci::FromHciBytesError::InvalidSize);
+            }
+
+            let (data, rest) = rest.split_at(bytes);
+            let addrs = unsafe { core::slice::from_raw_parts(data.as_ptr() as *const ZephyrStaticAddr, len) };
+            Ok((ZephyrStaticAddrs(addrs), rest))
+        }
+    }
+
+    param!(
+        struct ZephyrTxPower {
+            handle_type: u8,
+            handle: u16,
+            selected_tx_power: i8,
+        }
+    );
+
+    cmd! {
+        /// https://docs.zephyrproject.org/apidoc/latest/hci__vs_8h.html
+        ZephyrReadVersionInfo(VENDOR_SPECIFIC, 0x0001) {
+            Params = ();
+            ZephyrReadVersionInfoReturn {
+                hw_platform: u16,
+                hw_variant: u16,
+                fw_variant: u8,
+                fw_version: u8,
+                fw_revision: u16,
+                fw_build: u32,
+            }
+        }
+    }
+
+    cmd! {
+        /// https://docs.zephyrproject.org/apidoc/latest/hci__vs_8h.html
+        ZephyrReadSupportedCommands(VENDOR_SPECIFIC, 0x0002) {
+            Params = ();
+            Return = [u8; 64];
+        }
+    }
+
+    cmd! {
+        /// https://docs.zephyrproject.org/apidoc/latest/hci__vs_8h.html
+        ZephyrWriteBdAddr(VENDOR_SPECIFIC, 0x0006) {
+            Params = BdAddr;
+            Return = ();
+        }
+    }
+
+    cmd! {
+        /// https://docs.zephyrproject.org/apidoc/latest/hci__vs_8h.html
+        ZephyrReadStaticAddrs(VENDOR_SPECIFIC, 0x0009) {
+            Params = ();
+        }
+    }
+
+    impl bt_hci::cmd::SyncCmd for ZephyrReadStaticAddrs {
+        type Return<'ret> = ZephyrStaticAddrs<'ret>;
+    }
+
+    cmd! {
+        /// https://docs.zephyrproject.org/apidoc/latest/hci__vs_8h.html
+        ZephyrReadKeyHierarchyRoots(VENDOR_SPECIFIC, 0x000a) {
+            Params = ();
+            ZephyrReadKeyHierarchyRootsReturn {
+                ir: [u8; 16usize],
+                er: [u8; 16usize],
+            }
+        }
+    }
+
+    cmd! {
+        /// https://docs.zephyrproject.org/apidoc/latest/hci__vs_8h.html
+        ZephyrReadChipTemp(VENDOR_SPECIFIC, 0x000b) {
+            Params = ();
+            Return = i8;
+        }
+    }
+
+    cmd! {
+        /// https://docs.zephyrproject.org/apidoc/latest/hci__vs_8h.html
+        ZephyrWriteTxPower(VENDOR_SPECIFIC, 0x000e) {
+            Params = ZephyrWriteTxPowerParams;
+            Return = ZephyrTxPower;
+        }
+    }
+
+    param! {
+        struct ZephyrWriteTxPowerParams {
+            handle_type: u8,
+            handle: u16,
+            tx_power_level: i8,
+        }
+    }
+
+    cmd! {
+        /// https://docs.zephyrproject.org/apidoc/latest/hci__vs_8h.html
+        ZephyrReadTxPower(VENDOR_SPECIFIC, 0x000f) {
+            Params = ZephyrReadTxPowerParams;
+            Return = ZephyrTxPower;
+        }
+    }
+
+    param! {
+        struct ZephyrReadTxPowerParams {
+            handle_type: u8,
+            handle: u16,
+        }
+    }
+
+    cmd! {
+        NordicReadSupportedCommands(VENDOR_SPECIFIC, 0x0100) {
+            Params = ();
+            Return = [u8; 64];
+        }
+    }
+
+    cmd! {
+        NordicLlpmModeSet(VENDOR_SPECIFIC, 0x0101) {
+            Params = bool;
+            Return = ();
+        }
+    }
+
+    cmd! {
+        NordicConnUpdate(VENDOR_SPECIFIC, 0x0102) {
+            Params = NordicConnUpdateParams;
+            Return = ();
+        }
+    }
+
+    param! {
+        struct NordicConnUpdateParams {
+            handle: ConnHandle,
+            interval_us: u32,
+            latency: u16,
+            supervision_timeout: Duration<10_1000>,
+        }
+    }
+
+    cmd! {
+        NordicConnEventExtend(VENDOR_SPECIFIC, 0x0103) {
+            Params = bool;
+            Return = ();
+        }
+    }
+
+    cmd! {
+        NordicQosConnEventReportEnable(VENDOR_SPECIFIC, 0x0104) {
+            Params = bool;
+            Return = ();
+        }
+    }
+
+    cmd! {
+        NordicEventLengthSet(VENDOR_SPECIFIC, 0x0105) {
+            Params = bool;
+            Return = ();
+        }
+    }
+
+    cmd! {
+        NordicPeriodicAdvEventLengthSet(VENDOR_SPECIFIC, 0x0106) {
+            Params = u32;
+            Return = ();
+        }
+    }
+
+    cmd! {
+        NordicCoexScanModeConfig(VENDOR_SPECIFIC, 0x0107) {
+            Params = u8;
+            Return = ();
+        }
+    }
+
+    cmd! {
+        NordicCoexPriorityConfig(VENDOR_SPECIFIC, 0x0108) {
+            Params = NordicCoexPriorityConfigParams;
+            Return = ();
+        }
+    }
+
+    param! {
+        struct NordicCoexPriorityConfigParams {
+            role: u8,
+            priority: u8,
+            escalation_threshold: u8,
+        }
+    }
+
+    cmd! {
+        NordicPeripheralLatencyModeSet(VENDOR_SPECIFIC, 0x0109) {
+            Params = NordicPeripheralLatencyModeSetParams;
+            Return = ();
+        }
+    }
+
+    param! {
+        struct NordicPeripheralLatencyModeSetParams{
+            handle: ConnHandle,
+            mode: u8,
+         }
+    }
+
+    cmd! {
+        NordicWriteRemoteTxPower(VENDOR_SPECIFIC, 0x010a) {
+            Params = NordicWriteRemoteTxPowerParams;
+            Return = ();
+        }
+    }
+
+    param! {
+        struct NordicWriteRemoteTxPowerParams {
+            handle: ConnHandle,
+            phy: u8,
+            delta: i8,
+        }
+    }
+
+    cmd! {
+        NordicSetAutoPowerControlRequestParam(VENDOR_SPECIFIC, 0x010b) {
+            Params = NordicSetAutoPowerControlRequestParamParams;
+            Return = ();
+        }
+    }
+
+    param! {
+        struct NordicSetAutoPowerControlRequestParamParams {
+            enable: bool,
+            beta: u16,
+            lower_limit: i8,
+            upper_limit: i8,
+            lower_target_rssi: i8,
+            upper_target_rssi: i8,
+            wait_period: u8,
+        }
+    }
+
+    cmd! {
+        NordicSetAdvRandomness(VENDOR_SPECIFIC, 0x010c) {
+            Params = NordicSetAdvRandomnessParams;
+            Return = ();
+        }
+    }
+
+    param! {
+        struct NordicSetAdvRandomnessParams {
+            adv_handle: u8,
+            rand_us: u16,
+        }
+    }
+
+    /// Bluetooth HCI vendor specific commands
+    impl<'d> super::SoftdeviceController<'d> {
+        sdc_cmd! {
+            zephyr_read_version_info => sdc_hci_cmd_vs_zephyr_read_version_info::<ZephyrReadVersionInfo>() -> y,
+            zephyr_read_supported_commands => sdc_hci_cmd_vs_zephyr_read_supported_commands::<ZephyrReadSupportedCommands>() -> y,
+            zephyr_write_bd_addr => sdc_hci_cmd_vs_zephyr_write_bd_addr::<ZephyrWriteBdAddr>(x),
+            zephyr_read_key_hierarchy_roots => sdc_hci_cmd_vs_zephyr_read_key_hierarchy_roots::<ZephyrReadKeyHierarchyRoots>() -> y,
+            zephyr_read_chip_temp => sdc_hci_cmd_vs_zephyr_read_chip_temp::<ZephyrReadChipTemp>() -> y,
+            zephyr_write_tx_power => sdc_hci_cmd_vs_zephyr_write_tx_power::<ZephyrWriteTxPower>(x) -> y,
+            zephyr_read_tx_power => sdc_hci_cmd_vs_zephyr_read_tx_power::<ZephyrReadTxPower>(x) -> y,
+            read_supported_vs_commands => sdc_hci_cmd_vs_read_supported_vs_commands::<NordicReadSupportedCommands>() -> y,
+            llpm_mode_set => sdc_hci_cmd_vs_llpm_mode_set::<NordicLlpmModeSet>(x),
+            conn_update => sdc_hci_cmd_vs_conn_update::<NordicConnUpdate>(x),
+            conn_event_extend => sdc_hci_cmd_vs_conn_event_extend::<NordicConnEventExtend>(x),
+            qos_conn_event_report_enable => sdc_hci_cmd_vs_qos_conn_event_report_enable::<NordicQosConnEventReportEnable>(x),
+            event_length_set => sdc_hci_cmd_vs_event_length_set::<NordicEventLengthSet>(x),
+            periodic_adv_event_length_set => sdc_hci_cmd_vs_periodic_adv_event_length_set::<NordicPeriodicAdvEventLengthSet>(x),
+            coex_scan_mode_config => sdc_hci_cmd_vs_coex_scan_mode_config::<NordicCoexScanModeConfig>(x),
+            coex_priority_config => sdc_hci_cmd_vs_coex_priority_config::<NordicCoexPriorityConfig>(x),
+            peripheral_latency_mode_set => sdc_hci_cmd_vs_peripheral_latency_mode_set::<NordicPeripheralLatencyModeSet>(x),
+            write_remote_tx_power => sdc_hci_cmd_vs_write_remote_tx_power::<NordicWriteRemoteTxPower>(x),
+            set_auto_power_control_request_param => sdc_hci_cmd_vs_set_auto_power_control_request_param::<NordicSetAutoPowerControlRequestParam>(x),
+            set_adv_randomness => sdc_hci_cmd_vs_set_adv_randomness::<NordicSetAdvRandomness>(x),
+        }
+
+        /// # Safety
+        ///
+        /// `buf` must be large enough for the list of static addresses returned by the controller.
+        pub unsafe fn zephyr_read_static_addresses<'a>(
+            &self,
+            buf: &'a mut [u8],
+        ) -> Result<<ZephyrReadStaticAddrs as bt_hci::cmd::SyncCmd>::Return<'a>, Error> {
+            bt_hci::param::Status::from(raw::sdc_hci_cmd_vs_zephyr_read_static_addresses(buf.as_ptr() as *mut _))
+                .to_result()?;
+            Ok(unwrap!(ZephyrStaticAddrs::from_hci_bytes(buf)).0)
+        }
+    }
 }
