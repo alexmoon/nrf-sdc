@@ -536,9 +536,9 @@ impl<'d> SoftdeviceController<'d> {
         f: unsafe extern "C" fn(*mut R2) -> u8,
     ) -> Result<R1, bt_hci::param::Error> {
         debug_assert_eq!(core::mem::size_of::<R1>(), core::mem::size_of::<R2>());
-        let mut ret = core::mem::zeroed();
-        bt_hci::param::Status::from(f(&mut ret)).to_result()?;
-        Ok(unwrap!(R1::from_hci_bytes_complete(bytes_of(&ret))))
+        let mut out = core::mem::zeroed();
+        bt_hci::param::Status::from(f(&mut out)).to_result()?;
+        Ok(unwrap!(R1::from_hci_bytes_complete(bytes_of(&out))))
     }
 
     #[inline(always)]
@@ -550,9 +550,9 @@ impl<'d> SoftdeviceController<'d> {
         debug_assert_eq!(core::mem::size_of::<P1>(), core::mem::size_of::<P2>());
         debug_assert_eq!(core::mem::size_of::<R1>(), core::mem::size_of::<R2>());
 
-        let mut ret = core::mem::zeroed();
-        bt_hci::param::Status::from(f(params.as_hci_bytes().as_ptr() as *const _, &mut ret)).to_result()?;
-        Ok(unwrap!(R1::from_hci_bytes_complete(bytes_of(&ret))))
+        let mut out = core::mem::zeroed();
+        bt_hci::param::Status::from(f(params.as_hci_bytes().as_ptr() as *const _, &mut out)).to_result()?;
+        Ok(unwrap!(R1::from_hci_bytes_complete(bytes_of(&out))))
     }
 }
 
@@ -603,7 +603,8 @@ mod link_control {
 mod controller_baseband {
     use crate::raw;
     use bt_hci::cmd::controller_baseband::*;
-    use bt_hci::param::Error;
+    use bt_hci::param::{ConnHandleCompletedPackets, Error};
+    use bt_hci::WriteHci;
 
     /// Bluetooth HCI Controller & Baseband commands (§7.3)
     impl<'d> super::SoftdeviceController<'d> {
@@ -618,13 +619,14 @@ mod controller_baseband {
             write_authenticated_payload_timeout => sdc_hci_cmd_cb_write_authenticated_payload_timeout::<WriteAuthenticatedPayloadTimeout>(x) -> y,
         }
 
-        // TODO:
-        // pub fn host_number_of_completed_packets(
-        //     &self,
-        //     params: <HostNumberOfCompletedPackets as bt_hci::cmd::Cmd>::Params,
-        // ) -> Result<(), Error> {
-        //     unsafe { self.raw_cmd_params(raw::sdc_hci_cmd_cb_host_number_of_completed_packets, params) }
-        // }
+        pub fn host_number_of_completed_packets(&self, params: &[ConnHandleCompletedPackets]) -> Result<(), Error> {
+            const MAX_CONN_HANDLES: usize = 63;
+            const N: usize = 1 + MAX_CONN_HANDLES + core::mem::size_of::<ConnHandleCompletedPackets>();
+            let mut buf = [0; N];
+            unwrap!(params.write_hci(buf.as_mut_slice()));
+            let ret = unsafe { raw::sdc_hci_cmd_cb_host_number_of_completed_packets(buf.as_ptr() as *const _) };
+            bt_hci::param::Status::from(ret).to_result()
+        }
     }
 }
 
@@ -658,7 +660,12 @@ mod status {
 mod le {
     use crate::raw;
     use bt_hci::cmd::le::*;
-    use bt_hci::param::Error;
+    use bt_hci::param::{AdvSet, ConnHandle, Error, InitiatingPhy, ScanningPhy};
+    use bt_hci::{FromHciBytes, WriteHci};
+
+    const MAX_PHY_COUNT: usize = 3;
+    const MAX_ADV_SET: usize = 63;
+    const MAX_ANTENNA_IDS: usize = 75;
 
     /// Bluetooth HCI LE Controller commands (§7.8)
     impl<'d> super::SoftdeviceController<'d> {
@@ -706,19 +713,13 @@ mod le {
             le_set_phy => sdc_hci_cmd_le_set_phy::<LeSetPhy>(x),
             le_set_adv_set_random_address => sdc_hci_cmd_le_set_adv_set_random_address::<LeSetAdvSetRandomAddr>(x),
             le_set_ext_adv_params => sdc_hci_cmd_le_set_ext_adv_params::<LeSetExtAdvParams>(x) -> y,
-            // le_set_ext_adv_data => sdc_hci_cmd_le_set_ext_adv_data(LeSetExtAdvData), // TODO
-            // le_set_ext_scan_response_data => sdc_hci_cmd_le_set_ext_scan_response_data(LeSetExtScanResponseData), // TODO
-            // le_set_ext_adv_enable => sdc_hci_cmd_le_set_ext_adv_enable(LeSetExtAdvEnable), // TODO
             le_read_max_adv_data_length => sdc_hci_cmd_le_read_max_adv_data_length::<LeReadMaxAdvDataLength>() -> y,
             le_read_number_of_supported_adv_sets => sdc_hci_cmd_le_read_number_of_supported_adv_sets::<LeReadNumberOfSupportedAdvSets>() -> y,
             le_remove_adv_set => sdc_hci_cmd_le_remove_adv_set::<LeRemoveAdvSet>(x),
             le_clear_adv_sets => sdc_hci_cmd_le_clear_adv_sets::<LeClearAdvSets>(),
             le_set_periodic_adv_params => sdc_hci_cmd_le_set_periodic_adv_params::<LeSetPeriodicAdvParams>(x),
-            // le_set_periodic_adv_data => sdc_hci_cmd_le_set_periodic_adv_data(LeSetPeriodicAdvData), // TODO
             le_set_periodic_adv_enable => sdc_hci_cmd_le_set_periodic_adv_enable::<LeSetPeriodicAdvEnable>(x),
-            // le_set_ext_scan_params => sdc_hci_cmd_le_set_ext_scan_params(LeSetExtScanParams), // TODO
             le_set_ext_scan_enable => sdc_hci_cmd_le_set_ext_scan_enable::<LeSetExtScanEnable>(x),
-            // le_ext_create_conn => sdc_hci_cmd_le_ext_create_conn(LeExtCreateConn), // TODO
             le_periodic_adv_create_sync => sdc_hci_cmd_le_periodic_adv_create_sync::<LePeriodicAdvCreateSync>(x),
             le_periodic_adv_create_sync_cancel => sdc_hci_cmd_le_periodic_adv_create_sync_cancel::<LePeriodicAdvCreateSyncCancel>(),
             le_periodic_adv_terminate_sync => sdc_hci_cmd_le_periodic_adv_terminate_sync::<LePeriodicAdvTerminateSync>(x),
@@ -730,9 +731,7 @@ mod le {
             le_read_rf_path_compensation => sdc_hci_cmd_le_read_rf_path_compensation::<LeReadRfPathCompensation>() -> y,
             le_write_rf_path_compensation => sdc_hci_cmd_le_write_rf_path_compensation::<LeWriteRfPathCompensation>(x),
             le_set_privacy_mode => sdc_hci_cmd_le_set_privacy_mode::<LeSetPrivacyMode>(x),
-            // le_set_connless_cte_transmit_params => sdc_hci_cmd_le_set_connless_cte_transmit_params(LeSetConnectionlessCteTransmitParams), // TODO
             le_set_connless_cte_transmit_enable => sdc_hci_cmd_le_set_connless_cte_transmit_enable::<LeSetConnectionlessCteTransmitEnable>(x),
-            // le_set_conn_cte_transmit_params => sdc_hci_cmd_le_set_conn_cte_transmit_params(LeSetConnCteTransmitParams), // TODO
             le_conn_cte_response_enable => sdc_hci_cmd_le_conn_cte_response_enable::<LeConnCteResponseEnable>(x) -> y,
             le_read_antenna_information => sdc_hci_cmd_le_read_antenna_information::<LeReadAntennaInformation>() -> y,
             le_set_periodic_adv_receive_enable => sdc_hci_cmd_le_set_periodic_adv_receive_enable::<LeSetPeriodicAdvReceiveEnable>(x),
@@ -747,6 +746,82 @@ mod le {
             le_set_path_loss_reporting_enable => sdc_hci_cmd_le_set_path_loss_reporting_enable::<LeSetPathLossReportingEnable>(x) -> y,
             le_set_transmit_power_reporting_enable => sdc_hci_cmd_le_set_transmit_power_reporting_enable::<LeSetTransmitPowerReportingEnable>(x) -> y,
             le_set_data_related_address_changes => sdc_hci_cmd_le_set_data_related_address_changes::<LeSetDataRelatedAddrChanges>(x),
+        }
+
+        pub fn le_set_ext_adv_data(&self, params: LeSetExtAdvDataParams) -> Result<(), Error> {
+            const N: usize = 4 + 251;
+            let mut buf = [0; N];
+            unwrap!(params.write_hci(buf.as_mut_slice()));
+            let ret = unsafe { raw::sdc_hci_cmd_le_set_ext_adv_data(buf.as_ptr() as *const _) };
+            bt_hci::param::Status::from(ret).to_result()
+        }
+
+        pub fn le_set_ext_scan_response_data(&self, params: LeSetExtScanResponseDataParams) -> Result<(), Error> {
+            const N: usize = 4 + 251;
+            let mut buf = [0; N];
+            unwrap!(params.write_hci(buf.as_mut_slice()));
+            let ret = unsafe { raw::sdc_hci_cmd_le_set_ext_scan_response_data(buf.as_ptr() as *const _) };
+            bt_hci::param::Status::from(ret).to_result()
+        }
+
+        pub fn le_set_ext_adv_enable(&self, params: LeSetExtAdvEnableParams) -> Result<(), Error> {
+            const N: usize = 2 + MAX_ADV_SET * core::mem::size_of::<AdvSet>();
+            let mut buf = [0; N];
+            unwrap!(params.write_hci(buf.as_mut_slice()));
+            let ret = unsafe { raw::sdc_hci_cmd_le_set_ext_adv_enable(buf.as_ptr() as *const _) };
+            bt_hci::param::Status::from(ret).to_result()
+        }
+
+        pub fn le_set_periodic_adv_data(&self, params: LeSetPeriodicAdvDataParams) -> Result<(), Error> {
+            const N: usize = 3 + 252;
+            let mut buf = [0; N];
+            unwrap!(params.write_hci(buf.as_mut_slice()));
+            let ret = unsafe { raw::sdc_hci_cmd_le_set_periodic_adv_data(buf.as_ptr() as *const _) };
+            bt_hci::param::Status::from(ret).to_result()
+        }
+
+        pub fn le_set_ext_scan_params(&self, params: LeSetExtScanParamsParams) -> Result<(), Error> {
+            const N: usize = 3 + MAX_PHY_COUNT * core::mem::size_of::<ScanningPhy>();
+            let mut buf = [0; N];
+            unwrap!(params.write_hci(buf.as_mut_slice()));
+            let ret = unsafe { raw::sdc_hci_cmd_le_set_ext_scan_params(buf.as_ptr() as *const _) };
+            bt_hci::param::Status::from(ret).to_result()
+        }
+
+        pub fn le_ext_create_conn(&self, params: LeExtCreateConnParams) -> Result<(), Error> {
+            const N: usize = 10 + MAX_PHY_COUNT * core::mem::size_of::<InitiatingPhy>();
+            let mut buf = [0; N];
+            unwrap!(params.write_hci(buf.as_mut_slice()));
+            let ret = unsafe { raw::sdc_hci_cmd_le_ext_create_conn(buf.as_ptr() as *const _) };
+            bt_hci::param::Status::from(ret).to_result()
+        }
+
+        pub fn le_set_connless_cte_transmit_params(
+            &self,
+            params: LeSetConnectionlessCteTransmitParamsParams,
+        ) -> Result<(), Error> {
+            const N: usize = 5 + MAX_ANTENNA_IDS;
+            let mut buf = [0; N];
+            unwrap!(params.write_hci(buf.as_mut_slice()));
+            let ret = unsafe { raw::sdc_hci_cmd_le_set_connless_cte_transmit_params(buf.as_ptr() as *const _) };
+            bt_hci::param::Status::from(ret).to_result()
+        }
+
+        pub fn le_set_conn_cte_transmit_params(
+            &self,
+            params: LeSetConnCteTransmitParamsParams,
+        ) -> Result<ConnHandle, Error> {
+            const N: usize = 5 + MAX_ANTENNA_IDS;
+            let mut buf = [0; N];
+            unwrap!(params.write_hci(buf.as_mut_slice()));
+
+            let mut out = unsafe { core::mem::zeroed() };
+            let ret = unsafe { raw::sdc_hci_cmd_le_set_conn_cte_transmit_params(buf.as_ptr() as *const _, &mut out) };
+
+            bt_hci::param::Status::from(ret).to_result()?;
+            Ok(unwrap!(ConnHandle::from_hci_bytes_complete(unsafe {
+                super::bytes_of(&out)
+            })))
         }
     }
 }
@@ -766,7 +841,7 @@ pub mod vendor {
 
     #[repr(transparent)]
     #[derive(Default, Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-    // #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+    #[cfg_attr(feature = "defmt", derive(defmt::Format))]
     pub struct ZephyrStaticAddrs<'a>(&'a [ZephyrStaticAddr]);
 
     impl<'a> core::ops::Deref for ZephyrStaticAddrs<'a> {
