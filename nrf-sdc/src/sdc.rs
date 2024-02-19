@@ -1,6 +1,7 @@
 use core::ffi::CStr;
 use core::future::poll_fn;
 use core::marker::PhantomData;
+use core::mem::MaybeUninit;
 use core::sync::atomic::{AtomicPtr, Ordering};
 use core::task::{Poll, Waker};
 
@@ -129,6 +130,21 @@ extern "C" fn flash_callback(status: u32) {
         _ => Err(Error::EINVAL),
     };
     FLASH_STATUS.signal(res);
+}
+
+#[repr(align(8))]
+pub struct Mem<const N: usize>(MaybeUninit<[u8; N]>);
+
+impl<const N: usize> Mem<N> {
+    pub fn new() -> Self {
+        Self(MaybeUninit::uninit())
+    }
+}
+
+impl<const N: usize> Default for Mem<N> {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 pub struct Builder {
@@ -383,18 +399,18 @@ impl Builder {
     }
 
     /// SAFETY: `SoftdeviceController` must not have its lifetime end without running its destructor, e.g. using `mem::forget`.
-    pub fn build<'d>(
+    pub fn build<'d, const N: usize>(
         self,
         p: Peripherals<'d>,
         rng: &'d RngPool,
         mpsl: &'d MultiprotocolServiceLayer,
-        mem: &'d mut [u8],
+        mem: &'d mut Mem<N>,
     ) -> Result<SoftdeviceController<'d>, Error> {
         // Peripherals are used by the Softdevice Controller library, so we merely take ownership and ignore them
         let _ = (p, mpsl);
 
         let required = self.required_memory()?;
-        match mem.len().cmp(&required) {
+        match N.cmp(&required) {
             core::cmp::Ordering::Less => {
                 error!("Memory buffer too small. {} bytes needed.", required);
                 return Err(Error::EINVAL);
@@ -414,7 +430,7 @@ impl Builder {
         let ret = unsafe { raw::sdc_rand_source_register(&rand_source) };
         RetVal::from(ret).to_result()?;
 
-        let ret = unsafe { raw::sdc_enable(Some(sdc_callback), mem.as_mut_ptr()) };
+        let ret = unsafe { raw::sdc_enable(Some(sdc_callback), mem.0.as_mut_ptr() as *mut _) };
         RetVal::from(ret)
             .to_result()
             .and(Ok(SoftdeviceController { _private: PhantomData }))
@@ -827,6 +843,12 @@ mod le {
                 super::bytes_of(&out)
             })))
         }
+
+        // TODO: sdc_hci_cmd_le_ext_create_conn_v2
+        // TODO: sdc_hci_cmd_le_set_periodic_adv_params_v2
+        // TODO: sdc_hci_cmd_le_set_periodic_adv_response_data
+        // TODO: sdc_hci_cmd_le_set_periodic_adv_subevent_data
+        // TODO: sdc_hci_cmd_le_set_periodic_sync_subevent
     }
 }
 
@@ -1149,5 +1171,7 @@ pub mod vendor {
                 .to_result()?;
             Ok(unwrap!(ZephyrStaticAddrs::from_hci_bytes(buf)).0)
         }
+
+        // TODO: sdc_hci_cmd_vs_compat_mode_window_offset_set
     }
 }

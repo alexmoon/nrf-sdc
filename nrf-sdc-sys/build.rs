@@ -19,55 +19,55 @@ struct Callback {
 }
 
 impl ParseCallbacks for Callback {
-    fn func_macro(&self, name: &str, value: &[&[u8]]) {
-        if name.starts_with("SDC_MEM_") || name.starts_with("__MEM_") {
-            let i = name.find('(').unwrap();
-            let args = name[(i + 1)..(name.len() - 1)]
-                .split(',')
-                .map(|x| format!("{}: u32", x))
-                .collect::<Vec<_>>()
-                .join(", ");
-            let name = &name[..i];
+    // fn func_macro(&self, name: &str, value: &[&[u8]]) {
+    //     if name.starts_with("SDC_MEM_") || name.starts_with("__MEM_") {
+    //         let i = name.find('(').unwrap();
+    //         let args = name[(i + 1)..(name.len() - 1)]
+    //             .split(',')
+    //             .map(|x| format!("{}: u32", x))
+    //             .collect::<Vec<_>>()
+    //             .join(", ");
+    //         let name = &name[..i];
 
-            fn stringify(value: &[&[u8]]) -> String {
-                value
-                    .iter()
-                    .map(|x| core::str::from_utf8(x).unwrap())
-                    .collect::<String>()
-            }
+    //         fn stringify(value: &[&[u8]]) -> String {
+    //             value
+    //                 .iter()
+    //                 .map(|x| core::str::from_utf8(x).unwrap())
+    //                 .collect::<String>()
+    //         }
 
-            let body = if let Some(i) = value.iter().position(|x| x == b"?") {
-                // Translate a simple ternary expression to an if/else statement
-                assert_eq!(value.first().unwrap(), b"(");
-                assert_eq!(value.last().unwrap(), b")");
+    //         let body = if let Some(i) = value.iter().position(|x| x == b"?") {
+    //             // Translate a simple ternary expression to an if/else statement
+    //             assert_eq!(value.first().unwrap(), b"(");
+    //             assert_eq!(value.last().unwrap(), b")");
 
-                let j = value
-                    .iter()
-                    .position(|x| x == b":")
-                    .expect("Incomplete ternary expression in SDC_MEM_* macro");
+    //             let j = value
+    //                 .iter()
+    //                 .position(|x| x == b":")
+    //                 .expect("Incomplete ternary expression in SDC_MEM_* macro");
 
-                let condition = stringify(&value[1..i]);
-                let consequent = stringify(&value[(i + 1)..j]);
-                let alternative = stringify(&value[(j + 1)..(value.len() - 1)]);
+    //             let condition = stringify(&value[1..i]);
+    //             let consequent = stringify(&value[(i + 1)..j]);
+    //             let alternative = stringify(&value[(j + 1)..(value.len() - 1)]);
 
-                format!(
-                    "if {} {{\n    {}\n  }} else {{\n    {}\n  }}",
-                    condition, consequent, alternative
-                )
-            } else {
-                stringify(value)
-            };
+    //             format!(
+    //                 "if {} {{\n    {}\n  }} else {{\n    {}\n  }}",
+    //                 condition, consequent, alternative
+    //             )
+    //         } else {
+    //             stringify(value)
+    //         };
 
-            write!(
-                self.mem_fns.borrow_mut(),
-                "const fn {}({}) -> u32 {{\n  {}\n}}\n",
-                name,
-                args,
-                body
-            )
-            .unwrap();
-        }
-    }
+    //         write!(
+    //             self.mem_fns.borrow_mut(),
+    //             "const fn {}({}) -> u32 {{\n  {}\n}}\n",
+    //             name,
+    //             args,
+    //             body
+    //         )
+    //         .unwrap();
+    //     }
+    // }
 
     fn process_comment(&self, comment: &str) -> Option<String> {
         Some(
