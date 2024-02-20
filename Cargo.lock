@@ -66,7 +66,7 @@ checksum = "ed570934406eb16438a4e976b1b4500774099c13b8cb96eec99f620f05090ddf"
 [[package]]
 name = "bt-hci"
 version = "0.1.0"
-source = "git+https://github.com/alexmoon/bt-hci.git#df9fc54a955e752dd6cc8756a18cfa3e000be1fe"
+source = "git+https://github.com/alexmoon/bt-hci.git#217f5a0763b1db69c752431d5a853044d37a93ae"
 dependencies = [
  "defmt",
  "embedded-io",

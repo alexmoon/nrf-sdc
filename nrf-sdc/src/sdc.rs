@@ -680,7 +680,7 @@ mod status {
 mod le {
     use crate::raw;
     use bt_hci::cmd::le::*;
-    use bt_hci::param::{AdvSet, ConnHandle, Error, InitiatingPhy, ScanningPhy};
+    use bt_hci::param::{AdvHandle, AdvSet, ConnHandle, Error, InitiatingPhy, ScanningPhy, SyncHandle};
     use bt_hci::{FromHciBytes, WriteHci};
 
     const MAX_PHY_COUNT: usize = 3;
@@ -766,6 +766,7 @@ mod le {
             le_set_path_loss_reporting_enable => sdc_hci_cmd_le_set_path_loss_reporting_enable::<LeSetPathLossReportingEnable>(x) -> y,
             le_set_transmit_power_reporting_enable => sdc_hci_cmd_le_set_transmit_power_reporting_enable::<LeSetTransmitPowerReportingEnable>(x) -> y,
             le_set_data_related_address_changes => sdc_hci_cmd_le_set_data_related_address_changes::<LeSetDataRelatedAddrChanges>(x),
+            le_set_periodic_adv_params_v2 => sdc_hci_cmd_le_set_periodic_adv_params_v2::<LeSetPeriodicAdvParamsV2>(x) -> y,
         }
 
         pub fn le_set_ext_adv_data(&self, params: LeSetExtAdvDataParams) -> Result<(), Error> {
@@ -844,11 +845,65 @@ mod le {
             })))
         }
 
-        // TODO: sdc_hci_cmd_le_ext_create_conn_v2
-        // TODO: sdc_hci_cmd_le_set_periodic_adv_params_v2
-        // TODO: sdc_hci_cmd_le_set_periodic_adv_response_data
-        // TODO: sdc_hci_cmd_le_set_periodic_adv_subevent_data
-        // TODO: sdc_hci_cmd_le_set_periodic_sync_subevent
+        pub fn le_ext_create_conn_v2(&self, params: LeExtCreateConnV2Params) -> Result<(), Error> {
+            const N: usize = 5;
+            let mut buf = [0; N];
+            unwrap!(params.write_hci(buf.as_mut_slice()));
+
+            let ret = unsafe { raw::sdc_hci_cmd_le_ext_create_conn_v2(buf.as_ptr() as *const _) };
+            bt_hci::param::Status::from(ret).to_result()
+        }
+
+        pub fn le_set_periodic_adv_subevent_data(
+            &self,
+            params: LeSetPeriodicAdvSubeventDataParams,
+        ) -> Result<AdvHandle, Error> {
+            const N: usize = 5;
+            let mut buf = [0; N];
+            unwrap!(params.write_hci(buf.as_mut_slice()));
+
+            let mut out = unsafe { core::mem::zeroed() };
+            let ret = unsafe { raw::sdc_hci_cmd_le_set_periodic_adv_subevent_data(buf.as_ptr() as *const _, &mut out) };
+
+            bt_hci::param::Status::from(ret).to_result()?;
+            Ok(unwrap!(AdvHandle::from_hci_bytes_complete(unsafe {
+                super::bytes_of(&out)
+            })))
+        }
+
+        pub fn le_set_periodic_adv_response_data(
+            &self,
+            params: LeSetPeriodicAdvResponseDataParams,
+        ) -> Result<SyncHandle, Error> {
+            const N: usize = 5;
+            let mut buf = [0; N];
+            unwrap!(params.write_hci(buf.as_mut_slice()));
+
+            let mut out = unsafe { core::mem::zeroed() };
+            let ret = unsafe { raw::sdc_hci_cmd_le_set_periodic_adv_response_data(buf.as_ptr() as *const _, &mut out) };
+
+            bt_hci::param::Status::from(ret).to_result()?;
+            Ok(unwrap!(SyncHandle::from_hci_bytes_complete(unsafe {
+                super::bytes_of(&out)
+            })))
+        }
+
+        pub fn le_set_periodic_sync_subevent(
+            &self,
+            params: LeSetPeriodicSyncSubeventParams,
+        ) -> Result<SyncHandle, Error> {
+            const N: usize = 5;
+            let mut buf = [0; N];
+            unwrap!(params.write_hci(buf.as_mut_slice()));
+
+            let mut out = unsafe { core::mem::zeroed() };
+            let ret = unsafe { raw::sdc_hci_cmd_le_set_periodic_sync_subevent(buf.as_ptr() as *const _, &mut out) };
+
+            bt_hci::param::Status::from(ret).to_result()?;
+            Ok(unwrap!(SyncHandle::from_hci_bytes_complete(unsafe {
+                super::bytes_of(&out)
+            })))
+        }
     }
 }
 
@@ -1135,6 +1190,13 @@ pub mod vendor {
         }
     }
 
+    cmd! {
+        NordicCompatModeWindowOffsetSet(VENDOR_SPECIFIC, 0x010d) {
+            Params = bool;
+            Return = ();
+        }
+    }
+
     /// Bluetooth HCI vendor specific commands
     impl<'d> super::SoftdeviceController<'d> {
         sdc_cmd! {
@@ -1158,6 +1220,7 @@ pub mod vendor {
             write_remote_tx_power => sdc_hci_cmd_vs_write_remote_tx_power::<NordicWriteRemoteTxPower>(x),
             set_auto_power_control_request_param => sdc_hci_cmd_vs_set_auto_power_control_request_param::<NordicSetAutoPowerControlRequestParam>(x),
             set_adv_randomness => sdc_hci_cmd_vs_set_adv_randomness::<NordicSetAdvRandomness>(x),
+            compat_mode_window_offset_set => sdc_hci_cmd_vs_compat_mode_window_offset_set::<NordicCompatModeWindowOffsetSet>(x),
         }
 
         /// # Safety
@@ -1171,7 +1234,5 @@ pub mod vendor {
                 .to_result()?;
             Ok(unwrap!(ZephyrStaticAddrs::from_hci_bytes(buf)).0)
         }
-
-        // TODO: sdc_hci_cmd_vs_compat_mode_window_offset_set
     }
 }
