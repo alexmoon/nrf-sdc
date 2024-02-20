@@ -2,7 +2,7 @@ use core::ffi::CStr;
 use core::future::poll_fn;
 use core::marker::PhantomData;
 use core::sync::atomic::{AtomicPtr, Ordering};
-use core::task::Poll;
+use core::task::{Poll, Waker};
 
 use bt_hci::{AsHciBytes, FixedSizeValue, FromHciBytes};
 use embassy_nrf::{peripherals, Peripheral, PeripheralRef};
@@ -490,6 +490,10 @@ impl<'d> SoftdeviceController<'d> {
             res => Poll::Ready(res),
         })
         .await
+    }
+
+    pub fn register_waker(&self, waker: &Waker) {
+        WAKER.register(waker);
     }
 
     pub async fn flash_write(&self, addr: u32, buf: &[u8]) -> Result<(), Error> {
