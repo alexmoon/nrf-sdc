@@ -3,78 +3,22 @@
 //! Calls out to bindgen to generate a Rust crate from the Nordic header
 //! files.
 
-use std::cell::RefCell;
 use std::env;
 use std::fs::OpenOptions;
-use std::io::Write;
 use std::path::PathBuf;
-use std::rc::Rc;
 use std::str::FromStr;
 
 use bindgen::callbacks::ParseCallbacks;
 
 #[derive(Debug)]
-struct Callback {
-    mem_fns: Rc<RefCell<Vec<u8>>>,
-}
+struct Callback;
 
 impl ParseCallbacks for Callback {
-    // fn func_macro(&self, name: &str, value: &[&[u8]]) {
-    //     if name.starts_with("SDC_MEM_") || name.starts_with("__MEM_") {
-    //         let i = name.find('(').unwrap();
-    //         let args = name[(i + 1)..(name.len() - 1)]
-    //             .split(',')
-    //             .map(|x| format!("{}: u32", x))
-    //             .collect::<Vec<_>>()
-    //             .join(", ");
-    //         let name = &name[..i];
-
-    //         fn stringify(value: &[&[u8]]) -> String {
-    //             value
-    //                 .iter()
-    //                 .map(|x| core::str::from_utf8(x).unwrap())
-    //                 .collect::<String>()
-    //         }
-
-    //         let body = if let Some(i) = value.iter().position(|x| x == b"?") {
-    //             // Translate a simple ternary expression to an if/else statement
-    //             assert_eq!(value.first().unwrap(), b"(");
-    //             assert_eq!(value.last().unwrap(), b")");
-
-    //             let j = value
-    //                 .iter()
-    //                 .position(|x| x == b":")
-    //                 .expect("Incomplete ternary expression in SDC_MEM_* macro");
-
-    //             let condition = stringify(&value[1..i]);
-    //             let consequent = stringify(&value[(i + 1)..j]);
-    //             let alternative = stringify(&value[(j + 1)..(value.len() - 1)]);
-
-    //             format!(
-    //                 "if {} {{\n    {}\n  }} else {{\n    {}\n  }}",
-    //                 condition, consequent, alternative
-    //             )
-    //         } else {
-    //             stringify(value)
-    //         };
-
-    //         write!(
-    //             self.mem_fns.borrow_mut(),
-    //             "const fn {}({}) -> u32 {{\n  {}\n}}\n",
-    //             name,
-    //             args,
-    //             body
-    //         )
-    //         .unwrap();
-    //     }
-    // }
-
     fn process_comment(&self, comment: &str) -> Option<String> {
         Some(
             doxygen_rs::transform(
                 &comment
                     .replace('[', "\\[")
-                    .replace("@sa @ref", "@ref")
                     .replace("SDC_SOC_FLASH_CMD_STATUS.", "sdc_soc_flash_cmd_status."),
             )
             .replace(
@@ -110,7 +54,7 @@ impl Target {
     }
 }
 
-fn bindgen(target: &Target, mem_fns: Rc<RefCell<Vec<u8>>>) -> bindgen::Builder {
+fn bindgen(target: &Target) -> bindgen::Builder {
     bindgen::Builder::default()
         .use_core()
         .size_t_is_usize(true)
@@ -131,7 +75,7 @@ fn bindgen(target: &Target, mem_fns: Rc<RefCell<Vec<u8>>>) -> bindgen::Builder {
         .allowlist_var("__MEM_.*")
         .prepend_enum_name(false)
         .rustfmt_bindings(true)
-        .parse_callbacks(Box::new(Callback { mem_fns }))
+        .parse_callbacks(Box::new(Callback))
 }
 
 fn main() {
@@ -144,8 +88,7 @@ fn main() {
         (false, false) => panic!("At least one of the \"peripheral\" and/or \"central\" features must be enabled!"),
     };
 
-    let mem_fns = Rc::new(RefCell::new(Vec::new()));
-    let bindings = bindgen(&target, mem_fns.clone())
+    let bindings = bindgen(&target)
         .header("./third_party/nordic/nrfxlib/softdevice_controller/include/sdc.h")
         .header("./third_party/nordic/nrfxlib/softdevice_controller/include/sdc_hci.h")
         .header("./third_party/nordic/nrfxlib/softdevice_controller/include/sdc_hci_cmd_controller_baseband.h")
@@ -158,15 +101,13 @@ fn main() {
         .generate()
         .expect("Unable to generate bindings");
 
-    let mut file = OpenOptions::new()
+    let file = OpenOptions::new()
         .write(true)
         .truncate(true)
         .create(true)
         .open(PathBuf::from(env::var("OUT_DIR").unwrap()).join("bindings.rs"))
         .unwrap();
     bindings.write(Box::new(&file)).expect("Couldn't write bindgen output");
-    file.write_all(&mem_fns.borrow())
-        .expect("Couldn't write SDC_MEM_* functions");
 
     let lib_path = PathBuf::from_str(&env::var("CARGO_MANIFEST_DIR").unwrap())
         .unwrap()
