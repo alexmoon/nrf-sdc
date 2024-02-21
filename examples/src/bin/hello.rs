@@ -23,11 +23,11 @@ bind_interrupts!(struct Irqs {
     RTC0 => mpsl::HighPrioInterruptHandler;
 });
 
-fn build_sdc<'d>(
+fn build_sdc<'d, const N: usize>(
     p: nrf_sdc::Peripherals<'d>,
     rng: &'d RngPool<'d>,
     mpsl: &'d MultiprotocolServiceLayer<'d>,
-    mem: &'d mut [u8],
+    mem: &'d mut sdc::Mem<N>,
 ) -> Result<nrf_sdc::SoftdeviceController<'d>, nrf_sdc::Error> {
     sdc::Builder::new()?.support_adv()?.build(p, rng, mpsl, mem)
 }
@@ -80,7 +80,7 @@ async fn main(spawner: Spawner) {
     let mut pool = [0; 256];
     let rng = sdc::rng_pool::RngPool::new(p.RNG, Irqs, &mut pool, 64);
 
-    let mut sdc_mem = [0; 1584];
+    let mut sdc_mem = sdc::Mem::<1672>::new();
     let sdc = unwrap!(build_sdc(sdc_p, &rng, mpsl, &mut sdc_mem));
 
     let mut hci_buf = [0; HCI_MSG_BUFFER_MAX_SIZE as usize];

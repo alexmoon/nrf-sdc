@@ -23,11 +23,11 @@ bind_interrupts!(struct Irqs {
     RTC0 => mpsl::HighPrioInterruptHandler;
 });
 
-fn build_sdc<'d>(
+fn build_sdc<'d, const N: usize>(
     p: nrf_sdc::Peripherals<'d>,
     rng: &'d RngPool<'d>,
     mpsl: &'d MultiprotocolServiceLayer<'d>,
-    mem: &'d mut [u8],
+    mem: &'d mut sdc::Mem<N>,
 ) -> Result<nrf_sdc::SoftdeviceController<'d>, nrf_sdc::Error> {
     sdc::Builder::new()?.support_adv()?.build(p, rng, mpsl, mem)
 }
@@ -81,7 +81,7 @@ async fn main(spawner: Spawner) {
     let mut pool = [0; 256];
     let rng = sdc::rng_pool::RngPool::new(p.RNG, Irqs, &mut pool, 64);
 
-    let mut sdc_mem = [0; 1584];
+    let mut sdc_mem = sdc::Mem::<1672>::new();
     let sdc = unwrap!(build_sdc(sdc_p, &rng, mpsl, &mut sdc_mem));
 
     // Set the bluetooth address
@@ -90,7 +90,7 @@ async fn main(spawner: Spawner) {
     unwrap!(sdc.le_set_adv_params(LeSetAdvParamsParams {
         adv_interval_min: bt_hci::param::Duration::from_millis(1280),
         adv_interval_max: bt_hci::param::Duration::from_millis(1280),
-        adv_kind: bt_hci::param::AdvKind::AdvInd,
+        adv_kind: bt_hci::param::AdvKind::AdvScanInd,
         own_addr_kind: bt_hci::param::AddrKind::PUBLIC,
         peer_addr_kind: bt_hci::param::AddrKind::PUBLIC,
         peer_addr: BdAddr::default(),
