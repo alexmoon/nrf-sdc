@@ -1,7 +1,8 @@
 #![no_std]
 #![no_main]
 
-use bt_hci::cmd::le::{LeSetAdvDataParams, LeSetAdvParamsParams};
+use bt_hci::cmd::le::{LeSetAdvData, LeSetAdvDataParams, LeSetAdvEnable, LeSetAdvParams, LeSetAdvParamsParams};
+use bt_hci::cmd::SyncCmd;
 use bt_hci::param::BdAddr;
 use defmt::unwrap;
 use embassy_executor::Spawner;
@@ -11,6 +12,7 @@ use embassy_time::{Duration, Timer};
 use nrf_sdc::{self as sdc, mpsl, pac};
 use sdc::mpsl::MultiprotocolServiceLayer;
 use sdc::rng_pool::RngPool;
+use sdc::vendor::ZephyrWriteBdAddr;
 use static_cell::StaticCell;
 use {defmt_rtt as _, panic_probe as _};
 
@@ -85,28 +87,36 @@ async fn main(spawner: Spawner) {
     let sdc = unwrap!(build_sdc(sdc_p, &rng, mpsl, &mut sdc_mem));
 
     // Set the bluetooth address
-    unwrap!(sdc.zephyr_write_bd_addr(bd_addr()));
+    unwrap!(ZephyrWriteBdAddr::new(bd_addr()).exec(&sdc).await);
 
-    unwrap!(sdc.le_set_adv_params(LeSetAdvParamsParams {
-        adv_interval_min: bt_hci::param::Duration::from_millis(1280),
-        adv_interval_max: bt_hci::param::Duration::from_millis(1280),
-        adv_kind: bt_hci::param::AdvKind::AdvScanInd,
-        own_addr_kind: bt_hci::param::AddrKind::PUBLIC,
-        peer_addr_kind: bt_hci::param::AddrKind::PUBLIC,
-        peer_addr: BdAddr::default(),
-        adv_channel_map: bt_hci::param::AdvChannelMap::ALL,
-        adv_filter_policy: bt_hci::param::AdvFilterPolicy::default(),
-    }));
+    unwrap!(
+        LeSetAdvParams::new(LeSetAdvParamsParams {
+            adv_interval_min: bt_hci::param::Duration::from_millis(1280),
+            adv_interval_max: bt_hci::param::Duration::from_millis(1280),
+            adv_kind: bt_hci::param::AdvKind::AdvScanInd,
+            own_addr_kind: bt_hci::param::AddrKind::PUBLIC,
+            peer_addr_kind: bt_hci::param::AddrKind::PUBLIC,
+            peer_addr: BdAddr::default(),
+            adv_channel_map: bt_hci::param::AdvChannelMap::ALL,
+            adv_filter_policy: bt_hci::param::AdvFilterPolicy::default(),
+        })
+        .exec(&sdc)
+        .await
+    );
 
     let adv_data = &[0x0a, 0x09, b'H', b'e', b'l', b'l', b'o', b'R', b'u', b's', b't'];
     let mut data = [0; 31];
     data[..adv_data.len()].copy_from_slice(adv_data);
-    unwrap!(sdc.le_set_adv_data(LeSetAdvDataParams {
-        data_len: adv_data.len() as u8,
-        data
-    }));
+    unwrap!(
+        LeSetAdvData::new(LeSetAdvDataParams {
+            data_len: adv_data.len() as u8,
+            data
+        })
+        .exec(&sdc)
+        .await
+    );
 
-    unwrap!(sdc.le_set_adv_enable(true));
+    unwrap!(LeSetAdvEnable::new(true).exec(&sdc).await);
 
     let mut led = Output::new(p.P0_13, Level::Low, OutputDrive::Standard);
 
