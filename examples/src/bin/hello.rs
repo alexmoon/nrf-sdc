@@ -80,7 +80,7 @@ async fn main(spawner: Spawner) {
     let mut pool = [0; 256];
     let rng = sdc::rng_pool::RngPool::new(p.RNG, Irqs, &mut pool, 64);
 
-    let mut sdc_mem = sdc::Mem::<1584>::new();
+    let mut sdc_mem = sdc::Mem::<1672>::new();
     let sdc = unwrap!(build_sdc(sdc_p, &rng, mpsl, &mut sdc_mem));
 
     let mut hci_buf = [0; HCI_MSG_BUFFER_MAX_SIZE as usize];
