@@ -1,7 +1,7 @@
 #![no_std]
 #![no_main]
 
-use bt_hci::cmd::le::{LeSetAdvData, LeSetAdvDataParams, LeSetAdvEnable, LeSetAdvParams, LeSetAdvParamsParams};
+use bt_hci::cmd::le::{LeSetAdvData, LeSetAdvEnable, LeSetAdvParams};
 use bt_hci::cmd::SyncCmd;
 use bt_hci::param::BdAddr;
 use defmt::unwrap;
@@ -90,16 +90,16 @@ async fn main(spawner: Spawner) {
     unwrap!(ZephyrWriteBdAddr::new(bd_addr()).exec(&sdc).await);
 
     unwrap!(
-        LeSetAdvParams::new(LeSetAdvParamsParams {
-            adv_interval_min: bt_hci::param::Duration::from_millis(1280),
-            adv_interval_max: bt_hci::param::Duration::from_millis(1280),
-            adv_kind: bt_hci::param::AdvKind::AdvScanInd,
-            own_addr_kind: bt_hci::param::AddrKind::PUBLIC,
-            peer_addr_kind: bt_hci::param::AddrKind::PUBLIC,
-            peer_addr: BdAddr::default(),
-            adv_channel_map: bt_hci::param::AdvChannelMap::ALL,
-            adv_filter_policy: bt_hci::param::AdvFilterPolicy::default(),
-        })
+        LeSetAdvParams::new(
+            bt_hci::param::Duration::from_millis(1280),
+            bt_hci::param::Duration::from_millis(1280),
+            bt_hci::param::AdvKind::AdvScanInd,
+            bt_hci::param::AddrKind::PUBLIC,
+            bt_hci::param::AddrKind::PUBLIC,
+            BdAddr::default(),
+            bt_hci::param::AdvChannelMap::ALL,
+            bt_hci::param::AdvFilterPolicy::default(),
+        )
         .exec(&sdc)
         .await
     );
@@ -107,14 +107,7 @@ async fn main(spawner: Spawner) {
     let adv_data = &[0x0a, 0x09, b'H', b'e', b'l', b'l', b'o', b'R', b'u', b's', b't'];
     let mut data = [0; 31];
     data[..adv_data.len()].copy_from_slice(adv_data);
-    unwrap!(
-        LeSetAdvData::new(LeSetAdvDataParams {
-            data_len: adv_data.len() as u8,
-            data
-        })
-        .exec(&sdc)
-        .await
-    );
+    unwrap!(LeSetAdvData::new(adv_data.len() as u8, data).exec(&sdc).await);
 
     unwrap!(LeSetAdvEnable::new(true).exec(&sdc).await);
 
