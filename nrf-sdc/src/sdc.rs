@@ -5,7 +5,7 @@ use core::mem::MaybeUninit;
 use core::sync::atomic::{AtomicPtr, Ordering};
 use core::task::{Poll, Waker};
 
-use bt_hci::{AsHciBytes, FixedSizeValue, FromHciBytes};
+use bt_hci::{AsHciBytes, Controller, FixedSizeValue, FromHciBytes, WriteHci};
 use embassy_nrf::{peripherals, Peripheral, PeripheralRef};
 use embassy_sync::blocking_mutex::raw::ThreadModeRawMutex;
 use embassy_sync::signal::Signal;
@@ -544,7 +544,7 @@ impl<'d> SoftdeviceController<'d> {
     unsafe fn raw_cmd_params<P1: FixedSizeValue, P2: Copy>(
         &self,
         f: unsafe extern "C" fn(*const P2) -> u8,
-        params: P1,
+        params: &P1,
     ) -> Result<(), bt_hci::param::Error> {
         debug_assert_eq!(core::mem::size_of::<P1>(), core::mem::size_of::<P2>());
         bt_hci::param::Status::from(f(params.as_hci_bytes().as_ptr() as *const _)).to_result()
@@ -565,7 +565,7 @@ impl<'d> SoftdeviceController<'d> {
     unsafe fn raw_cmd_params_return<P1: FixedSizeValue, R1: FixedSizeValue, P2: Copy, R2: Copy>(
         &self,
         f: unsafe extern "C" fn(*const P2, *mut R2) -> u8,
-        params: P1,
+        params: &P1,
     ) -> Result<R1, bt_hci::param::Error> {
         debug_assert_eq!(core::mem::size_of::<P1>(), core::mem::size_of::<P2>());
         debug_assert_eq!(core::mem::size_of::<R1>(), core::mem::size_of::<R2>());
@@ -576,265 +576,311 @@ impl<'d> SoftdeviceController<'d> {
     }
 }
 
-macro_rules! sdc_cmd {
-    ($name:ident => $raw:ident::<$cmd:ty>()) => {
-        pub fn $name(&self) -> Result<(), Error> {
-            unsafe { self.raw_cmd(raw::$raw) }
-        }
-    };
+impl<'a> Controller for SoftdeviceController<'a> {
+    type Error = Error;
 
-    ($name:ident => $raw:ident::<$cmd:ty>($param:ident)) => {
-        pub fn $name(&self, params: <$cmd as bt_hci::cmd::Cmd>::Params) -> Result<(), Error> {
-            unsafe { self.raw_cmd_params(raw::$raw, params) }
-        }
-    };
+    async fn write_acl_data(&self, packet: &bt_hci::data::AclPacket<'_>) -> Result<(), Self::Error> {
+        let mut buf = [0u8; raw::HCI_DATA_PACKET_MAX_SIZE as usize];
+        packet.write_hci(buf.as_mut_slice()).map_err(|err| match err {
+            embedded_io::SliceWriteError::Full => Error::ENOMEM,
+            _ => unreachable!(),
+        })?;
+        self.hci_data_put(buf.as_slice())
+    }
 
-    ($name:ident => $raw:ident::<$cmd:ty>() -> $ret:ident) => {
-        pub fn $name(&self) -> Result<<$cmd as bt_hci::cmd::SyncCmd>::Return<'static>, Error> {
-            unsafe { self.raw_cmd_return(raw::$raw) }
-        }
-    };
+    async fn write_sync_data(&self, _packet: &bt_hci::data::SyncPacket<'_>) -> Result<(), Self::Error> {
+        unimplemented!()
+    }
 
-    ($name:ident => $raw:ident::<$cmd:ty>($param:ident) -> $ret:ident) => {
-        pub fn $name(&self, params: <$cmd as bt_hci::cmd::Cmd>::Params) -> Result<<$cmd as bt_hci::cmd::SyncCmd>::Return<'static>, Error> {
-            unsafe { self.raw_cmd_params_return(raw::$raw, params) }
-        }
-    };
+    async fn write_iso_data(&self, _packet: &bt_hci::data::IsoPacket<'_>) -> Result<(), Self::Error> {
+        unimplemented!()
+    }
 
-    ($($name:ident => $raw:ident::<$cmd:ty>($($param:ident)?) $(-> $ret:ident)?),+ $(,)?) => {
-        $(sdc_cmd! { $name => $raw::<$cmd>($($param)?) $(-> $ret)? })+
-    };
-}
-
-mod link_control {
-    use crate::raw;
-    use bt_hci::cmd::link_control::*;
-    use bt_hci::param::Error;
-
-    /// Bluetooth HCI Link Control commands (§7.1)
-    impl<'d> super::SoftdeviceController<'d> {
-        sdc_cmd! {
-            disconnect => sdc_hci_cmd_lc_disconnect::<Disconnect>(x),
-            read_remote_version_information => sdc_hci_cmd_lc_read_remote_version_information::<ReadRemoteVersionInformation>(x),
-        }
+    async fn read<'b>(&self, buf: &'b mut [u8]) -> Result<bt_hci::ControllerToHostPacket<'b>, Self::Error> {
+        let kind = self.hci_get(buf).await?;
+        bt_hci::ControllerToHostPacket::from_hci_bytes_with_kind(kind, buf)
+            .map(|(x, _)| x)
+            .map_err(|err| match err {
+                bt_hci::FromHciBytesError::InvalidSize => Error::ENOMEM,
+                bt_hci::FromHciBytesError::InvalidValue => Error::EINVAL,
+            })
     }
 }
 
+macro_rules! sdc_cmd {
+    (async $cmd:ty => $raw:ident()) => {
+        impl<'d> bt_hci::ControllerCmdAsync<$cmd> for $crate::sdc::SoftdeviceController<'d> {
+            async fn exec(&self, _cmd: &$cmd) -> Result<(), bt_hci::param::Error> {
+                unsafe { self.raw_cmd(raw::$raw) }
+            }
+        }
+    };
+
+    (async $cmd:ty => $raw:ident(x)) => {
+        impl<'d> bt_hci::ControllerCmdAsync<$cmd> for $crate::sdc::SoftdeviceController<'d> {
+            async fn exec(&self, cmd: &$cmd) -> Result<(), bt_hci::param::Error> {
+                unsafe { self.raw_cmd_params(raw::$raw, <$cmd as bt_hci::cmd::Cmd>::params(cmd)) }
+            }
+        }
+    };
+
+    ($cmd:ty => $raw:ident()) => {
+        impl<'d> bt_hci::ControllerCmdSync<$cmd> for $crate::sdc::SoftdeviceController<'d> {
+            async fn exec(&self, _cmd: &$cmd) -> Result<(), bt_hci::param::Error> {
+                unsafe { self.raw_cmd(raw::$raw) }
+            }
+        }
+    };
+
+    ($cmd:ty => $raw:ident(x)) => {
+        impl<'d> bt_hci::ControllerCmdSync<$cmd> for $crate::sdc::SoftdeviceController<'d> {
+            async fn exec(&self, cmd: &$cmd) -> Result<(), bt_hci::param::Error> {
+                unsafe { self.raw_cmd_params(raw::$raw, <$cmd as bt_hci::cmd::Cmd>::params(cmd)) }
+            }
+        }
+    };
+
+    ($cmd:ty => $raw:ident() -> y) => {
+        impl<'d> bt_hci::ControllerCmdSync<$cmd> for $crate::sdc::SoftdeviceController<'d> {
+            async fn exec(&self, _cmd: &$cmd) -> Result<<$cmd as bt_hci::cmd::SyncCmd>::Return, bt_hci::param::Error> {
+                unsafe { self.raw_cmd_return(raw::$raw) }
+            }
+        }
+    };
+
+    ($cmd:ty => $raw:ident(x) -> y) => {
+        impl<'d> bt_hci::ControllerCmdSync<$cmd> for $crate::sdc::SoftdeviceController<'d> {
+            async fn exec(&self, cmd: &$cmd) -> Result<<$cmd as bt_hci::cmd::SyncCmd>::Return, bt_hci::param::Error> {
+                unsafe { self.raw_cmd_params_return(raw::$raw, <$cmd as bt_hci::cmd::Cmd>::params(cmd)) }
+            }
+        }
+    };
+}
+
+/// Bluetooth HCI Link Control commands (§7.1)
+mod link_control {
+    use crate::raw;
+    use bt_hci::cmd::link_control::*;
+
+    sdc_cmd!(Disconnect => sdc_hci_cmd_lc_disconnect(x));
+    sdc_cmd!(async ReadRemoteVersionInformation => sdc_hci_cmd_lc_read_remote_version_information(x));
+}
+
+/// Bluetooth HCI Controller & Baseband commands (§7.3)
 mod controller_baseband {
     use crate::raw;
-    use bt_hci::cmd::controller_baseband::*;
-    use bt_hci::param::{ConnHandleCompletedPackets, Error};
-    use bt_hci::WriteHci;
+    use bt_hci::cmd::{controller_baseband::*, Cmd};
+    use bt_hci::param::ConnHandleCompletedPackets;
+    use bt_hci::{ControllerCmdSync, WriteHci};
 
-    /// Bluetooth HCI Controller & Baseband commands (§7.3)
-    impl<'d> super::SoftdeviceController<'d> {
-        sdc_cmd! {
-            set_event_mask => sdc_hci_cmd_cb_set_event_mask::<SetEventMask>(x),
-            reset => sdc_hci_cmd_cb_reset::<Reset>(),
-            read_transmit_power_level => sdc_hci_cmd_cb_read_transmit_power_level::<ReadTransmitPowerLevel>(x) -> y,
-            set_controller_to_host_flow_control => sdc_hci_cmd_cb_set_controller_to_host_flow_control::<SetControllerToHostFlowControl>(x),
-            host_buffer_size => sdc_hci_cmd_cb_host_buffer_size::<HostBufferSize>(x),
-            set_event_mask_page_2 => sdc_hci_cmd_cb_set_event_mask_page_2::<SetEventMaskPage2>(x),
-            read_authenticated_payload_timeout => sdc_hci_cmd_cb_read_authenticated_payload_timeout::<ReadAuthenticatedPayloadTimeout>(x) -> y,
-            write_authenticated_payload_timeout => sdc_hci_cmd_cb_write_authenticated_payload_timeout::<WriteAuthenticatedPayloadTimeout>(x) -> y,
-        }
+    sdc_cmd!(SetEventMask => sdc_hci_cmd_cb_set_event_mask(x));
+    sdc_cmd!(Reset => sdc_hci_cmd_cb_reset());
+    sdc_cmd!(ReadTransmitPowerLevel => sdc_hci_cmd_cb_read_transmit_power_level(x) -> y);
+    sdc_cmd!(SetControllerToHostFlowControl => sdc_hci_cmd_cb_set_controller_to_host_flow_control(x));
+    sdc_cmd!(HostBufferSize => sdc_hci_cmd_cb_host_buffer_size(x));
+    sdc_cmd!(SetEventMaskPage2 => sdc_hci_cmd_cb_set_event_mask_page_2(x));
+    sdc_cmd!(ReadAuthenticatedPayloadTimeout => sdc_hci_cmd_cb_read_authenticated_payload_timeout(x) -> y);
+    sdc_cmd!(WriteAuthenticatedPayloadTimeout => sdc_hci_cmd_cb_write_authenticated_payload_timeout(x) -> y);
 
-        pub fn host_number_of_completed_packets(&self, params: &[ConnHandleCompletedPackets]) -> Result<(), Error> {
+    impl<'a, 'd> ControllerCmdSync<HostNumberOfCompletedPackets<'a>> for super::SoftdeviceController<'d> {
+        async fn exec(
+            &self,
+            cmd: &HostNumberOfCompletedPackets<'a>,
+        ) -> Result<<HostNumberOfCompletedPackets as bt_hci::cmd::SyncCmd>::Return, bt_hci::param::Error> {
             const MAX_CONN_HANDLES: usize = 63;
             const N: usize = 1 + MAX_CONN_HANDLES + core::mem::size_of::<ConnHandleCompletedPackets>();
             let mut buf = [0; N];
-            unwrap!(params.write_hci(buf.as_mut_slice()));
+            unwrap!(cmd.params().write_hci(buf.as_mut_slice()));
             let ret = unsafe { raw::sdc_hci_cmd_cb_host_number_of_completed_packets(buf.as_ptr() as *const _) };
             bt_hci::param::Status::from(ret).to_result()
         }
     }
 }
 
+/// Bluetooth HCI Informational parameters (§7.4)
 mod info {
     use crate::raw;
     use bt_hci::cmd::info::*;
-    use bt_hci::param::Error;
 
-    /// Bluetooth HCI Informational parameters (§7.4)
-    impl<'d> super::SoftdeviceController<'d> {
-        sdc_cmd! {
-            read_local_version_information => sdc_hci_cmd_ip_read_local_version_information::<ReadLocalVersionInformation>() -> y,
-            read_local_supported_commands => sdc_hci_cmd_ip_read_local_supported_commands::<ReadLocalSupportedCmds>() -> y,
-            read_local_supported_features => sdc_hci_cmd_ip_read_local_supported_features::<ReadLocalSupportedFeatures>() -> y,
-            read_bd_addr => sdc_hci_cmd_ip_read_bd_addr::<ReadBdAddr>() -> y,
-        }
-    }
+    sdc_cmd!(ReadLocalVersionInformation => sdc_hci_cmd_ip_read_local_version_information() -> y);
+    sdc_cmd!(ReadLocalSupportedCmds => sdc_hci_cmd_ip_read_local_supported_commands() -> y);
+    sdc_cmd!(ReadLocalSupportedFeatures => sdc_hci_cmd_ip_read_local_supported_features() -> y);
+    sdc_cmd!(ReadBdAddr => sdc_hci_cmd_ip_read_bd_addr() -> y);
 }
 
+/// Bluetooth HCI Status parameters (§7.5)
 mod status {
     use crate::raw;
     use bt_hci::cmd::status::*;
-    use bt_hci::param::Error;
 
-    /// Bluetooth HCI Status parameters (§7.5)
-    impl<'d> super::SoftdeviceController<'d> {
-        sdc_cmd!(read_rssi => sdc_hci_cmd_sp_read_rssi::<ReadRssi>(x) -> y);
-    }
+    sdc_cmd!(ReadRssi => sdc_hci_cmd_sp_read_rssi(x) -> y);
 }
 
+/// Bluetooth HCI LE Controller commands (§7.8)
 mod le {
     use crate::raw;
-    use bt_hci::cmd::le::*;
+    use bt_hci::cmd::{le::*, Cmd};
     use bt_hci::param::{AdvHandle, AdvSet, ConnHandle, Error, InitiatingPhy, ScanningPhy, SyncHandle};
     use bt_hci::{FromHciBytes, WriteHci};
 
     const MAX_PHY_COUNT: usize = 3;
     const MAX_ADV_SET: usize = 63;
     const MAX_ANTENNA_IDS: usize = 75;
+    const MAX_SUBEVENTS: usize = 128;
 
-    /// Bluetooth HCI LE Controller commands (§7.8)
-    impl<'d> super::SoftdeviceController<'d> {
-        sdc_cmd! {
-            le_set_event_mask => sdc_hci_cmd_le_set_event_mask::<LeSetEventMask>(x),
-            le_read_buffer_size => sdc_hci_cmd_le_read_buffer_size::<LeReadBufferSize>() -> y,
-            le_read_local_supported_features => sdc_hci_cmd_le_read_local_supported_features::<LeReadLocalSupportedFeatures>() -> y,
-            le_set_random_address => sdc_hci_cmd_le_set_random_address::<LeSetRandomAddr>(x),
-            le_set_adv_params => sdc_hci_cmd_le_set_adv_params::<LeSetAdvParams>(x),
-            le_read_adv_physical_channel_tx_power => sdc_hci_cmd_le_read_adv_physical_channel_tx_power::<LeReadAdvPhysicalChannelTxPower>() -> y,
-            le_set_adv_data => sdc_hci_cmd_le_set_adv_data::<LeSetAdvData>(x),
-            le_set_scan_response_data => sdc_hci_cmd_le_set_scan_response_data::<LeSetScanResponseData>(x),
-            le_set_adv_enable => sdc_hci_cmd_le_set_adv_enable::<LeSetAdvEnable>(x),
-            le_set_scan_params => sdc_hci_cmd_le_set_scan_params::<LeSetScanParams>(x),
-            le_set_scan_enable => sdc_hci_cmd_le_set_scan_enable::<LeSetScanEnable>(x),
-            le_create_conn => sdc_hci_cmd_le_create_conn::<LeCreateConn>(x),
-            le_create_conn_cancel => sdc_hci_cmd_le_create_conn_cancel::<LeCreateConnCancel>(),
-            le_read_filter_accept_list_size => sdc_hci_cmd_le_read_filter_accept_list_size::<LeReadFilterAcceptListSize>() -> y,
-            le_clear_filter_accept_list => sdc_hci_cmd_le_clear_filter_accept_list::<LeClearFilterAcceptList>(),
-            le_add_device_to_filter_accept_list => sdc_hci_cmd_le_add_device_to_filter_accept_list::<LeAddDeviceToFilterAcceptList>(x),
-            le_remove_device_from_filter_accept_list => sdc_hci_cmd_le_remove_device_from_filter_accept_list::<LeRemoveDeviceFromFilterAcceptList>(x),
-            le_conn_update => sdc_hci_cmd_le_conn_update::<LeConnUpdate>(x),
-            le_set_host_channel_classification => sdc_hci_cmd_le_set_host_channel_classification::<LeSetHostChannelClassification>(x),
-            le_read_channel_map => sdc_hci_cmd_le_read_channel_map::<LeReadChannelMap>(x) -> y,
-            le_read_remote_features => sdc_hci_cmd_le_read_remote_features::<LeReadRemoteFeatures>(x),
-            le_encrypt => sdc_hci_cmd_le_encrypt::<LeEncrypt>(x) -> y,
-            le_rand => sdc_hci_cmd_le_rand::<LeRand>() -> y,
-            le_enable_encryption => sdc_hci_cmd_le_enable_encryption::<LeEnableEncryption>(x),
-            le_long_term_key_request_reply => sdc_hci_cmd_le_long_term_key_request_reply::<LeLongTermKeyRequestReply>(x) -> y,
-            le_long_term_key_request_negative_reply => sdc_hci_cmd_le_long_term_key_request_negative_reply::<LeLongTermKeyRequestNegativeReply>(x) -> y,
-            le_read_supported_states => sdc_hci_cmd_le_read_supported_states::<LeReadSupportedStates>() -> y,
-            le_test_end => sdc_hci_cmd_le_test_end::<LeTestEnd>() -> y,
-            le_set_data_length => sdc_hci_cmd_le_set_data_length::<LeSetDataLength>(x) -> y,
-            le_read_suggested_default_data_length => sdc_hci_cmd_le_read_suggested_default_data_length::<LeReadSuggestedDefaultDataLength>() -> y,
-            le_write_suggested_default_data_length => sdc_hci_cmd_le_write_suggested_default_data_length::<LeWriteSuggestedDefaultDataLength>(x),
-            le_add_device_to_resolving_list => sdc_hci_cmd_le_add_device_to_resolving_list::<LeAddDeviceToResolvingList>(x),
-            le_remove_device_from_resolving_list => sdc_hci_cmd_le_remove_device_from_resolving_list::<LeRemoveDeviceFromResolvingList>(x),
-            le_clear_resolving_list => sdc_hci_cmd_le_clear_resolving_list::<LeClearResolvingList>(),
-            le_read_resolving_list_size => sdc_hci_cmd_le_read_resolving_list_size::<LeReadResolvingListSize>() -> y,
-            le_set_address_resolution_enable => sdc_hci_cmd_le_set_address_resolution_enable::<LeSetAddrResolutionEnable>(x),
-            le_set_resolvable_private_address_timeout => sdc_hci_cmd_le_set_resolvable_private_address_timeout::<LeSetResolvablePrivateAddrTimeout>(x),
-            le_read_max_data_length => sdc_hci_cmd_le_read_max_data_length::<LeReadMaxDataLength>() -> y,
-            le_read_phy => sdc_hci_cmd_le_read_phy::<LeReadPhy>(x) -> y,
-            le_set_default_phy => sdc_hci_cmd_le_set_default_phy::<LeSetDefaultPhy>(x),
-            le_set_phy => sdc_hci_cmd_le_set_phy::<LeSetPhy>(x),
-            le_set_adv_set_random_address => sdc_hci_cmd_le_set_adv_set_random_address::<LeSetAdvSetRandomAddr>(x),
-            le_set_ext_adv_params => sdc_hci_cmd_le_set_ext_adv_params::<LeSetExtAdvParams>(x) -> y,
-            le_read_max_adv_data_length => sdc_hci_cmd_le_read_max_adv_data_length::<LeReadMaxAdvDataLength>() -> y,
-            le_read_number_of_supported_adv_sets => sdc_hci_cmd_le_read_number_of_supported_adv_sets::<LeReadNumberOfSupportedAdvSets>() -> y,
-            le_remove_adv_set => sdc_hci_cmd_le_remove_adv_set::<LeRemoveAdvSet>(x),
-            le_clear_adv_sets => sdc_hci_cmd_le_clear_adv_sets::<LeClearAdvSets>(),
-            le_set_periodic_adv_params => sdc_hci_cmd_le_set_periodic_adv_params::<LeSetPeriodicAdvParams>(x),
-            le_set_periodic_adv_enable => sdc_hci_cmd_le_set_periodic_adv_enable::<LeSetPeriodicAdvEnable>(x),
-            le_set_ext_scan_enable => sdc_hci_cmd_le_set_ext_scan_enable::<LeSetExtScanEnable>(x),
-            le_periodic_adv_create_sync => sdc_hci_cmd_le_periodic_adv_create_sync::<LePeriodicAdvCreateSync>(x),
-            le_periodic_adv_create_sync_cancel => sdc_hci_cmd_le_periodic_adv_create_sync_cancel::<LePeriodicAdvCreateSyncCancel>(),
-            le_periodic_adv_terminate_sync => sdc_hci_cmd_le_periodic_adv_terminate_sync::<LePeriodicAdvTerminateSync>(x),
-            le_add_device_to_periodic_adv_list => sdc_hci_cmd_le_add_device_to_periodic_adv_list::<LeAddDeviceToPeriodicAdvList>(x),
-            le_remove_device_from_periodic_adv_list => sdc_hci_cmd_le_remove_device_from_periodic_adv_list::<LeRemoveDeviceFromPeriodicAdvList>(x),
-            le_clear_periodic_adv_list => sdc_hci_cmd_le_clear_periodic_adv_list::<LeClearPeriodicAdvList>(),
-            le_read_periodic_adv_list_size => sdc_hci_cmd_le_read_periodic_adv_list_size::<LeReadPeriodicAdvListSize>() -> y,
-            le_read_transmit_power => sdc_hci_cmd_le_read_transmit_power::<LeReadTransmitPower>() -> y,
-            le_read_rf_path_compensation => sdc_hci_cmd_le_read_rf_path_compensation::<LeReadRfPathCompensation>() -> y,
-            le_write_rf_path_compensation => sdc_hci_cmd_le_write_rf_path_compensation::<LeWriteRfPathCompensation>(x),
-            le_set_privacy_mode => sdc_hci_cmd_le_set_privacy_mode::<LeSetPrivacyMode>(x),
-            le_set_connless_cte_transmit_enable => sdc_hci_cmd_le_set_connless_cte_transmit_enable::<LeSetConnectionlessCteTransmitEnable>(x),
-            le_conn_cte_response_enable => sdc_hci_cmd_le_conn_cte_response_enable::<LeConnCteResponseEnable>(x) -> y,
-            le_read_antenna_information => sdc_hci_cmd_le_read_antenna_information::<LeReadAntennaInformation>() -> y,
-            le_set_periodic_adv_receive_enable => sdc_hci_cmd_le_set_periodic_adv_receive_enable::<LeSetPeriodicAdvReceiveEnable>(x),
-            le_periodic_adv_sync_transfer => sdc_hci_cmd_le_periodic_adv_sync_transfer::<LePeriodicAdvSyncTransfer>(x) -> y,
-            le_periodic_adv_set_info_transfer => sdc_hci_cmd_le_periodic_adv_set_info_transfer::<LePeriodicAdvSetInfoTransfer>(x) -> y,
-            le_set_periodic_adv_sync_transfer_params => sdc_hci_cmd_le_set_periodic_adv_sync_transfer_params::<LeSetPeriodicAdvSyncTransferParams>(x) -> y,
-            le_set_default_periodic_adv_sync_transfer_params => sdc_hci_cmd_le_set_default_periodic_adv_sync_transfer_params::<LeSetDefaultPeriodicAdvSyncTransferParams>(x),
-            le_request_peer_sca => sdc_hci_cmd_le_request_peer_sca::<LeRequestPeerSca>(x),
-            le_enhanced_read_transmit_power_level => sdc_hci_cmd_le_enhanced_read_transmit_power_level::<LeEnhancedReadTransmitPowerLevel>(x) -> y,
-            le_read_remote_transmit_power_level => sdc_hci_cmd_le_read_remote_transmit_power_level::<LeReadRemoteTransmitPowerLevel>(x),
-            le_set_path_loss_reporting_params => sdc_hci_cmd_le_set_path_loss_reporting_params::<LeSetPathLossReportingParams>(x) -> y,
-            le_set_path_loss_reporting_enable => sdc_hci_cmd_le_set_path_loss_reporting_enable::<LeSetPathLossReportingEnable>(x) -> y,
-            le_set_transmit_power_reporting_enable => sdc_hci_cmd_le_set_transmit_power_reporting_enable::<LeSetTransmitPowerReportingEnable>(x) -> y,
-            le_set_data_related_address_changes => sdc_hci_cmd_le_set_data_related_address_changes::<LeSetDataRelatedAddrChanges>(x),
-            le_set_periodic_adv_params_v2 => sdc_hci_cmd_le_set_periodic_adv_params_v2::<LeSetPeriodicAdvParamsV2>(x) -> y,
-        }
+    sdc_cmd!(LeSetEventMask => sdc_hci_cmd_le_set_event_mask(x));
+    sdc_cmd!(LeReadBufferSize => sdc_hci_cmd_le_read_buffer_size() -> y);
+    sdc_cmd!(LeReadLocalSupportedFeatures => sdc_hci_cmd_le_read_local_supported_features() -> y);
+    sdc_cmd!(LeSetRandomAddr => sdc_hci_cmd_le_set_random_address(x));
+    sdc_cmd!(LeSetAdvParams => sdc_hci_cmd_le_set_adv_params(x));
+    sdc_cmd!(LeReadAdvPhysicalChannelTxPower => sdc_hci_cmd_le_read_adv_physical_channel_tx_power() -> y);
+    sdc_cmd!(LeSetAdvData => sdc_hci_cmd_le_set_adv_data(x));
+    sdc_cmd!(LeSetScanResponseData => sdc_hci_cmd_le_set_scan_response_data(x));
+    sdc_cmd!(LeSetAdvEnable => sdc_hci_cmd_le_set_adv_enable(x));
+    sdc_cmd!(LeSetScanParams => sdc_hci_cmd_le_set_scan_params(x));
+    sdc_cmd!(LeSetScanEnable => sdc_hci_cmd_le_set_scan_enable(x));
+    sdc_cmd!(async LeCreateConn => sdc_hci_cmd_le_create_conn(x));
+    sdc_cmd!(LeCreateConnCancel => sdc_hci_cmd_le_create_conn_cancel());
+    sdc_cmd!(LeReadFilterAcceptListSize => sdc_hci_cmd_le_read_filter_accept_list_size() -> y);
+    sdc_cmd!(LeClearFilterAcceptList => sdc_hci_cmd_le_clear_filter_accept_list());
+    sdc_cmd!(LeAddDeviceToFilterAcceptList => sdc_hci_cmd_le_add_device_to_filter_accept_list(x));
+    sdc_cmd!(LeRemoveDeviceFromFilterAcceptList => sdc_hci_cmd_le_remove_device_from_filter_accept_list(x));
+    sdc_cmd!(async LeConnUpdate => sdc_hci_cmd_le_conn_update(x));
+    sdc_cmd!(LeSetHostChannelClassification => sdc_hci_cmd_le_set_host_channel_classification(x));
+    sdc_cmd!(LeReadChannelMap => sdc_hci_cmd_le_read_channel_map(x) -> y);
+    sdc_cmd!(async LeReadRemoteFeatures => sdc_hci_cmd_le_read_remote_features(x));
+    sdc_cmd!(LeEncrypt => sdc_hci_cmd_le_encrypt(x) -> y);
+    sdc_cmd!(LeRand => sdc_hci_cmd_le_rand() -> y);
+    sdc_cmd!(async LeEnableEncryption => sdc_hci_cmd_le_enable_encryption(x));
+    sdc_cmd!(LeLongTermKeyRequestReply => sdc_hci_cmd_le_long_term_key_request_reply(x) -> y);
+    sdc_cmd!(LeLongTermKeyRequestNegativeReply => sdc_hci_cmd_le_long_term_key_request_negative_reply(x) -> y);
+    sdc_cmd!(LeReadSupportedStates => sdc_hci_cmd_le_read_supported_states() -> y);
+    sdc_cmd!(LeTestEnd => sdc_hci_cmd_le_test_end() -> y);
+    sdc_cmd!(LeSetDataLength => sdc_hci_cmd_le_set_data_length(x) -> y);
+    sdc_cmd!(LeReadSuggestedDefaultDataLength => sdc_hci_cmd_le_read_suggested_default_data_length() -> y);
+    sdc_cmd!(LeWriteSuggestedDefaultDataLength => sdc_hci_cmd_le_write_suggested_default_data_length(x));
+    sdc_cmd!(LeAddDeviceToResolvingList => sdc_hci_cmd_le_add_device_to_resolving_list(x));
+    sdc_cmd!(LeRemoveDeviceFromResolvingList => sdc_hci_cmd_le_remove_device_from_resolving_list(x));
+    sdc_cmd!(LeClearResolvingList => sdc_hci_cmd_le_clear_resolving_list());
+    sdc_cmd!(LeReadResolvingListSize => sdc_hci_cmd_le_read_resolving_list_size() -> y);
+    sdc_cmd!(LeSetAddrResolutionEnable => sdc_hci_cmd_le_set_address_resolution_enable(x));
+    sdc_cmd!(LeSetResolvablePrivateAddrTimeout => sdc_hci_cmd_le_set_resolvable_private_address_timeout(x));
+    sdc_cmd!(LeReadMaxDataLength => sdc_hci_cmd_le_read_max_data_length() -> y);
+    sdc_cmd!(LeReadPhy => sdc_hci_cmd_le_read_phy(x) -> y);
+    sdc_cmd!(LeSetDefaultPhy => sdc_hci_cmd_le_set_default_phy(x));
+    sdc_cmd!(async LeSetPhy => sdc_hci_cmd_le_set_phy(x));
+    sdc_cmd!(LeSetAdvSetRandomAddr => sdc_hci_cmd_le_set_adv_set_random_address(x));
+    sdc_cmd!(LeSetExtAdvParams => sdc_hci_cmd_le_set_ext_adv_params(x) -> y);
+    sdc_cmd!(LeReadMaxAdvDataLength => sdc_hci_cmd_le_read_max_adv_data_length() -> y);
+    sdc_cmd!(LeReadNumberOfSupportedAdvSets => sdc_hci_cmd_le_read_number_of_supported_adv_sets() -> y);
+    sdc_cmd!(LeRemoveAdvSet => sdc_hci_cmd_le_remove_adv_set(x));
+    sdc_cmd!(LeClearAdvSets => sdc_hci_cmd_le_clear_adv_sets());
+    sdc_cmd!(LeSetPeriodicAdvParams => sdc_hci_cmd_le_set_periodic_adv_params(x));
+    sdc_cmd!(LeSetPeriodicAdvEnable => sdc_hci_cmd_le_set_periodic_adv_enable(x));
+    sdc_cmd!(LeSetExtScanEnable => sdc_hci_cmd_le_set_ext_scan_enable(x));
+    sdc_cmd!(async LePeriodicAdvCreateSync => sdc_hci_cmd_le_periodic_adv_create_sync(x));
+    sdc_cmd!(LePeriodicAdvCreateSyncCancel => sdc_hci_cmd_le_periodic_adv_create_sync_cancel());
+    sdc_cmd!(LePeriodicAdvTerminateSync => sdc_hci_cmd_le_periodic_adv_terminate_sync(x));
+    sdc_cmd!(LeAddDeviceToPeriodicAdvList => sdc_hci_cmd_le_add_device_to_periodic_adv_list(x));
+    sdc_cmd!(LeRemoveDeviceFromPeriodicAdvList => sdc_hci_cmd_le_remove_device_from_periodic_adv_list(x));
+    sdc_cmd!(LeClearPeriodicAdvList => sdc_hci_cmd_le_clear_periodic_adv_list());
+    sdc_cmd!(LeReadPeriodicAdvListSize => sdc_hci_cmd_le_read_periodic_adv_list_size() -> y);
+    sdc_cmd!(LeReadTransmitPower => sdc_hci_cmd_le_read_transmit_power() -> y);
+    sdc_cmd!(LeReadRfPathCompensation => sdc_hci_cmd_le_read_rf_path_compensation() -> y);
+    sdc_cmd!(LeWriteRfPathCompensation => sdc_hci_cmd_le_write_rf_path_compensation(x));
+    sdc_cmd!(LeSetPrivacyMode => sdc_hci_cmd_le_set_privacy_mode(x));
+    sdc_cmd!(LeSetConnectionlessCteTransmitEnable => sdc_hci_cmd_le_set_connless_cte_transmit_enable(x));
+    sdc_cmd!(LeConnCteResponseEnable => sdc_hci_cmd_le_conn_cte_response_enable(x) -> y);
+    sdc_cmd!(LeReadAntennaInformation => sdc_hci_cmd_le_read_antenna_information() -> y);
+    sdc_cmd!(LeSetPeriodicAdvReceiveEnable => sdc_hci_cmd_le_set_periodic_adv_receive_enable(x));
+    sdc_cmd!(LePeriodicAdvSyncTransfer => sdc_hci_cmd_le_periodic_adv_sync_transfer(x) -> y);
+    sdc_cmd!(LePeriodicAdvSetInfoTransfer => sdc_hci_cmd_le_periodic_adv_set_info_transfer(x) -> y);
+    sdc_cmd!(LeSetPeriodicAdvSyncTransferParams => sdc_hci_cmd_le_set_periodic_adv_sync_transfer_params(x) -> y);
+    sdc_cmd!(LeSetDefaultPeriodicAdvSyncTransferParams => sdc_hci_cmd_le_set_default_periodic_adv_sync_transfer_params(x));
+    sdc_cmd!(async LeRequestPeerSca => sdc_hci_cmd_le_request_peer_sca(x));
+    sdc_cmd!(LeEnhancedReadTransmitPowerLevel => sdc_hci_cmd_le_enhanced_read_transmit_power_level(x) -> y);
+    sdc_cmd!(async LeReadRemoteTransmitPowerLevel => sdc_hci_cmd_le_read_remote_transmit_power_level(x));
+    sdc_cmd!(LeSetPathLossReportingParams => sdc_hci_cmd_le_set_path_loss_reporting_params(x) -> y);
+    sdc_cmd!(LeSetPathLossReportingEnable => sdc_hci_cmd_le_set_path_loss_reporting_enable(x) -> y);
+    sdc_cmd!(LeSetTransmitPowerReportingEnable => sdc_hci_cmd_le_set_transmit_power_reporting_enable(x) -> y);
+    sdc_cmd!(LeSetDataRelatedAddrChanges => sdc_hci_cmd_le_set_data_related_address_changes(x));
+    sdc_cmd!(LeSetPeriodicAdvParamsV2 => sdc_hci_cmd_le_set_periodic_adv_params_v2(x) -> y);
 
-        pub fn le_set_ext_adv_data(&self, params: LeSetExtAdvDataParams) -> Result<(), Error> {
+    impl<'a, 'd> bt_hci::ControllerCmdSync<LeSetExtAdvData<'a>> for super::SoftdeviceController<'d> {
+        async fn exec(&self, cmd: &LeSetExtAdvData<'a>) -> Result<(), Error> {
             const N: usize = 4 + 251;
             let mut buf = [0; N];
-            unwrap!(params.write_hci(buf.as_mut_slice()));
+            unwrap!(cmd.params().write_hci(buf.as_mut_slice()));
             let ret = unsafe { raw::sdc_hci_cmd_le_set_ext_adv_data(buf.as_ptr() as *const _) };
             bt_hci::param::Status::from(ret).to_result()
         }
+    }
 
-        pub fn le_set_ext_scan_response_data(&self, params: LeSetExtScanResponseDataParams) -> Result<(), Error> {
+    impl<'a, 'd> bt_hci::ControllerCmdSync<LeSetExtScanResponseData<'a>> for super::SoftdeviceController<'d> {
+        async fn exec(&self, cmd: &LeSetExtScanResponseData<'a>) -> Result<(), Error> {
             const N: usize = 4 + 251;
             let mut buf = [0; N];
-            unwrap!(params.write_hci(buf.as_mut_slice()));
+            unwrap!(cmd.params().write_hci(buf.as_mut_slice()));
             let ret = unsafe { raw::sdc_hci_cmd_le_set_ext_scan_response_data(buf.as_ptr() as *const _) };
             bt_hci::param::Status::from(ret).to_result()
         }
+    }
 
-        pub fn le_set_ext_adv_enable(&self, params: LeSetExtAdvEnableParams) -> Result<(), Error> {
+    impl<'a, 'd> bt_hci::ControllerCmdSync<LeSetExtAdvEnable<'a>> for super::SoftdeviceController<'d> {
+        async fn exec(&self, cmd: &LeSetExtAdvEnable<'a>) -> Result<(), Error> {
             const N: usize = 2 + MAX_ADV_SET * core::mem::size_of::<AdvSet>();
             let mut buf = [0; N];
-            unwrap!(params.write_hci(buf.as_mut_slice()));
+            unwrap!(cmd.params().write_hci(buf.as_mut_slice()));
             let ret = unsafe { raw::sdc_hci_cmd_le_set_ext_adv_enable(buf.as_ptr() as *const _) };
             bt_hci::param::Status::from(ret).to_result()
         }
+    }
 
-        pub fn le_set_periodic_adv_data(&self, params: LeSetPeriodicAdvDataParams) -> Result<(), Error> {
+    impl<'a, 'd> bt_hci::ControllerCmdSync<LeSetPeriodicAdvData<'a>> for super::SoftdeviceController<'d> {
+        async fn exec(&self, cmd: &LeSetPeriodicAdvData<'a>) -> Result<(), Error> {
             const N: usize = 3 + 252;
             let mut buf = [0; N];
-            unwrap!(params.write_hci(buf.as_mut_slice()));
+            unwrap!(cmd.params().write_hci(buf.as_mut_slice()));
             let ret = unsafe { raw::sdc_hci_cmd_le_set_periodic_adv_data(buf.as_ptr() as *const _) };
             bt_hci::param::Status::from(ret).to_result()
         }
+    }
 
-        pub fn le_set_ext_scan_params(&self, params: LeSetExtScanParamsParams) -> Result<(), Error> {
+    impl<'d> bt_hci::ControllerCmdSync<LeSetExtScanParams> for super::SoftdeviceController<'d> {
+        async fn exec(&self, cmd: &LeSetExtScanParams) -> Result<(), Error> {
             const N: usize = 3 + MAX_PHY_COUNT * core::mem::size_of::<ScanningPhy>();
             let mut buf = [0; N];
-            unwrap!(params.write_hci(buf.as_mut_slice()));
+            unwrap!(cmd.params().write_hci(buf.as_mut_slice()));
             let ret = unsafe { raw::sdc_hci_cmd_le_set_ext_scan_params(buf.as_ptr() as *const _) };
             bt_hci::param::Status::from(ret).to_result()
         }
+    }
 
-        pub fn le_ext_create_conn(&self, params: LeExtCreateConnParams) -> Result<(), Error> {
+    impl<'d> bt_hci::ControllerCmdAsync<LeExtCreateConn> for super::SoftdeviceController<'d> {
+        async fn exec(&self, cmd: &LeExtCreateConn) -> Result<(), Error> {
             const N: usize = 10 + MAX_PHY_COUNT * core::mem::size_of::<InitiatingPhy>();
             let mut buf = [0; N];
-            unwrap!(params.write_hci(buf.as_mut_slice()));
+            unwrap!(cmd.params().write_hci(buf.as_mut_slice()));
             let ret = unsafe { raw::sdc_hci_cmd_le_ext_create_conn(buf.as_ptr() as *const _) };
             bt_hci::param::Status::from(ret).to_result()
         }
+    }
 
-        pub fn le_set_connless_cte_transmit_params(
-            &self,
-            params: LeSetConnectionlessCteTransmitParamsParams,
-        ) -> Result<(), Error> {
+    impl<'a, 'd> bt_hci::ControllerCmdSync<LeSetConnectionlessCteTransmitParams<'a>> for super::SoftdeviceController<'d> {
+        async fn exec(&self, cmd: &LeSetConnectionlessCteTransmitParams<'a>) -> Result<(), Error> {
             const N: usize = 5 + MAX_ANTENNA_IDS;
             let mut buf = [0; N];
-            unwrap!(params.write_hci(buf.as_mut_slice()));
+            unwrap!(cmd.params().write_hci(buf.as_mut_slice()));
             let ret = unsafe { raw::sdc_hci_cmd_le_set_connless_cte_transmit_params(buf.as_ptr() as *const _) };
             bt_hci::param::Status::from(ret).to_result()
         }
+    }
 
-        pub fn le_set_conn_cte_transmit_params(
-            &self,
-            params: LeSetConnCteTransmitParamsParams,
-        ) -> Result<ConnHandle, Error> {
+    impl<'a, 'd> bt_hci::ControllerCmdSync<LeSetConnCteTransmitParams<'a>> for super::SoftdeviceController<'d> {
+        async fn exec(&self, cmd: &LeSetConnCteTransmitParams<'a>) -> Result<ConnHandle, Error> {
             const N: usize = 5 + MAX_ANTENNA_IDS;
             let mut buf = [0; N];
-            unwrap!(params.write_hci(buf.as_mut_slice()));
+            unwrap!(cmd.params().write_hci(buf.as_mut_slice()));
 
             let mut out = unsafe { core::mem::zeroed() };
             let ret = unsafe { raw::sdc_hci_cmd_le_set_conn_cte_transmit_params(buf.as_ptr() as *const _, &mut out) };
@@ -844,23 +890,24 @@ mod le {
                 super::bytes_of(&out)
             })))
         }
+    }
 
-        pub fn le_ext_create_conn_v2(&self, params: LeExtCreateConnV2Params) -> Result<(), Error> {
-            const N: usize = 5;
+    impl<'d> bt_hci::ControllerCmdAsync<LeExtCreateConnV2> for super::SoftdeviceController<'d> {
+        async fn exec(&self, cmd: &LeExtCreateConnV2) -> Result<(), Error> {
+            const N: usize = 12 + MAX_PHY_COUNT * 16;
             let mut buf = [0; N];
-            unwrap!(params.write_hci(buf.as_mut_slice()));
+            unwrap!(cmd.params().write_hci(buf.as_mut_slice()));
 
             let ret = unsafe { raw::sdc_hci_cmd_le_ext_create_conn_v2(buf.as_ptr() as *const _) };
             bt_hci::param::Status::from(ret).to_result()
         }
+    }
 
-        pub fn le_set_periodic_adv_subevent_data(
-            &self,
-            params: LeSetPeriodicAdvSubeventDataParams,
-        ) -> Result<AdvHandle, Error> {
-            const N: usize = 5;
+    impl<'a, 'd> bt_hci::ControllerCmdSync<LeSetPeriodicAdvSubeventData<'a>> for super::SoftdeviceController<'d> {
+        async fn exec(&self, cmd: &LeSetPeriodicAdvSubeventData<'a>) -> Result<AdvHandle, Error> {
+            const N: usize = raw::HCI_CMD_MAX_SIZE as usize;
             let mut buf = [0; N];
-            unwrap!(params.write_hci(buf.as_mut_slice()));
+            unwrap!(cmd.params().write_hci(buf.as_mut_slice()));
 
             let mut out = unsafe { core::mem::zeroed() };
             let ret = unsafe { raw::sdc_hci_cmd_le_set_periodic_adv_subevent_data(buf.as_ptr() as *const _, &mut out) };
@@ -870,14 +917,13 @@ mod le {
                 super::bytes_of(&out)
             })))
         }
+    }
 
-        pub fn le_set_periodic_adv_response_data(
-            &self,
-            params: LeSetPeriodicAdvResponseDataParams,
-        ) -> Result<SyncHandle, Error> {
-            const N: usize = 5;
+    impl<'a, 'd> bt_hci::ControllerCmdSync<LeSetPeriodicAdvResponseData<'a>> for super::SoftdeviceController<'d> {
+        async fn exec(&self, cmd: &LeSetPeriodicAdvResponseData<'a>) -> Result<SyncHandle, Error> {
+            const N: usize = raw::HCI_CMD_MAX_SIZE as usize;
             let mut buf = [0; N];
-            unwrap!(params.write_hci(buf.as_mut_slice()));
+            unwrap!(cmd.params().write_hci(buf.as_mut_slice()));
 
             let mut out = unsafe { core::mem::zeroed() };
             let ret = unsafe { raw::sdc_hci_cmd_le_set_periodic_adv_response_data(buf.as_ptr() as *const _, &mut out) };
@@ -887,14 +933,13 @@ mod le {
                 super::bytes_of(&out)
             })))
         }
+    }
 
-        pub fn le_set_periodic_sync_subevent(
-            &self,
-            params: LeSetPeriodicSyncSubeventParams,
-        ) -> Result<SyncHandle, Error> {
-            const N: usize = 5;
+    impl<'a, 'd> bt_hci::ControllerCmdSync<LeSetPeriodicSyncSubevent<'a>> for super::SoftdeviceController<'d> {
+        async fn exec(&self, cmd: &LeSetPeriodicSyncSubevent<'a>) -> Result<SyncHandle, Error> {
+            const N: usize = 5 + MAX_SUBEVENTS;
             let mut buf = [0; N];
-            unwrap!(params.write_hci(buf.as_mut_slice()));
+            unwrap!(cmd.params().write_hci(buf.as_mut_slice()));
 
             let mut out = unsafe { core::mem::zeroed() };
             let ret = unsafe { raw::sdc_hci_cmd_le_set_periodic_sync_subevent(buf.as_ptr() as *const _, &mut out) };
@@ -907,6 +952,7 @@ mod le {
     }
 }
 
+/// Bluetooth HCI vendor specific commands
 pub mod vendor {
     use crate::raw;
     use bt_hci::param::{BdAddr, ConnHandle, Duration, Error};
@@ -985,17 +1031,6 @@ pub mod vendor {
             Params = BdAddr;
             Return = ();
         }
-    }
-
-    cmd! {
-        /// https://docs.zephyrproject.org/apidoc/latest/hci__vs_8h.html
-        ZephyrReadStaticAddrs(VENDOR_SPECIFIC, 0x0009) {
-            Params = ();
-        }
-    }
-
-    impl bt_hci::cmd::SyncCmd for ZephyrReadStaticAddrs {
-        type Return<'ret> = ZephyrStaticAddrs<'ret>;
     }
 
     cmd! {
@@ -1197,41 +1232,34 @@ pub mod vendor {
         }
     }
 
-    /// Bluetooth HCI vendor specific commands
-    impl<'d> super::SoftdeviceController<'d> {
-        sdc_cmd! {
-            zephyr_read_version_info => sdc_hci_cmd_vs_zephyr_read_version_info::<ZephyrReadVersionInfo>() -> y,
-            zephyr_read_supported_commands => sdc_hci_cmd_vs_zephyr_read_supported_commands::<ZephyrReadSupportedCommands>() -> y,
-            zephyr_write_bd_addr => sdc_hci_cmd_vs_zephyr_write_bd_addr::<ZephyrWriteBdAddr>(x),
-            zephyr_read_key_hierarchy_roots => sdc_hci_cmd_vs_zephyr_read_key_hierarchy_roots::<ZephyrReadKeyHierarchyRoots>() -> y,
-            zephyr_read_chip_temp => sdc_hci_cmd_vs_zephyr_read_chip_temp::<ZephyrReadChipTemp>() -> y,
-            zephyr_write_tx_power => sdc_hci_cmd_vs_zephyr_write_tx_power::<ZephyrWriteTxPower>(x) -> y,
-            zephyr_read_tx_power => sdc_hci_cmd_vs_zephyr_read_tx_power::<ZephyrReadTxPower>(x) -> y,
-            read_supported_vs_commands => sdc_hci_cmd_vs_read_supported_vs_commands::<NordicReadSupportedCommands>() -> y,
-            llpm_mode_set => sdc_hci_cmd_vs_llpm_mode_set::<NordicLlpmModeSet>(x),
-            conn_update => sdc_hci_cmd_vs_conn_update::<NordicConnUpdate>(x),
-            conn_event_extend => sdc_hci_cmd_vs_conn_event_extend::<NordicConnEventExtend>(x),
-            qos_conn_event_report_enable => sdc_hci_cmd_vs_qos_conn_event_report_enable::<NordicQosConnEventReportEnable>(x),
-            event_length_set => sdc_hci_cmd_vs_event_length_set::<NordicEventLengthSet>(x),
-            periodic_adv_event_length_set => sdc_hci_cmd_vs_periodic_adv_event_length_set::<NordicPeriodicAdvEventLengthSet>(x),
-            coex_scan_mode_config => sdc_hci_cmd_vs_coex_scan_mode_config::<NordicCoexScanModeConfig>(x),
-            coex_priority_config => sdc_hci_cmd_vs_coex_priority_config::<NordicCoexPriorityConfig>(x),
-            peripheral_latency_mode_set => sdc_hci_cmd_vs_peripheral_latency_mode_set::<NordicPeripheralLatencyModeSet>(x),
-            write_remote_tx_power => sdc_hci_cmd_vs_write_remote_tx_power::<NordicWriteRemoteTxPower>(x),
-            set_auto_power_control_request_param => sdc_hci_cmd_vs_set_auto_power_control_request_param::<NordicSetAutoPowerControlRequestParam>(x),
-            set_adv_randomness => sdc_hci_cmd_vs_set_adv_randomness::<NordicSetAdvRandomness>(x),
-            compat_mode_window_offset_set => sdc_hci_cmd_vs_compat_mode_window_offset_set::<NordicCompatModeWindowOffsetSet>(x),
-        }
+    sdc_cmd!(ZephyrReadVersionInfo => sdc_hci_cmd_vs_zephyr_read_version_info() -> y);
+    sdc_cmd!(ZephyrReadSupportedCommands => sdc_hci_cmd_vs_zephyr_read_supported_commands() -> y);
+    sdc_cmd!(ZephyrWriteBdAddr => sdc_hci_cmd_vs_zephyr_write_bd_addr(x));
+    sdc_cmd!(ZephyrReadKeyHierarchyRoots => sdc_hci_cmd_vs_zephyr_read_key_hierarchy_roots() -> y);
+    sdc_cmd!(ZephyrReadChipTemp => sdc_hci_cmd_vs_zephyr_read_chip_temp() -> y);
+    sdc_cmd!(ZephyrWriteTxPower => sdc_hci_cmd_vs_zephyr_write_tx_power(x) -> y);
+    sdc_cmd!(ZephyrReadTxPower => sdc_hci_cmd_vs_zephyr_read_tx_power(x) -> y);
+    sdc_cmd!(NordicReadSupportedCommands => sdc_hci_cmd_vs_read_supported_vs_commands() -> y);
+    sdc_cmd!(NordicLlpmModeSet => sdc_hci_cmd_vs_llpm_mode_set(x));
+    sdc_cmd!(NordicConnUpdate => sdc_hci_cmd_vs_conn_update(x));
+    sdc_cmd!(NordicConnEventExtend => sdc_hci_cmd_vs_conn_event_extend(x));
+    sdc_cmd!(NordicQosConnEventReportEnable => sdc_hci_cmd_vs_qos_conn_event_report_enable(x));
+    sdc_cmd!(NordicEventLengthSet => sdc_hci_cmd_vs_event_length_set(x));
+    sdc_cmd!(NordicPeriodicAdvEventLengthSet => sdc_hci_cmd_vs_periodic_adv_event_length_set(x));
+    sdc_cmd!(NordicCoexScanModeConfig => sdc_hci_cmd_vs_coex_scan_mode_config(x));
+    sdc_cmd!(NordicCoexPriorityConfig => sdc_hci_cmd_vs_coex_priority_config(x));
+    sdc_cmd!(NordicPeripheralLatencyModeSet => sdc_hci_cmd_vs_peripheral_latency_mode_set(x));
+    sdc_cmd!(NordicWriteRemoteTxPower => sdc_hci_cmd_vs_write_remote_tx_power(x));
+    sdc_cmd!(NordicSetAutoPowerControlRequestParam => sdc_hci_cmd_vs_set_auto_power_control_request_param(x));
+    sdc_cmd!(NordicSetAdvRandomness => sdc_hci_cmd_vs_set_adv_randomness(x));
+    sdc_cmd!(NordicCompatModeWindowOffsetSet => sdc_hci_cmd_vs_compat_mode_window_offset_set(x));
 
-        /// # Safety
-        ///
-        /// `buf` must be large enough for the list of static addresses returned by the controller.
-        pub unsafe fn zephyr_read_static_addresses<'a>(
-            &self,
-            buf: &'a mut [u8],
-        ) -> Result<<ZephyrReadStaticAddrs as bt_hci::cmd::SyncCmd>::Return<'a>, Error> {
-            bt_hci::param::Status::from(raw::sdc_hci_cmd_vs_zephyr_read_static_addresses(buf.as_ptr() as *mut _))
-                .to_result()?;
+    impl<'d> super::SoftdeviceController<'d> {
+        pub fn zephyr_read_static_addresses<'a>(&self, buf: &'a mut [u8]) -> Result<ZephyrStaticAddrs<'a>, Error> {
+            assert!(buf.len() >= raw::HCI_EVENT_MAX_SIZE as usize);
+
+            let ret = unsafe { raw::sdc_hci_cmd_vs_zephyr_read_static_addresses(buf.as_ptr() as *mut _) };
+            bt_hci::param::Status::from(ret).to_result()?;
             Ok(unwrap!(ZephyrStaticAddrs::from_hci_bytes(buf)).0)
         }
     }

@@ -1,6 +1,7 @@
 #![no_std]
 #![no_main]
 
+use bt_hci::cmd::SyncCmd;
 use bt_hci::param::BdAddr;
 use defmt::{info, unwrap};
 use embassy_executor::Spawner;
@@ -11,6 +12,7 @@ use nrf_sdc::{self as sdc, mpsl, pac};
 use sdc::mpsl::MultiprotocolServiceLayer;
 use sdc::raw::HCI_MSG_BUFFER_MAX_SIZE;
 use sdc::rng_pool::RngPool;
+use sdc::vendor::ZephyrWriteBdAddr;
 use static_cell::StaticCell;
 use {defmt_rtt as _, panic_probe as _};
 
@@ -86,7 +88,7 @@ async fn main(spawner: Spawner) {
     let mut hci_buf = [0; HCI_MSG_BUFFER_MAX_SIZE as usize];
 
     // Set the bluetooth address
-    unwrap!(sdc.zephyr_write_bd_addr(bd_addr()));
+    unwrap!(ZephyrWriteBdAddr::new(bd_addr()).exec(&sdc).await);
 
     // HCI_LE_Set_Advertising_Parameters
     unwrap!(sdc.hci_cmd_put(&[
