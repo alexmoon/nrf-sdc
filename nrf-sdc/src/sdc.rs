@@ -16,15 +16,14 @@ use embassy_sync::signal::Signal;
 use embassy_sync::waitqueue::AtomicWaker;
 use nrf_mpsl::MultiprotocolServiceLayer;
 use raw::{
-    sdc_cfg_adv_buffer_cfg_t, sdc_cfg_buffer_cfg_t, sdc_cfg_buffer_count_t, sdc_cfg_event_length_t,
-    sdc_cfg_role_count_t, sdc_cfg_t, SDC_CFG_TYPE_NONE, SDC_DEFAULT_RESOURCE_CFG_TAG,
+    sdc_cfg_adv_buffer_cfg_t, sdc_cfg_buffer_cfg_t, sdc_cfg_buffer_count_t, sdc_cfg_role_count_t, sdc_cfg_t,
+    SDC_CFG_TYPE_NONE, SDC_DEFAULT_RESOURCE_CFG_TAG,
 };
 
 use crate::rng_pool::RngPool;
 use crate::{pac, raw, Error, RetVal};
 
 static WAKER: AtomicWaker = AtomicWaker::new();
-static FLASH_STATUS: Signal<ThreadModeRawMutex, Result<(), Error>> = Signal::new();
 static RNG_POOL: AtomicPtr<RngPool> = AtomicPtr::new(core::ptr::null_mut());
 
 pub struct Peripherals<'d> {
@@ -127,15 +126,6 @@ unsafe extern "C" fn rand_blocking(p_buff: *mut u8, length: u8) {
     }
 }
 
-extern "C" fn flash_callback(status: u32) {
-    let res = match status {
-        raw::SDC_SOC_FLASH_CMD_STATUS_SUCCESS => Ok(()),
-        raw::SDC_SOC_FLASH_CMD_STATUS_TIMEOUT => Err(Error::ETIMEDOUT),
-        _ => Err(Error::EINVAL),
-    };
-    FLASH_STATUS.signal(res);
-}
-
 #[repr(align(8))]
 pub struct Mem<const N: usize>(MaybeUninit<[u8; N]>);
 
@@ -195,17 +185,6 @@ impl Builder {
                     rx_packet_size,
                     tx_packet_count,
                     rx_packet_count,
-                },
-            },
-        )
-    }
-
-    pub fn event_duration(self, microseconds: u32) -> Result<Self, Error> {
-        self.cfg_set(
-            raw::SDC_CFG_TYPE_EVENT_LENGTH,
-            sdc_cfg_t {
-                event_length: sdc_cfg_event_length_t {
-                    event_length_us: microseconds,
                 },
             },
         )
@@ -482,16 +461,16 @@ impl<'d> SoftdeviceController<'d> {
         RetVal::from(ret).to_result().and(Ok(rev))
     }
 
-    pub fn hci_cmd_put(&self, buf: &[u8]) -> Result<(), Error> {
-        assert!(buf.len() >= 3 && buf.len() >= 3 + usize::from(buf[2]));
-        RetVal::from(unsafe { raw::sdc_hci_cmd_put(buf.as_ptr()) })
+    pub fn hci_data_put(&self, buf: &[u8]) -> Result<(), Error> {
+        assert!(buf.len() >= 4 && buf.len() >= 4 + usize::from(u16::from_le_bytes([buf[2], buf[3]])));
+        RetVal::from(unsafe { raw::sdc_hci_data_put(buf.as_ptr()) })
             .to_result()
             .and(Ok(()))
     }
 
-    pub fn hci_data_put(&self, buf: &[u8]) -> Result<(), Error> {
+    pub fn hci_iso_data_put(&self, buf: &[u8]) -> Result<(), Error> {
         assert!(buf.len() >= 4 && buf.len() >= 4 + usize::from(u16::from_le_bytes([buf[2], buf[3]])));
-        RetVal::from(unsafe { raw::sdc_hci_data_put(buf.as_ptr()) })
+        RetVal::from(unsafe { raw::sdc_hci_iso_data_put(buf.as_ptr()) })
             .to_result()
             .and(Ok(()))
     }
@@ -540,22 +519,6 @@ impl<'d> SoftdeviceController<'d> {
 
     pub fn register_waker(&self, waker: &Waker) {
         WAKER.register(waker);
-    }
-
-    pub async fn flash_write(&self, addr: u32, buf: &[u8]) -> Result<(), Error> {
-        let ret = unsafe {
-            raw::sdc_soc_flash_write_async(addr, buf.as_ptr() as *const _, buf.len() as u32, Some(flash_callback))
-        };
-        RetVal::from(ret).to_result()?;
-        FLASH_STATUS.reset();
-        FLASH_STATUS.wait().await
-    }
-
-    pub async fn flash_erase(&self, addr: u32) -> Result<(), Error> {
-        let ret = unsafe { raw::sdc_soc_flash_page_erase_async(addr, Some(flash_callback)) };
-        RetVal::from(ret).to_result()?;
-        FLASH_STATUS.reset();
-        FLASH_STATUS.wait().await
     }
 
     pub fn ecb_block_encrypt(&self, key: &[u8; 16], cleartext: &[u8], ciphertext: &mut [u8]) -> Result<(), Error> {
@@ -634,8 +597,13 @@ impl<'a> Controller for SoftdeviceController<'a> {
         unimplemented!()
     }
 
-    async fn write_iso_data(&self, _packet: &bt_hci::data::IsoPacket<'_>) -> Result<(), Self::Error> {
-        unimplemented!()
+    async fn write_iso_data(&self, packet: &bt_hci::data::IsoPacket<'_>) -> Result<(), Self::Error> {
+        let mut buf = [0u8; raw::HCI_DATA_PACKET_MAX_SIZE as usize];
+        packet.write_hci(buf.as_mut_slice()).map_err(|err| match err {
+            embedded_io::SliceWriteError::Full => Error::ENOMEM,
+            _ => unreachable!(),
+        })?;
+        self.hci_iso_data_put(buf.as_slice())
     }
 
     async fn read<'b>(&self, buf: &'b mut [u8]) -> Result<bt_hci::ControllerToHostPacket<'b>, Self::Error> {
