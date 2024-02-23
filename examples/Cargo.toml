@@ -5,7 +5,7 @@ name = "nrf-sdc-examples"
 version = "0.0.0"
 
 [[bin]]
-name = "hello"
+name = "adv-simple"
 
 [dependencies]
 nrf-sdc = { version = "0.1.0", path = "../nrf-sdc", features = ["defmt", "nrf52840", "peripheral"] }
