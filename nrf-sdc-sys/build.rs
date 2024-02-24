@@ -131,24 +131,17 @@ impl ParseCallbacks for Callback {
 
             write!(
                 self.mem_fns.borrow_mut(),
-                "const fn {name}({args}) -> u32 {{\n  {body}\n}}\n",
+                "#[allow(clippy::identity_op)]\nconst fn {name}({args}) -> u32 {{\n  {body}\n}}\n",
             )
             .unwrap();
         }
     }
 
     fn process_comment(&self, comment: &str) -> Option<String> {
-        Some(
-            doxygen_rs::transform(
-                &comment
-                    .replace('[', "\\[")
-                    .replace("SDC_SOC_FLASH_CMD_STATUS.", "sdc_soc_flash_cmd_status."),
-            )
-            .replace(
-                "http://csrc.nist.gov/publications/fips/ fips197/fips-197.pdf",
-                "<http://csrc.nist.gov/publications/fips/fips197/fips-197.pdf>",
-            ),
-        )
+        Some(doxygen_rs::transform(&comment.replace('[', "\\[")).replace(
+            "http://csrc.nist.gov/publications/fips/ fips197/fips-197.pdf",
+            "<http://csrc.nist.gov/publications/fips/fips197/fips-197.pdf>",
+        ))
     }
 }
 
