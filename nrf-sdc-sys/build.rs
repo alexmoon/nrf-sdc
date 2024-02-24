@@ -3,17 +3,140 @@
 //! Calls out to bindgen to generate a Rust crate from the Nordic header
 //! files.
 
+use std::cell::RefCell;
 use std::env;
 use std::fs::OpenOptions;
+use std::io::Write;
 use std::path::PathBuf;
+use std::rc::Rc;
 use std::str::FromStr;
 
 use bindgen::callbacks::ParseCallbacks;
+use winnow::Parser;
 
 #[derive(Debug)]
-struct Callback;
+struct Callback {
+    mem_fns: Rc<RefCell<Vec<u8>>>,
+}
+
+mod parser {
+    use winnow::ascii::digit1;
+    use winnow::combinator::{alt, cut_err, delimited, repeat, separated, separated_pair};
+    use winnow::prelude::*;
+    use winnow::stream::AsChar;
+    use winnow::token::{one_of, take_while};
+
+    pub fn uint<'s>(i: &mut &'s str) -> PResult<&'s str> {
+        digit1.parse_next(i)
+    }
+
+    pub fn ident<'s>(i: &mut &'s str) -> PResult<&'s str> {
+        (
+            one_of(|c: char| c.is_alpha() || c == '_'),
+            take_while(0.., |c: char| c.is_alphanum() || c == '_'),
+        )
+            .recognize()
+            .parse_next(i)
+    }
+
+    pub fn ternary(i: &mut &str) -> PResult<String> {
+        separated_pair(expr, '?', cut_err(separated_pair(expr, ':', expr)))
+            .context(winnow::error::StrContext::Label("ternary expression"))
+            .map(|(condition, (if_true, if_false))| format!("if {condition} {{ {if_true} }} else {{ {if_false} }}"))
+            .parse_next(i)
+    }
+
+    pub fn func(i: &mut &str) -> PResult<String> {
+        let func = ident.parse_next(i)?;
+
+        let args = delimited(
+            '(',
+            cut_err(separated(0.., expr, ',').map(|x: Vec<String>| x.join(","))),
+            ')',
+        )
+        .context(winnow::error::StrContext::Label("function-like macro call"))
+        .parse_next(i)?;
+
+        Ok(format!("{func}({args})"))
+    }
+
+    pub fn expr(i: &mut &str) -> PResult<String> {
+        let init = term.parse_next(i)?;
+
+        repeat(
+            0..,
+            (alt(("+", "-", "*", "/", ">", "<", "&&")), cut_err(term))
+                .context(winnow::error::StrContext::Label("expression")),
+        )
+        .fold(
+            move || init.clone(),
+            |mut acc: String, (op, val): (&str, String)| {
+                acc.push_str(op);
+                acc.push_str(&val);
+                acc
+            },
+        )
+        .parse_next(i)
+    }
+
+    pub fn term(i: &mut &str) -> PResult<String> {
+        alt((func, ident.map(str::to_owned), uint.map(str::to_owned), parens))
+            .context(winnow::error::StrContext::Label("term"))
+            .parse_next(i)
+    }
+
+    pub fn parens(i: &mut &str) -> PResult<String> {
+        delimited('(', cut_err(alt((ternary, expr))), ')')
+            .context(winnow::error::StrContext::Label("parenthesized expression"))
+            .map(|x| format!("({x})"))
+            .parse_next(i)
+    }
+
+    /// A quick and dirty parser to translate the function-like `SDC_MEM_` macros from
+    /// C to Rust.
+    ///
+    /// This handles only the very small subset of C expressions used in those
+    /// macros. The primary purpose of the translation is to turn C-style ternary
+    /// expressions into Rust if/else expressions.
+    pub fn sdc_mem_macro(i: &mut &str) -> PResult<String> {
+        parens.parse_next(i)
+    }
+}
 
 impl ParseCallbacks for Callback {
+    fn func_macro(&self, name: &str, value: &[&[u8]]) {
+        if name.starts_with("SDC_MEM_") || name.starts_with("__MEM_") {
+            let i = name.find('(').unwrap();
+            let args = name[(i + 1)..(name.len() - 1)]
+                .split(',')
+                .map(|x| {
+                    if x.ends_with("_enabled") {
+                        format!("{x}: bool")
+                    } else {
+                        format!("{x}: u32")
+                    }
+                })
+                .collect::<Vec<_>>()
+                .join(", ");
+            let name = &name[..i];
+
+            fn stringify(value: &[&[u8]]) -> String {
+                value
+                    .iter()
+                    .map(|x| core::str::from_utf8(x).unwrap())
+                    .collect::<String>()
+            }
+
+            let body = parser::sdc_mem_macro.parse(&stringify(value)).unwrap();
+
+            write!(
+                self.mem_fns.borrow_mut(),
+                "const fn {name}({args}) -> u32 {{\n  {body}\n}}\n",
+            )
+            .unwrap();
+        }
+    }
+
     fn process_comment(&self, comment: &str) -> Option<String> {
         Some(
             doxygen_rs::transform(
@@ -54,7 +177,7 @@ impl Target {
     }
 }
 
-fn bindgen(target: &Target) -> bindgen::Builder {
+fn bindgen(target: &Target, mem_fns: Rc<RefCell<Vec<u8>>>) -> bindgen::Builder {
     bindgen::Builder::default()
         .use_core()
         .size_t_is_usize(true)
@@ -75,7 +198,7 @@ fn bindgen(target: &Target) -> bindgen::Builder {
         .allowlist_var("__MEM_.*")
         .prepend_enum_name(false)
         .rustfmt_bindings(true)
-        .parse_callbacks(Box::new(Callback))
+        .parse_callbacks(Box::new(Callback { mem_fns }))
 }
 
 fn main() {
@@ -88,7 +211,8 @@ fn main() {
         (false, false) => panic!("At least one of the \"peripheral\" and/or \"central\" features must be enabled!"),
     };
 
-    let bindings = bindgen(&target)
+    let mem_fns = Rc::new(RefCell::new(Vec::new()));
+    let bindings = bindgen(&target, mem_fns.clone())
         .header("./third_party/nordic/nrfxlib/softdevice_controller/include/sdc.h")
         .header("./third_party/nordic/nrfxlib/softdevice_controller/include/sdc_hci.h")
         .header("./third_party/nordic/nrfxlib/softdevice_controller/include/sdc_hci_cmd_controller_baseband.h")
@@ -101,13 +225,15 @@ fn main() {
         .generate()
         .expect("Unable to generate bindings");
 
-    let file = OpenOptions::new()
+    let mut file = OpenOptions::new()
         .write(true)
         .truncate(true)
         .create(true)
         .open(PathBuf::from(env::var("OUT_DIR").unwrap()).join("bindings.rs"))
         .unwrap();
     bindings.write(Box::new(&file)).expect("Couldn't write bindgen output");
+    file.write_all(&mem_fns.borrow())
+        .expect("Couldn't write SDC_MEM_* functions");
 
     let lib_path = PathBuf::from_str(&env::var("CARGO_MANIFEST_DIR").unwrap())
         .unwrap()

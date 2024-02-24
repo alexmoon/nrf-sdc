@@ -31,3 +31,4 @@ nrf-mpsl-sys = { version = "0.1.0", path = "../nrf-mpsl-sys" }
 [build-dependencies]
 bindgen = "0.63.0"
 doxygen-rs = "0.3.0"
+winnow = "0.6.2"
