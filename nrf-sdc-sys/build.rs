@@ -9,7 +9,6 @@ use std::fs::OpenOptions;
 use std::io::Write;
 use std::path::PathBuf;
 use std::rc::Rc;
-use std::str::FromStr;
 
 use bindgen::callbacks::ParseCallbacks;
 use winnow::Parser;
@@ -222,18 +221,16 @@ fn main() {
         .write(true)
         .truncate(true)
         .create(true)
-        .open(PathBuf::from(env::var("OUT_DIR").unwrap()).join("bindings.rs"))
+        .open(PathBuf::from(env::var_os("OUT_DIR").unwrap()).join("bindings.rs"))
         .unwrap();
     bindings.write(Box::new(&file)).expect("Couldn't write bindgen output");
     file.write_all(&mem_fns.borrow())
         .expect("Couldn't write SDC_MEM_* functions");
 
-    let lib_path = PathBuf::from_str(&env::var("CARGO_MANIFEST_DIR").unwrap())
-        .unwrap()
-        .join(format!(
-            "./third_party/nordic/nrfxlib/softdevice_controller/lib/{}/{}-float",
-            target.cpu, target.float_abi
-        ));
+    let mut lib_path = PathBuf::from(env::var_os("CARGO_MANIFEST_DIR").unwrap());
+    lib_path.push("third_party/nordic/nrfxlib/softdevice_controller/lib");
+    lib_path.push(target.cpu);
+    lib_path.push(format!("{}-float", target.float_abi));
 
     println!("cargo:rustc-link-search={}", lib_path.to_str().unwrap());
     println!("cargo:rustc-link-lib=static=softdevice_controller_{}", role);
