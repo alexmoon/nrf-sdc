@@ -15,10 +15,12 @@ nrf52820 = ["nrf52820-pac", "embassy-nrf/nrf52820"]
 nrf52832 = ["nrf52832-pac", "embassy-nrf/nrf52832"]
 nrf52833 = ["nrf52833-pac", "embassy-nrf/nrf52833"]
 nrf52840 = ["nrf52840-pac", "embassy-nrf/nrf52840"]
+critical-section-impl = ["critical-section/restore-state-bool"]
 
 [dependencies]
 defmt = { version = "0.3", optional = true }
 log = { version = "0.4.11", optional = true }
+critical-section = { version = "1.1", optional = true }
 
 cortex-m = "0.7.2"
 
