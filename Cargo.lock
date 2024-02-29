@@ -638,6 +638,7 @@ name = "nrf-mpsl"
 version = "0.1.0"
 dependencies = [
  "cortex-m",
+ "critical-section",
  "defmt",
  "embassy-nrf",
  "embassy-sync",

@@ -60,6 +60,9 @@ mod hfclk;
 mod mpsl;
 mod temp;
 
+#[cfg(feature = "critical-section-impl")]
+mod critical_section_impl;
+
 pub use error::*;
 pub use hfclk::*;
 pub use mpsl::*;
