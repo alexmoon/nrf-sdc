@@ -21,6 +21,11 @@ include = [
     "third_party/nordic/nrfxlib/mpsl/lib/**",
 ]
 
+[features]
+"fem-simple-gpio" = []
+"fem-nrf21540-gpio" = []
+"fem-nrf21540-gpio-spi" = []
+
 [dependencies]
 
 [build-dependencies]
