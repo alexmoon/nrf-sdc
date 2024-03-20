@@ -66,11 +66,13 @@ checksum = "ed570934406eb16438a4e976b1b4500774099c13b8cb96eec99f620f05090ddf"
 [[package]]
 name = "bt-hci"
 version = "0.1.0"
-source = "git+https://github.com/alexmoon/bt-hci.git#a719f6cfa7fed30f2227d0828a6b62f7f8449651"
+source = "git+https://github.com/alexmoon/bt-hci.git?branch=serial-controller#eed871d809261e3e318552a20bbe4e2d94ccb642"
 dependencies = [
  "defmt",
+ "embassy-sync",
  "embedded-io",
  "embedded-io-async",
+ "heapless",
 ]
 
 [[package]]
@@ -642,6 +644,7 @@ dependencies = [
  "defmt",
  "embassy-nrf",
  "embassy-sync",
+ "embedded-io",
  "log",
  "nrf-mpsl-sys",
  "nrf52805-pac",
