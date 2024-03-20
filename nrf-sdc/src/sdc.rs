@@ -8,7 +8,8 @@ use core::task::{Poll, Waker};
 
 use bt_hci::cmd::le::LeSetPeriodicAdvResponseData;
 use bt_hci::cmd::Cmd;
-use bt_hci::{AsHciBytes, Controller, FixedSizeValue, FromHciBytes, WriteHci};
+use bt_hci::controller::Controller;
+use bt_hci::{AsHciBytes, FixedSizeValue, FromHciBytes, WriteHci};
 use embassy_nrf::{peripherals, Peripheral, PeripheralRef};
 use embassy_sync::blocking_mutex::raw::ThreadModeRawMutex;
 use embassy_sync::signal::Signal;
@@ -660,10 +661,10 @@ macro_rules! sdc_cmd {
     (async $cmd:ty => $method:ident($raw:ident$(, $params:ty)?) $($ext_adv:literal)?) => {
         #[automatically_derived]
         #[allow(unused_variables)]
-        impl<'d> bt_hci::ControllerCmdAsync<$cmd> for $crate::sdc::SoftdeviceController<'d> {
-            async fn exec(&self, cmd: &$cmd) -> Result<(), bt_hci::param::Error> {
+        impl<'d> bt_hci::controller::ControllerCmdAsync<$cmd> for $crate::sdc::SoftdeviceController<'d> {
+            async fn exec(&self, cmd: &$cmd) -> Result<(), bt_hci::controller::CmdError<Self::Error>> {
                 $(self.check_adv_cmd($ext_adv)?;)?
-                unsafe { self.$method(raw::$raw$(, <$params as bt_hci::cmd::Cmd>::params(cmd))?) }
+                unsafe { self.$method(raw::$raw$(, <$params as bt_hci::cmd::Cmd>::params(cmd))?) }.map_err(bt_hci::controller::CmdError::Hci)
             }
         }
     };
@@ -687,10 +688,11 @@ macro_rules! sdc_cmd {
     ($cmd:ty => $method:ident($raw:ident$(, $params:ty)*) $($ext_adv:literal)?) => {
         #[automatically_derived]
         #[allow(unused_variables)]
-        impl<'d> bt_hci::ControllerCmdSync<$cmd> for $crate::sdc::SoftdeviceController<'d> {
-            async fn exec(&self, cmd: &$cmd) -> Result<<$cmd as bt_hci::cmd::SyncCmd>::Return, bt_hci::param::Error> {
+        impl<'d> bt_hci::controller::ControllerCmdSync<$cmd> for $crate::sdc::SoftdeviceController<'d> {
+            async fn exec(&self, cmd: &$cmd) -> Result<<$cmd as bt_hci::cmd::SyncCmd>::Return, bt_hci::controller::CmdError<Self::Error>> {
                 $(self.check_adv_cmd($ext_adv)?;)?
-                unsafe { self.$method(raw::$raw$(, <$params as bt_hci::cmd::Cmd>::params(cmd))?) }
+                let ret = unsafe { self.$method(raw::$raw$(, <$params as bt_hci::cmd::Cmd>::params(cmd))?) }?;
+                Ok(ret)
             }
         }
     };
@@ -709,13 +711,14 @@ mod link_control {
 mod controller_baseband {
     use crate::raw;
     use bt_hci::cmd::{controller_baseband::*, Cmd};
+    use bt_hci::controller::{CmdError, ControllerCmdSync};
     use bt_hci::param::ConnHandleCompletedPackets;
-    use bt_hci::{ControllerCmdSync, WriteHci};
+    use bt_hci::WriteHci;
 
-    impl<'d> bt_hci::ControllerCmdSync<Reset> for super::SoftdeviceController<'d> {
-        async fn exec(&self, _cmd: &Reset) -> Result<<Reset as bt_hci::cmd::SyncCmd>::Return, bt_hci::param::Error> {
+    impl<'d> ControllerCmdSync<Reset> for super::SoftdeviceController<'d> {
+        async fn exec(&self, _cmd: &Reset) -> Result<<Reset as bt_hci::cmd::SyncCmd>::Return, CmdError<Self::Error>> {
             *self.using_ext_adv_cmds.borrow_mut() = None;
-            unsafe { self.raw_cmd(raw::sdc_hci_cmd_cb_reset) }
+            unsafe { self.raw_cmd(raw::sdc_hci_cmd_cb_reset) }.map_err(bt_hci::controller::CmdError::Hci)
         }
     }
 
@@ -731,13 +734,13 @@ mod controller_baseband {
         async fn exec(
             &self,
             cmd: &HostNumberOfCompletedPackets<'a>,
-        ) -> Result<<HostNumberOfCompletedPackets as bt_hci::cmd::SyncCmd>::Return, bt_hci::param::Error> {
+        ) -> Result<<HostNumberOfCompletedPackets as bt_hci::cmd::SyncCmd>::Return, CmdError<Self::Error>> {
             const MAX_CONN_HANDLES: usize = 63;
             const N: usize = 1 + MAX_CONN_HANDLES + core::mem::size_of::<ConnHandleCompletedPackets>();
             let mut buf = [0; N];
             unwrap!(cmd.params().write_hci(buf.as_mut_slice()));
             let ret = unsafe { raw::sdc_hci_cmd_cb_host_number_of_completed_packets(buf.as_ptr() as *const _) };
-            bt_hci::param::Status::from(ret).to_result()
+            bt_hci::param::Status::from(ret).to_result().map_err(CmdError::Hci)
         }
     }
 }
@@ -767,7 +770,8 @@ mod le {
 
     use crate::raw;
     use bt_hci::cmd::{le::*, Cmd};
-    use bt_hci::param::{AdvHandle, AdvSet, ConnHandle, Error, InitiatingPhy, ScanningPhy, SyncHandle};
+    use bt_hci::controller::{CmdError, ControllerCmdAsync, ControllerCmdSync};
+    use bt_hci::param::{AdvHandle, AdvSet, ConnHandle, InitiatingPhy, ScanningPhy, SyncHandle};
     use bt_hci::{FromHciBytes, WriteHci};
 
     const MAX_PHY_COUNT: usize = 3;
@@ -857,84 +861,84 @@ mod le {
     sdc_cmd!(LeSetTransmitPowerReportingEnable => sdc_hci_cmd_le_set_transmit_power_reporting_enable(x) -> y);
     sdc_cmd!(LeSetDataRelatedAddrChanges => sdc_hci_cmd_le_set_data_related_address_changes(x));
 
-    impl<'a, 'd> bt_hci::ControllerCmdSync<LeSetExtAdvData<'a>> for super::SoftdeviceController<'d> {
-        async fn exec(&self, cmd: &LeSetExtAdvData<'a>) -> Result<(), Error> {
+    impl<'a, 'd> ControllerCmdSync<LeSetExtAdvData<'a>> for super::SoftdeviceController<'d> {
+        async fn exec(&self, cmd: &LeSetExtAdvData<'a>) -> Result<(), CmdError<nrf_mpsl::Error>> {
             self.check_adv_cmd(true)?;
             const N: usize = 4 + 251;
             let mut buf = [0; N];
             unwrap!(cmd.params().write_hci(buf.as_mut_slice()));
             let ret = unsafe { raw::sdc_hci_cmd_le_set_ext_adv_data(buf.as_ptr() as *const _) };
-            bt_hci::param::Status::from(ret).to_result()
+            bt_hci::param::Status::from(ret).to_result().map_err(CmdError::Hci)
         }
     }
 
-    impl<'a, 'd> bt_hci::ControllerCmdSync<LeSetExtScanResponseData<'a>> for super::SoftdeviceController<'d> {
-        async fn exec(&self, cmd: &LeSetExtScanResponseData<'a>) -> Result<(), Error> {
+    impl<'a, 'd> ControllerCmdSync<LeSetExtScanResponseData<'a>> for super::SoftdeviceController<'d> {
+        async fn exec(&self, cmd: &LeSetExtScanResponseData<'a>) -> Result<(), CmdError<nrf_mpsl::Error>> {
             self.check_adv_cmd(true)?;
             const N: usize = 4 + 251;
             let mut buf = [0; N];
             unwrap!(cmd.params().write_hci(buf.as_mut_slice()));
             let ret = unsafe { raw::sdc_hci_cmd_le_set_ext_scan_response_data(buf.as_ptr() as *const _) };
-            bt_hci::param::Status::from(ret).to_result()
+            bt_hci::param::Status::from(ret).to_result().map_err(CmdError::Hci)
         }
     }
 
-    impl<'a, 'd> bt_hci::ControllerCmdSync<LeSetExtAdvEnable<'a>> for super::SoftdeviceController<'d> {
-        async fn exec(&self, cmd: &LeSetExtAdvEnable<'a>) -> Result<(), Error> {
+    impl<'a, 'd> ControllerCmdSync<LeSetExtAdvEnable<'a>> for super::SoftdeviceController<'d> {
+        async fn exec(&self, cmd: &LeSetExtAdvEnable<'a>) -> Result<(), CmdError<nrf_mpsl::Error>> {
             self.check_adv_cmd(true)?;
             const N: usize = 2 + MAX_ADV_SET * core::mem::size_of::<AdvSet>();
             let mut buf = [0; N];
             unwrap!(cmd.params().write_hci(buf.as_mut_slice()));
             let ret = unsafe { raw::sdc_hci_cmd_le_set_ext_adv_enable(buf.as_ptr() as *const _) };
-            bt_hci::param::Status::from(ret).to_result()
+            bt_hci::param::Status::from(ret).to_result().map_err(CmdError::Hci)
         }
     }
 
-    impl<'a, 'd> bt_hci::ControllerCmdSync<LeSetPeriodicAdvData<'a>> for super::SoftdeviceController<'d> {
-        async fn exec(&self, cmd: &LeSetPeriodicAdvData<'a>) -> Result<(), Error> {
+    impl<'a, 'd> ControllerCmdSync<LeSetPeriodicAdvData<'a>> for super::SoftdeviceController<'d> {
+        async fn exec(&self, cmd: &LeSetPeriodicAdvData<'a>) -> Result<(), CmdError<nrf_mpsl::Error>> {
             self.check_adv_cmd(true)?;
             const N: usize = 3 + 252;
             let mut buf = [0; N];
             unwrap!(cmd.params().write_hci(buf.as_mut_slice()));
             let ret = unsafe { raw::sdc_hci_cmd_le_set_periodic_adv_data(buf.as_ptr() as *const _) };
-            bt_hci::param::Status::from(ret).to_result()
+            bt_hci::param::Status::from(ret).to_result().map_err(CmdError::Hci)
         }
     }
 
-    impl<'d> bt_hci::ControllerCmdSync<LeSetExtScanParams> for super::SoftdeviceController<'d> {
-        async fn exec(&self, cmd: &LeSetExtScanParams) -> Result<(), Error> {
+    impl<'d> ControllerCmdSync<LeSetExtScanParams> for super::SoftdeviceController<'d> {
+        async fn exec(&self, cmd: &LeSetExtScanParams) -> Result<(), CmdError<nrf_mpsl::Error>> {
             self.check_adv_cmd(true)?;
             const N: usize = 3 + MAX_PHY_COUNT * core::mem::size_of::<ScanningPhy>();
             let mut buf = [0; N];
             unwrap!(cmd.params().write_hci(buf.as_mut_slice()));
             let ret = unsafe { raw::sdc_hci_cmd_le_set_ext_scan_params(buf.as_ptr() as *const _) };
-            bt_hci::param::Status::from(ret).to_result()
+            bt_hci::param::Status::from(ret).to_result().map_err(CmdError::Hci)
         }
     }
 
-    impl<'d> bt_hci::ControllerCmdAsync<LeExtCreateConn> for super::SoftdeviceController<'d> {
-        async fn exec(&self, cmd: &LeExtCreateConn) -> Result<(), Error> {
+    impl<'d> ControllerCmdAsync<LeExtCreateConn> for super::SoftdeviceController<'d> {
+        async fn exec(&self, cmd: &LeExtCreateConn) -> Result<(), CmdError<nrf_mpsl::Error>> {
             self.check_adv_cmd(true)?;
             const N: usize = 10 + MAX_PHY_COUNT * core::mem::size_of::<InitiatingPhy>();
             let mut buf = [0; N];
             unwrap!(cmd.params().write_hci(buf.as_mut_slice()));
             let ret = unsafe { raw::sdc_hci_cmd_le_ext_create_conn(buf.as_ptr() as *const _) };
-            bt_hci::param::Status::from(ret).to_result()
+            bt_hci::param::Status::from(ret).to_result().map_err(CmdError::Hci)
         }
     }
 
-    impl<'a, 'd> bt_hci::ControllerCmdSync<LeSetConnectionlessCteTransmitParams<'a>> for super::SoftdeviceController<'d> {
-        async fn exec(&self, cmd: &LeSetConnectionlessCteTransmitParams<'a>) -> Result<(), Error> {
+    impl<'a, 'd> ControllerCmdSync<LeSetConnectionlessCteTransmitParams<'a>> for super::SoftdeviceController<'d> {
+        async fn exec(&self, cmd: &LeSetConnectionlessCteTransmitParams<'a>) -> Result<(), CmdError<nrf_mpsl::Error>> {
             const N: usize = 5 + MAX_ANTENNA_IDS;
             let mut buf = [0; N];
             unwrap!(cmd.params().write_hci(buf.as_mut_slice()));
             let ret = unsafe { raw::sdc_hci_cmd_le_set_connless_cte_transmit_params(buf.as_ptr() as *const _) };
-            bt_hci::param::Status::from(ret).to_result()
+            bt_hci::param::Status::from(ret).to_result().map_err(CmdError::Hci)
         }
     }
 
-    impl<'a, 'd> bt_hci::ControllerCmdSync<LeSetConnCteTransmitParams<'a>> for super::SoftdeviceController<'d> {
-        async fn exec(&self, cmd: &LeSetConnCteTransmitParams<'a>) -> Result<ConnHandle, Error> {
+    impl<'a, 'd> ControllerCmdSync<LeSetConnCteTransmitParams<'a>> for super::SoftdeviceController<'d> {
+        async fn exec(&self, cmd: &LeSetConnCteTransmitParams<'a>) -> Result<ConnHandle, CmdError<nrf_mpsl::Error>> {
             const N: usize = 5 + MAX_ANTENNA_IDS;
             let mut buf = [0; N];
             unwrap!(cmd.params().write_hci(buf.as_mut_slice()));
@@ -949,20 +953,20 @@ mod le {
         }
     }
 
-    impl<'d> bt_hci::ControllerCmdAsync<LeExtCreateConnV2> for super::SoftdeviceController<'d> {
-        async fn exec(&self, cmd: &LeExtCreateConnV2) -> Result<(), Error> {
+    impl<'d> ControllerCmdAsync<LeExtCreateConnV2> for super::SoftdeviceController<'d> {
+        async fn exec(&self, cmd: &LeExtCreateConnV2) -> Result<(), CmdError<nrf_mpsl::Error>> {
             self.check_adv_cmd(true)?;
             const N: usize = 12 + MAX_PHY_COUNT * 16;
             let mut buf = [0; N];
             unwrap!(cmd.params().write_hci(buf.as_mut_slice()));
 
             let ret = unsafe { raw::sdc_hci_cmd_le_ext_create_conn_v2(buf.as_ptr() as *const _) };
-            bt_hci::param::Status::from(ret).to_result()
+            bt_hci::param::Status::from(ret).to_result().map_err(CmdError::Hci)
         }
     }
 
-    impl<'a, 'd> bt_hci::ControllerCmdSync<LeSetPeriodicAdvSubeventData<'a>> for super::SoftdeviceController<'d> {
-        async fn exec(&self, cmd: &LeSetPeriodicAdvSubeventData<'a>) -> Result<AdvHandle, Error> {
+    impl<'a, 'd> ControllerCmdSync<LeSetPeriodicAdvSubeventData<'a>> for super::SoftdeviceController<'d> {
+        async fn exec(&self, cmd: &LeSetPeriodicAdvSubeventData<'a>) -> Result<AdvHandle, CmdError<nrf_mpsl::Error>> {
             self.check_adv_cmd(true)?;
             const N: usize = raw::HCI_CMD_MAX_SIZE as usize;
             let mut buf = [0; N];
@@ -978,13 +982,13 @@ mod le {
         }
     }
 
-    impl<'a, 'd> bt_hci::ControllerCmdSync<LeSetPeriodicAdvResponseData<'a>> for super::SoftdeviceController<'d> {
-        async fn exec(&self, cmd: &LeSetPeriodicAdvResponseData<'a>) -> Result<SyncHandle, Error> {
+    impl<'a, 'd> ControllerCmdSync<LeSetPeriodicAdvResponseData<'a>> for super::SoftdeviceController<'d> {
+        async fn exec(&self, cmd: &LeSetPeriodicAdvResponseData<'a>) -> Result<SyncHandle, CmdError<nrf_mpsl::Error>> {
             if self
                 .periodic_adv_response_data_in_progress
                 .swap(true, Ordering::Relaxed)
             {
-                return Err(Error::CONTROLLER_BUSY);
+                return Err(CmdError::Hci(bt_hci::param::Error::CONTROLLER_BUSY));
             }
 
             self.check_adv_cmd(true)?;
@@ -1001,12 +1005,12 @@ mod le {
             self.periodic_adv_response_data_in_progress
                 .store(false, Ordering::Relaxed);
 
-            status.to_result().map(|_| handle)
+            status.to_result().map(|_| handle).map_err(CmdError::Hci)
         }
     }
 
-    impl<'a, 'd> bt_hci::ControllerCmdSync<LeSetPeriodicSyncSubevent<'a>> for super::SoftdeviceController<'d> {
-        async fn exec(&self, cmd: &LeSetPeriodicSyncSubevent<'a>) -> Result<SyncHandle, Error> {
+    impl<'a, 'd> ControllerCmdSync<LeSetPeriodicSyncSubevent<'a>> for super::SoftdeviceController<'d> {
+        async fn exec(&self, cmd: &LeSetPeriodicSyncSubevent<'a>) -> Result<SyncHandle, CmdError<nrf_mpsl::Error>> {
             self.check_adv_cmd(true)?;
             const N: usize = 5 + MAX_SUBEVENTS;
             let mut buf = [0; N];
@@ -1026,6 +1030,7 @@ mod le {
 /// Bluetooth HCI vendor specific commands
 pub mod vendor {
     use crate::raw;
+    use bt_hci::controller::{CmdError, ControllerCmdSync};
     use bt_hci::param::{BdAddr, ConnHandle, Duration};
     use bt_hci::{cmd, param, FromHciBytes};
 
@@ -1307,11 +1312,11 @@ pub mod vendor {
     sdc_cmd!(NordicSetAdvRandomness => sdc_hci_cmd_vs_set_adv_randomness(x));
     sdc_cmd!(NordicCompatModeWindowOffsetSet => sdc_hci_cmd_vs_compat_mode_window_offset_set(x));
 
-    impl<'d> bt_hci::ControllerCmdSync<ZephyrReadStaticAddrs> for super::SoftdeviceController<'d> {
+    impl<'d> ControllerCmdSync<ZephyrReadStaticAddrs> for super::SoftdeviceController<'d> {
         async fn exec(
             &self,
             _cmd: &ZephyrReadStaticAddrs,
-        ) -> Result<<ZephyrReadStaticAddrs as bt_hci::cmd::SyncCmd>::Return, bt_hci::param::Error> {
+        ) -> Result<<ZephyrReadStaticAddrs as bt_hci::cmd::SyncCmd>::Return, CmdError<Self::Error>> {
             const N: usize = core::mem::size_of::<ZephyrReadStaticAddrsReturn>();
             let mut out = [0; N];
             let ret = unsafe { raw::sdc_hci_cmd_vs_zephyr_read_static_addresses(out.as_mut_ptr() as *mut _) };

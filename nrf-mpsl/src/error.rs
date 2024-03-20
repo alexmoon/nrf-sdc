@@ -65,6 +65,12 @@ impl core::fmt::Display for Error {
     }
 }
 
+impl embedded_io::Error for Error {
+    fn kind(&self) -> embedded_io::ErrorKind {
+        embedded_io::ErrorKind::Other
+    }
+}
+
 impl From<Error> for i32 {
     fn from(value: Error) -> Self {
         value.0.get()
