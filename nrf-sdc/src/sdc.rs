@@ -29,7 +29,6 @@ static RNG_POOL: AtomicPtr<RngPool> = AtomicPtr::new(core::ptr::null_mut());
 pub struct Peripherals<'d> {
     pub ecb: pac::ECB,
     pub aar: pac::AAR,
-    pub nvmc: PeripheralRef<'d, peripherals::NVMC>,
 
     pub ppi_ch17: PeripheralRef<'d, peripherals::PPI_CH17>,
     pub ppi_ch18: PeripheralRef<'d, peripherals::PPI_CH18>,
@@ -50,7 +49,6 @@ impl<'d> Peripherals<'d> {
     pub fn new(
         ecb: pac::ECB,
         aar: pac::AAR,
-        nvmc: impl Peripheral<P = peripherals::NVMC> + 'd,
         ppi_ch17: impl Peripheral<P = peripherals::PPI_CH17> + 'd,
         ppi_ch18: impl Peripheral<P = peripherals::PPI_CH18> + 'd,
         ppi_ch20: impl Peripheral<P = peripherals::PPI_CH20> + 'd,
@@ -67,7 +65,6 @@ impl<'d> Peripherals<'d> {
         Peripherals {
             ecb,
             aar,
-            nvmc: nvmc.into_ref(),
             ppi_ch17: ppi_ch17.into_ref(),
             ppi_ch18: ppi_ch18.into_ref(),
             ppi_ch20: ppi_ch20.into_ref(),
