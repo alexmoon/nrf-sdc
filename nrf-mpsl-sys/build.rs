@@ -4,8 +4,7 @@
 //! files.
 
 use std::env;
-use std::path::PathBuf;
-use std::str::FromStr;
+use std::path::{Path, PathBuf};
 
 use bindgen::callbacks::ParseCallbacks;
 
@@ -76,20 +75,24 @@ fn bindgen(target: &Target) -> bindgen::Builder {
 fn main() {
     let target = Target::new(env::var("TARGET").unwrap());
 
+    let fem = match (
+        env::var_os("CARGO_FEATURE_FEM_SIMPLE_GPIO"),
+        env::var_os("CARGO_FEATURE_FEM_NRF21540_GPIO"),
+        env::var_os("CARGO_FEATURE_FEM_NRF21540_GPIO_SPI"),
+    ) {
+        (None, None, None) => None,
+        (Some(_), None, None) => Some("simple_gpio"),
+        (None, Some(_), None) => Some("nrf21540_gpio"),
+        (None, None, Some(_)) => Some("nrf21540_gpio_spi"),
+        _ => panic!("Only one front-end module feature may be enabled"),
+    };
+
     bindgen(&target)
         .header("./include/stdlib.h")
         .header("./third_party/nordic/nrfxlib/mpsl/include/mpsl.h")
         .header("./third_party/nordic/nrfxlib/mpsl/include/mpsl_clock.h")
         .header("./third_party/nordic/nrfxlib/mpsl/include/mpsl_coex.h")
         .header("./third_party/nordic/nrfxlib/mpsl/include/mpsl_cx_abstract_interface.h")
-        .header("./third_party/nordic/nrfxlib/mpsl/include/mpsl_fem_config_common.h")
-        .header("./third_party/nordic/nrfxlib/mpsl/include/mpsl_fem_config_nrf21540_common.h")
-        .header("./third_party/nordic/nrfxlib/mpsl/include/mpsl_fem_config_nrf21540_gpio.h")
-        .header("./third_party/nordic/nrfxlib/mpsl/include/mpsl_fem_config_nrf21540_gpio_spi.h")
-        .header("./third_party/nordic/nrfxlib/mpsl/include/mpsl_fem_config_simple_gpio.h")
-        .header("./third_party/nordic/nrfxlib/mpsl/include/mpsl_fem_init.h")
-        .header("./third_party/nordic/nrfxlib/mpsl/include/mpsl_fem_power_model.h")
-        .header("./third_party/nordic/nrfxlib/mpsl/include/mpsl_fem_types.h")
         .header("./third_party/nordic/nrfxlib/mpsl/include/mpsl_radio_notification.h")
         .header("./third_party/nordic/nrfxlib/mpsl/include/mpsl_temp.h")
         .header("./third_party/nordic/nrfxlib/mpsl/include/mpsl_timeslot.h")
@@ -97,19 +100,32 @@ fn main() {
         .header("./third_party/nordic/nrfxlib/mpsl/include/nrf_errno.h")
         .header("./third_party/nordic/nrfxlib/mpsl/include/protocol/mpsl_cx_protocol_api.h")
         .header("./third_party/nordic/nrfxlib/mpsl/include/protocol/mpsl_dppi_protocol_api.h")
-        .header("./third_party/nordic/nrfxlib/mpsl/include/protocol/mpsl_fem_protocol_api.h")
         .generate()
         .expect("Unable to generate bindings")
-        .write_to_file(PathBuf::from(env::var("OUT_DIR").unwrap()).join("bindings.rs"))
+        .write_to_file(PathBuf::from(env::var_os("OUT_DIR").unwrap()).join("bindings.rs"))
         .expect("Couldn't write bindgen output");
 
-    let lib_path = PathBuf::from_str(&env::var("CARGO_MANIFEST_DIR").unwrap())
-        .unwrap()
-        .join(format!(
-            "./third_party/nordic/nrfxlib/mpsl/lib/{}/{}-float",
-            target.cpu, target.float_abi
-        ));
+    fn lib_path<P: AsRef<Path>>(dir: P, target: &Target) -> PathBuf {
+        let mut path = PathBuf::from(env::var_os("CARGO_MANIFEST_DIR").unwrap());
+        path.push("third_party/nordic/nrfxlib/mpsl");
+        path.push(dir);
+        path.push("lib");
+        path.push(target.cpu);
+        path.push(format!("{}-float", target.float_abi));
+        path
+    }
 
-    println!("cargo:rustc-link-search={}", lib_path.to_str().unwrap());
+    let mpsl_lib_path = lib_path(".", &target);
+    let fem_common_lib_path = lib_path("fem/common", &target);
+
+    println!("cargo:rustc-link-search={}", mpsl_lib_path.to_str().unwrap());
+    println!("cargo:rustc-link-search={}", fem_common_lib_path.to_str().unwrap());
     println!("cargo:rustc-link-lib=static=mpsl");
+    println!("cargo:rustc-link-lib=static=mpsl_fem_common");
+
+    if let Some(fem) = fem {
+        let fem_lib_path = lib_path(format!("fem/{fem}"), &target);
+        println!("cargo:rustc-link-search={}", fem_lib_path.to_str().unwrap());
+        println!("cargo:rustc-link-lib=static=mpsl_fem_{}", fem);
+    }
 }

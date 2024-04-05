@@ -76,14 +76,14 @@ async fn main(spawner: Spawner) {
     spawner.must_spawn(mpsl_task(&*mpsl));
 
     let sdc_p = sdc::Peripherals::new(
-        pac_p.ECB, pac_p.AAR, p.NVMC, p.PPI_CH17, p.PPI_CH18, p.PPI_CH20, p.PPI_CH21, p.PPI_CH22, p.PPI_CH23,
-        p.PPI_CH24, p.PPI_CH25, p.PPI_CH26, p.PPI_CH27, p.PPI_CH28, p.PPI_CH29,
+        pac_p.ECB, pac_p.AAR, p.PPI_CH17, p.PPI_CH18, p.PPI_CH20, p.PPI_CH21, p.PPI_CH22, p.PPI_CH23, p.PPI_CH24,
+        p.PPI_CH25, p.PPI_CH26, p.PPI_CH27, p.PPI_CH28, p.PPI_CH29,
     );
 
     let mut pool = [0; 256];
     let rng = sdc::rng_pool::RngPool::new(p.RNG, Irqs, &mut pool, 64);
 
-    let mut sdc_mem = sdc::Mem::<1672>::new();
+    let mut sdc_mem = sdc::Mem::<1648>::new();
     let sdc = unwrap!(build_sdc(sdc_p, &rng, mpsl, &mut sdc_mem));
 
     // Set the bluetooth address
