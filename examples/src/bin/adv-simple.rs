@@ -8,6 +8,8 @@ use defmt::unwrap;
 use embassy_executor::Spawner;
 use embassy_nrf::bind_interrupts;
 use embassy_nrf::gpio::{Level, Output, OutputDrive};
+use embassy_sync::blocking_mutex::raw::{RawMutex, ThreadModeRawMutex};
+use embassy_sync::blocking_mutex::Mutex;
 use embassy_time::{Duration, Timer};
 use nrf_sdc::{self as sdc, mpsl, pac};
 use sdc::mpsl::MultiprotocolServiceLayer;
@@ -25,12 +27,12 @@ bind_interrupts!(struct Irqs {
     RTC0 => mpsl::HighPrioInterruptHandler;
 });
 
-fn build_sdc<'d, const N: usize>(
+fn build_sdc<'d, 'm, R: RawMutex, const N: usize>(
     p: nrf_sdc::Peripherals<'d>,
     rng: &'d RngPool<'d>,
-    mpsl: &'d MultiprotocolServiceLayer<'d>,
+    mpsl: &'d Mutex<R, MultiprotocolServiceLayer<'m>>,
     mem: &'d mut sdc::Mem<N>,
-) -> Result<nrf_sdc::SoftdeviceController<'d>, nrf_sdc::Error> {
+) -> Result<nrf_sdc::SoftdeviceController<'d, 'm, R>, nrf_sdc::Error> {
     sdc::Builder::new()?.support_adv()?.build(p, rng, mpsl, mem)
 }
 
@@ -45,8 +47,8 @@ fn bd_addr() -> BdAddr {
 }
 
 #[embassy_executor::task]
-async fn mpsl_task(mpsl: &'static MultiprotocolServiceLayer<'static>) -> ! {
-    mpsl.run().await
+async fn mpsl_task(mpsl: &'static Mutex<ThreadModeRawMutex, MultiprotocolServiceLayer<'static>>) -> ! {
+    MultiprotocolServiceLayer::run(mpsl).await
 }
 
 #[embassy_executor::main]
@@ -71,8 +73,10 @@ async fn main(spawner: Spawner) {
         accuracy_ppm: mpsl::raw::MPSL_DEFAULT_CLOCK_ACCURACY_PPM as u16,
         skip_wait_lfclk_started: mpsl::raw::MPSL_DEFAULT_SKIP_WAIT_LFCLK_STARTED != 0,
     };
-    static MPSL: StaticCell<MultiprotocolServiceLayer> = StaticCell::new();
-    let mpsl = MPSL.init(unwrap!(mpsl::MultiprotocolServiceLayer::new(mpsl_p, Irqs, lfclk_cfg)));
+    static MPSL: StaticCell<Mutex<ThreadModeRawMutex, MultiprotocolServiceLayer>> = StaticCell::new();
+    let mpsl = MPSL.init(Mutex::new(unwrap!(mpsl::MultiprotocolServiceLayer::new(
+        mpsl_p, Irqs, lfclk_cfg
+    ))));
     spawner.must_spawn(mpsl_task(&*mpsl));
 
     let sdc_p = sdc::Peripherals::new(

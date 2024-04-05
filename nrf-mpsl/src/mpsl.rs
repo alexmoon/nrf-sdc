@@ -7,6 +7,8 @@ use cortex_m::interrupt::InterruptNumber as _;
 use embassy_nrf::interrupt::typelevel::{Binding, Handler, Interrupt, POWER_CLOCK, RADIO, RTC0, TIMER0};
 use embassy_nrf::interrupt::Priority;
 use embassy_nrf::{interrupt, peripherals, Peripheral, PeripheralRef};
+use embassy_sync::blocking_mutex::raw::RawMutex;
+use embassy_sync::blocking_mutex::Mutex;
 use embassy_sync::waitqueue::AtomicWaker;
 
 use crate::error::{Error, RetVal};
@@ -52,8 +54,8 @@ impl<'d> Peripherals<'d> {
 }
 
 pub struct MultiprotocolServiceLayer<'d> {
-    // Prevent Send, Sync
-    _private: PhantomData<&'d *mut ()>,
+    // Prevent Sync
+    _private: PhantomData<core::cell::Cell<&'d ()>>,
 }
 
 unsafe extern "C" fn assert_handler(file: *const core::ffi::c_char, line: u32) {
@@ -80,11 +82,6 @@ impl<'d> MultiprotocolServiceLayer<'d> {
             + Binding<interrupt::typelevel::RTC0, HighPrioInterruptHandler>
             + Binding<interrupt::typelevel::POWER_CLOCK, ClockInterruptHandler>,
     {
-        assert!(
-            cortex_m::peripheral::SCB::vect_active() == cortex_m::peripheral::scb::VectActive::ThreadMode,
-            "MultiprotocolServiceLayer must be initialized from thread mode"
-        );
-
         // Peripherals are used by the MPSL library, so we merely take ownership and ignore them
         let _ = p;
 
@@ -108,10 +105,10 @@ impl<'d> MultiprotocolServiceLayer<'d> {
         RetVal::from(ret).to_result().and(Ok(rev))
     }
 
-    pub async fn run(&self) -> ! {
+    pub async fn run<R: RawMutex>(mpsl: &Mutex<R, Self>) -> ! {
         poll_fn(|ctx| {
             WAKER.register(ctx.waker());
-            unsafe { raw::mpsl_low_priority_process() };
+            mpsl.lock(|_| unsafe { raw::mpsl_low_priority_process() });
             Poll::Pending
         })
         .await
