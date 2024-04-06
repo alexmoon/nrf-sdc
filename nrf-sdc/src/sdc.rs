@@ -11,6 +11,8 @@ use bt_hci::cmd::Cmd;
 use bt_hci::controller::blocking::TryError;
 use bt_hci::controller::{blocking, Controller};
 use bt_hci::{AsHciBytes, FixedSizeValue, FromHciBytes, WriteHci};
+use embassy_nrf::peripherals::RNG;
+use embassy_nrf::rng::Rng;
 use embassy_nrf::{peripherals, Peripheral, PeripheralRef};
 use embassy_sync::blocking_mutex::raw::NoopRawMutex;
 use embassy_sync::signal::Signal;
@@ -22,11 +24,10 @@ use raw::{
     SDC_CFG_TYPE_NONE, SDC_DEFAULT_RESOURCE_CFG_TAG,
 };
 
-use crate::rng_pool::RngPool;
 use crate::{pac, raw, Error, RetVal};
 
 static WAKER: AtomicWaker = AtomicWaker::new();
-static RNG_POOL: AtomicPtr<RngPool> = AtomicPtr::new(core::ptr::null_mut());
+static RNG_POOL: AtomicPtr<Rng<RNG>> = AtomicPtr::new(core::ptr::null_mut());
 
 pub struct Peripherals<'d> {
     pub ecb: pac::ECB,
@@ -93,26 +94,6 @@ unsafe extern "C" fn fault_handler(file: *const core::ffi::c_char, line: u32) {
 
 extern "C" fn sdc_callback() {
     WAKER.wake()
-}
-
-unsafe extern "C" fn rand_prio_low_get(p_buff: *mut u8, length: u8) -> u8 {
-    let rng = RNG_POOL.load(Ordering::Acquire);
-    if !rng.is_null() {
-        let buf = core::slice::from_raw_parts_mut(p_buff, usize::from(length));
-        (*rng).try_fill_bytes(buf) as u8
-    } else {
-        0
-    }
-}
-
-unsafe extern "C" fn rand_prio_high_get(p_buff: *mut u8, length: u8) -> u8 {
-    let rng = RNG_POOL.load(Ordering::Acquire);
-    if !rng.is_null() {
-        let buf = core::slice::from_raw_parts_mut(p_buff, usize::from(length));
-        (*rng).try_fill_bytes(buf) as u8
-    } else {
-        0
-    }
 }
 
 unsafe extern "C" fn rand_blocking(p_buff: *mut u8, length: u8) {
@@ -388,7 +369,7 @@ impl Builder {
     pub fn build<'d, const N: usize>(
         self,
         p: Peripherals<'d>,
-        rng: &'d RngPool,
+        rng: &'d Rng<'d, RNG>,
         mpsl: &'d MultiprotocolServiceLayer,
         mem: &'d mut Mem<N>,
     ) -> Result<SoftdeviceController<'d>, Error> {
@@ -409,8 +390,8 @@ impl Builder {
 
         RNG_POOL.store(rng as *const _ as *mut _, Ordering::Release);
         let rand_source = raw::sdc_rand_source_t {
-            rand_prio_low_get: Some(rand_prio_low_get),
-            rand_prio_high_get: Some(rand_prio_high_get),
+            rand_prio_low_get: None,
+            rand_prio_high_get: None,
             rand_poll: Some(rand_blocking),
         };
         let ret = unsafe { raw::sdc_rand_source_register(&rand_source) };
@@ -1400,7 +1381,6 @@ pub mod vendor {
     sdc_cmd!(NordicCoexPriorityConfig => sdc_hci_cmd_vs_coex_priority_config(x));
     sdc_cmd!(NordicPeripheralLatencyModeSet => sdc_hci_cmd_vs_peripheral_latency_mode_set(x));
     sdc_cmd!(NordicWriteRemoteTxPower => sdc_hci_cmd_vs_write_remote_tx_power(x));
-    sdc_cmd!(NordicSetAutoPowerControlRequestParam => sdc_hci_cmd_vs_set_auto_power_control_request_param(x));
     sdc_cmd!(NordicSetAdvRandomness => sdc_hci_cmd_vs_set_adv_randomness(x));
     sdc_cmd!(NordicCompatModeWindowOffsetSet => sdc_hci_cmd_vs_compat_mode_window_offset_set(x));
     sdc_cmd!(NordicQosChannelSurveyEnable => sdc_hci_cmd_vs_qos_channel_survey_enable(x));
