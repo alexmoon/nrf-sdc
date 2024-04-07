@@ -28,7 +28,7 @@ bind_interrupts!(struct Irqs {
 
 fn build_sdc<'d, const N: usize>(
     p: nrf_sdc::Peripherals<'d>,
-    rng: &'d Rng<RNG>,
+    rng: &'d mut Rng<RNG>,
     mpsl: &'d MultiprotocolServiceLayer,
     mem: &'d mut sdc::Mem<N>,
 ) -> Result<nrf_sdc::SoftdeviceController<'d>, nrf_sdc::Error> {
@@ -81,10 +81,10 @@ async fn main(spawner: Spawner) {
         p.PPI_CH25, p.PPI_CH26, p.PPI_CH27, p.PPI_CH28, p.PPI_CH29,
     );
 
-    let rng = Rng::new(p.RNG, Irqs);
+    let mut rng = Rng::new(p.RNG, Irqs);
 
     let mut sdc_mem = sdc::Mem::<1648>::new();
-    let sdc = unwrap!(build_sdc(sdc_p, &rng, mpsl, &mut sdc_mem));
+    let sdc = unwrap!(build_sdc(sdc_p, &mut rng, mpsl, &mut sdc_mem));
 
     // Set the bluetooth address
     unwrap!(ZephyrWriteBdAddr::new(bd_addr()).exec(&sdc).await);

@@ -10,13 +10,12 @@ use bt_hci::cmd::le::LeSetPeriodicAdvResponseData;
 use bt_hci::cmd::Cmd;
 use bt_hci::controller::Controller;
 use bt_hci::{AsHciBytes, FixedSizeValue, FromHciBytes, WriteHci};
-use embassy_nrf::peripherals::RNG;
-use embassy_nrf::rng::Rng;
 use embassy_nrf::{peripherals, Peripheral, PeripheralRef};
 use embassy_sync::blocking_mutex::raw::NoopRawMutex;
 use embassy_sync::signal::Signal;
 use embassy_sync::waitqueue::AtomicWaker;
 use nrf_mpsl::MultiprotocolServiceLayer;
+use rand_core::CryptoRngCore;
 use raw::{
     sdc_cfg_adv_buffer_cfg_t, sdc_cfg_buffer_cfg_t, sdc_cfg_buffer_count_t, sdc_cfg_role_count_t, sdc_cfg_t,
     SDC_CFG_TYPE_NONE, SDC_DEFAULT_RESOURCE_CFG_TAG,
@@ -25,7 +24,7 @@ use raw::{
 use crate::{pac, raw, Error, RetVal};
 
 static WAKER: AtomicWaker = AtomicWaker::new();
-static RNG_POOL: AtomicPtr<Rng<RNG>> = AtomicPtr::new(core::ptr::null_mut());
+static SDC_RNG: AtomicPtr<()> = AtomicPtr::new(core::ptr::null_mut());
 
 pub struct Peripherals<'d> {
     pub ecb: pac::ECB,
@@ -94,14 +93,19 @@ extern "C" fn sdc_callback() {
     WAKER.wake()
 }
 
-unsafe extern "C" fn rand_blocking(p_buff: *mut u8, length: u8) {
-    let rng = RNG_POOL.load(Ordering::Acquire);
-    if !rng.is_null() {
-        let buf = core::slice::from_raw_parts_mut(p_buff, usize::from(length));
-        (*rng).blocking_fill_bytes(buf);
-    } else {
-        panic!("rand_blocking called from Softdevice Controller when no RngPool is set");
+/// SAFETY: This function must only be called while a `SoftdeviceController` instance
+/// is alive, with the same type parameter as was passed to `Builder::build`, and must
+/// be synchronized with other MPSL accesses.
+///
+/// The softdevice controller calls this function exclusively from `mpsl_low_priority_process`,
+/// which is appropriately synchronized.
+unsafe extern "C" fn rand_blocking<R: CryptoRngCore + Send>(p_buff: *mut u8, length: u8) {
+    let rng = SDC_RNG.load(Ordering::Acquire) as *mut R;
+    if rng.is_null() {
+        panic!("rand_blocking called from Softdevice Controller when no rng is set");
     }
+    let buf = core::slice::from_raw_parts_mut(p_buff, usize::from(length));
+    (*rng).fill_bytes(buf);
 }
 
 #[repr(align(8))]
@@ -364,10 +368,10 @@ impl Builder {
     }
 
     /// SAFETY: `SoftdeviceController` must not have its lifetime end without running its destructor, e.g. using `mem::forget`.
-    pub fn build<'d, const N: usize>(
+    pub fn build<'d, R: CryptoRngCore + Send, const N: usize>(
         self,
         p: Peripherals<'d>,
-        rng: &'d Rng<'d, RNG>,
+        rng: &'d mut R,
         mpsl: &'d MultiprotocolServiceLayer,
         mem: &'d mut Mem<N>,
     ) -> Result<SoftdeviceController<'d>, Error> {
@@ -386,11 +390,19 @@ impl Builder {
             }
         }
 
-        RNG_POOL.store(rng as *const _ as *mut _, Ordering::Release);
+        unwrap!(
+            SDC_RNG.compare_exchange(
+                core::ptr::null_mut(),
+                rng as *mut _ as _,
+                Ordering::Release,
+                Ordering::Relaxed
+            ),
+            "SoftdeviceController already initialized!"
+        );
         let rand_source = raw::sdc_rand_source_t {
             rand_prio_low_get: None,
             rand_prio_high_get: None,
-            rand_poll: Some(rand_blocking),
+            rand_poll: Some(rand_blocking::<R>),
         };
         let ret = unsafe { raw::sdc_rand_source_register(&rand_source) };
         RetVal::from(ret).to_result()?;
@@ -426,7 +438,7 @@ pub struct SoftdeviceController<'d> {
 impl<'d> Drop for SoftdeviceController<'d> {
     fn drop(&mut self) {
         unsafe { raw::sdc_disable() };
-        RNG_POOL.store(core::ptr::null_mut(), Ordering::Release);
+        SDC_RNG.store(core::ptr::null_mut(), Ordering::Release);
     }
 }
 
@@ -1145,7 +1157,7 @@ pub mod vendor {
 
     cmd! {
         NordicEventLengthSet(VENDOR_SPECIFIC, 0x0105) {
-            Params = bool;
+            Params = u32;
             Return = ();
         }
     }
