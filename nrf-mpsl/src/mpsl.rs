@@ -52,8 +52,8 @@ impl<'d> Peripherals<'d> {
 }
 
 pub struct MultiprotocolServiceLayer<'d> {
-    // Prevent Send, Sync
-    _private: PhantomData<&'d *mut ()>,
+    // Prevent Sync
+    _private: PhantomData<core::cell::UnsafeCell<&'d ()>>,
 }
 
 unsafe extern "C" fn assert_handler(file: *const core::ffi::c_char, line: u32) {
@@ -80,11 +80,6 @@ impl<'d> MultiprotocolServiceLayer<'d> {
             + Binding<interrupt::typelevel::RTC0, HighPrioInterruptHandler>
             + Binding<interrupt::typelevel::POWER_CLOCK, ClockInterruptHandler>,
     {
-        assert!(
-            cortex_m::peripheral::SCB::vect_active() == cortex_m::peripheral::scb::VectActive::ThreadMode,
-            "MultiprotocolServiceLayer must be initialized from thread mode"
-        );
-
         // Peripherals are used by the MPSL library, so we merely take ownership and ignore them
         let _ = p;
 

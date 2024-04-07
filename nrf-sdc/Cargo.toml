@@ -20,6 +20,7 @@ peripheral = ["nrf-sdc-sys/peripheral"]
 central = ["nrf-sdc-sys/central"]
 
 defmt = ["dep:defmt", "nrf-mpsl/defmt", "bt-hci/defmt"]
+log = ["dep:log", "nrf-mpsl/log", "bt-hci/log"]
 
 [dependencies]
 defmt = { version = "0.3", optional = true }
