@@ -5,8 +5,8 @@ use bt_hci::cmd::le::{LeSetAdvData, LeSetAdvEnable, LeSetAdvParams};
 use bt_hci::cmd::SyncCmd;
 use bt_hci::param::BdAddr;
 use defmt::unwrap;
-use embassy_executor::Spawner;
-use embassy_nrf::bind_interrupts;
+use embassy_executor::{InterruptExecutor, Spawner};
+use embassy_nrf::{interrupt, bind_interrupts};
 use embassy_nrf::gpio::{Level, Output, OutputDrive};
 use embassy_time::{Duration, Timer};
 use nrf_sdc::{self as sdc, mpsl, pac};
@@ -44,6 +44,13 @@ fn bd_addr() -> BdAddr {
     }
 }
 
+static EXECUTOR_MED: InterruptExecutor = InterruptExecutor::new();
+
+#[interrupt]
+unsafe fn SWI1_EGU1() {
+    EXECUTOR_MED.on_interrupt()
+}
+
 #[embassy_executor::task]
 async fn mpsl_task(mpsl: &'static MultiprotocolServiceLayer<'static>) -> ! {
     mpsl.run().await
@@ -73,7 +80,9 @@ async fn main(spawner: Spawner) {
     };
     static MPSL: StaticCell<MultiprotocolServiceLayer> = StaticCell::new();
     let mpsl = MPSL.init(unwrap!(mpsl::MultiprotocolServiceLayer::new(mpsl_p, Irqs, lfclk_cfg)));
-    spawner.must_spawn(mpsl_task(&*mpsl));
+
+    let s = EXECUTOR_MED.start(interrupt::SWI1_EGU1);
+    s.must_spawn(mpsl_task(&*mpsl));
 
     let sdc_p = sdc::Peripherals::new(
         pac_p.ECB, pac_p.AAR, p.PPI_CH17, p.PPI_CH18, p.PPI_CH20, p.PPI_CH21, p.PPI_CH22, p.PPI_CH23, p.PPI_CH24,
