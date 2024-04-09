@@ -11,7 +11,7 @@ use bt_hci::cmd::Cmd;
 use bt_hci::controller::Controller;
 use bt_hci::{AsHciBytes, FixedSizeValue, FromHciBytes, WriteHci};
 use embassy_nrf::{peripherals, Peripheral, PeripheralRef};
-use embassy_sync::blocking_mutex::raw::ThreadModeRawMutex;
+use embassy_sync::blocking_mutex::raw::NoopRawMutex;
 use embassy_sync::signal::Signal;
 use embassy_sync::waitqueue::AtomicWaker;
 use nrf_mpsl::MultiprotocolServiceLayer;
@@ -433,7 +433,7 @@ impl Builder {
 pub struct SoftdeviceController<'d> {
     using_ext_adv_cmds: RefCell<Option<bool>>,
     periodic_adv_response_data_in_progress: AtomicBool,
-    periodic_adv_response_data_complete: Signal<ThreadModeRawMutex, (bt_hci::param::Status, bt_hci::param::SyncHandle)>,
+    periodic_adv_response_data_complete: Signal<NoopRawMutex, (bt_hci::param::Status, bt_hci::param::SyncHandle)>,
     // Prevent Send, Sync
     _private: PhantomData<&'d *mut ()>,
 }

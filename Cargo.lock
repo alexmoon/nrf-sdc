@@ -74,6 +74,7 @@ dependencies = [
  "embedded-io-async",
  "futures-intrusive",
  "heapless",
+ "log",
 ]
 
 [[package]]
