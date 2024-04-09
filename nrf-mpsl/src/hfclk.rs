@@ -1,14 +1,15 @@
+use core::future::poll_fn;
 use core::marker::PhantomData;
 use core::sync::atomic::{AtomicBool, Ordering};
+use core::task::Poll;
 
-use embassy_sync::blocking_mutex::raw::ThreadModeRawMutex;
-use embassy_sync::signal::Signal;
+use embassy_sync::waitqueue::AtomicWaker;
 
 use crate::error::{Error, RetVal};
 use crate::raw;
 
-static SIGNAL: Signal<ThreadModeRawMutex, ()> = Signal::new();
 static ENABLED: AtomicBool = AtomicBool::new(false);
+static WAKER: AtomicWaker = AtomicWaker::new();
 
 pub struct Hfclk {
     // Prevent Send, Sync
@@ -33,20 +34,26 @@ impl Hfclk {
         }
 
         extern "C" fn on_hfclk_started() {
-            SIGNAL.signal(());
+            WAKER.wake();
         }
 
         let ret = unsafe { raw::mpsl_clock_hfclk_request(Some(on_hfclk_started)) };
         RetVal::from(ret).to_result().and(Ok(Hfclk { _private: PhantomData }))
     }
 
-    pub async fn wait() {
-        let mut is_running = 0;
-        let ret = unsafe { raw::mpsl_clock_hfclk_is_running(&mut is_running) };
-        if let Err(err) = RetVal::from(ret).to_result() {
-            warn!("Error checking hfclk status: {:?}", err)
-        } else if is_running == 0 {
-            SIGNAL.wait().await
-        }
+    pub async fn wait() -> Result<(), Error> {
+        poll_fn(|cx| {
+            WAKER.register(cx.waker());
+            let mut is_running = 0;
+            let ret = unsafe { raw::mpsl_clock_hfclk_is_running(&mut is_running) };
+            if let Err(err) = RetVal::from(ret).to_result() {
+                Poll::Ready(Err(err))
+            } else if is_running == 0 {
+                Poll::Pending
+            } else {
+                Poll::Ready(Ok(()))
+            }
+        })
+        .await
     }
 }
