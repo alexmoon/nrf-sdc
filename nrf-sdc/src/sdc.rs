@@ -1137,7 +1137,7 @@ pub mod vendor {
             handle: ConnHandle,
             interval_us: u32,
             latency: u16,
-            supervision_timeout: Duration<10_1000>,
+            supervision_timeout: Duration<10_000>,
         }
     }
 
@@ -1221,25 +1221,6 @@ pub mod vendor {
     }
 
     cmd! {
-        NordicSetAutoPowerControlRequestParam(VENDOR_SPECIFIC, 0x010b) {
-            Params = NordicSetAutoPowerControlRequestParamParams;
-            Return = ();
-        }
-    }
-
-    param! {
-        struct NordicSetAutoPowerControlRequestParamParams {
-            enable: bool,
-            beta: u16,
-            lower_limit: i8,
-            upper_limit: i8,
-            lower_target_rssi: i8,
-            upper_target_rssi: i8,
-            wait_period: u8,
-        }
-    }
-
-    cmd! {
         NordicSetAdvRandomness(VENDOR_SPECIFIC, 0x010c) {
             Params = NordicSetAdvRandomnessParams;
             Return = ();
@@ -1262,15 +1243,115 @@ pub mod vendor {
 
     cmd! {
         NordicQosChannelSurveyEnable(VENDOR_SPECIFIC, 0x010e) {
-            Params = NordicQosChannelSurveyEnableParams;
+            NordicQosChannelSurveyEnableParams {
+                enable: bool,
+                interval_us: u32,
+            }
             Return = ();
         }
     }
 
-    param! {
-        struct NordicQosChannelSurveyEnableParams {
-            enable: bool,
-            interval_us: u32,
+    cmd! {
+        NordicSetPowerControlRequestParams(VENDOR_SPECIFIC, 0x0110) {
+            NordicSetPowerControlRequestParamsParams {
+                auto_enable: bool,
+                apr_enable: bool,
+                beta: u16,
+                lower_limit: i8,
+                upper_limit: i8,
+                lower_target_rssi: i8,
+                upper_target_rssi: i8,
+                wait_period_ms: Duration<1_000>,
+                apr_margin: u8,
+            }
+            Return = ();
+        }
+    }
+
+    cmd! {
+        NordicReadAverageRssi(VENDOR_SPECIFIC, 0x111) {
+            Params = ConnHandle;
+            NordicReadAverageRssiReturn {
+                avg_rssi: i8,
+            }
+            Handle = handle: ConnHandle;
+        }
+    }
+
+    cmd! {
+        NordicCentralAclEventSpacingSet(VENDOR_SPECIFIC, 0x112) {
+            Params = u32;
+            Return = ();
+        }
+    }
+
+    cmd! {
+        NordicSetConnEventTrigger(VENDOR_SPECIFIC, 0x113) {
+            NordicSetConnEventTriggerParams {
+                conn_handle: ConnHandle,
+                role: u8,
+                ppi_ch_id: u8,
+                task_endpoint: u32,
+                conn_evt_counter_start: u16,
+                period_in_events: u16,
+            }
+            Return = ();
+        }
+    }
+
+    cmd! {
+        NordicGetNextConnEventCounter(VENDOR_SPECIFIC, 0x114) {
+            Params = ConnHandle;
+            NordicGetNextConnEventCounterReturn {
+                next_conn_event_counter: u16,
+            }
+            Handle = handle: ConnHandle;
+        }
+    }
+
+    cmd! {
+        NordicAllowParallelConnectionEstablishments(VENDOR_SPECIFIC, 0x115) {
+            Params = bool;
+            Return = ();
+        }
+    }
+
+    cmd! {
+        NordicMinValOfMaxAclTxPayloadSet(VENDOR_SPECIFIC, 0x116) {
+            Params = u8;
+            Return = ();
+        }
+    }
+
+    cmd! {
+        NordicIsoReadTxTimestamp(VENDOR_SPECIFIC, 0x117) {
+            Params = ConnHandle;
+            NordicIsoReadTxTimestampReturn {
+                packet_sequence_number: u16,
+                tx_time_stamp: u32,
+            }
+            Handle = handle: ConnHandle;
+        }
+    }
+
+    cmd! {
+        NordicBigReservedTimeSet(VENDOR_SPECIFIC, 0x118) {
+            Params = u32;
+            Return = ();
+        }
+    }
+
+    cmd! {
+        NordicCigReservedTimeSet(VENDOR_SPECIFIC, 0x119) {
+            Params = u32;
+            Return = ();
+        }
+    }
+
+    cmd! {
+        NordicCisSubeventLengthSet(VENDOR_SPECIFIC, 0x11a) {
+            Params = u32;
+            Return = ();
         }
     }
 
@@ -1295,6 +1376,17 @@ pub mod vendor {
     sdc_cmd!(NordicSetAdvRandomness => sdc_hci_cmd_vs_set_adv_randomness(x));
     sdc_cmd!(NordicCompatModeWindowOffsetSet => sdc_hci_cmd_vs_compat_mode_window_offset_set(x));
     sdc_cmd!(NordicQosChannelSurveyEnable => sdc_hci_cmd_vs_qos_channel_survey_enable(x));
+    sdc_cmd!(NordicSetPowerControlRequestParams => sdc_hci_cmd_vs_set_power_control_request_params(x));
+    sdc_cmd!(NordicReadAverageRssi => sdc_hci_cmd_vs_read_average_rssi(x) -> y);
+    sdc_cmd!(NordicCentralAclEventSpacingSet => sdc_hci_cmd_vs_central_acl_event_spacing_set(x));
+    sdc_cmd!(NordicSetConnEventTrigger => sdc_hci_cmd_vs_set_conn_event_trigger(x));
+    sdc_cmd!(NordicGetNextConnEventCounter => sdc_hci_cmd_vs_get_next_conn_event_counter(x) -> y);
+    sdc_cmd!(NordicAllowParallelConnectionEstablishments => sdc_hci_cmd_vs_allow_parallel_connection_establishments(x));
+    sdc_cmd!(NordicMinValOfMaxAclTxPayloadSet => sdc_hci_cmd_vs_min_val_of_max_acl_tx_payload_set(x));
+    sdc_cmd!(NordicIsoReadTxTimestamp => sdc_hci_cmd_vs_iso_read_tx_timestamp(x) -> y);
+    sdc_cmd!(NordicBigReservedTimeSet => sdc_hci_cmd_vs_big_reserved_time_set(x));
+    sdc_cmd!(NordicCigReservedTimeSet => sdc_hci_cmd_vs_cig_reserved_time_set(x));
+    sdc_cmd!(NordicCisSubeventLengthSet => sdc_hci_cmd_vs_cis_subevent_length_set(x));
 
     impl<'d> ControllerCmdSync<ZephyrReadStaticAddrs> for super::SoftdeviceController<'d> {
         async fn exec(
