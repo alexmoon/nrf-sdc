@@ -16,6 +16,9 @@ nrf52832 = ["nrf52832-pac", "embassy-nrf/nrf52832"]
 nrf52833 = ["nrf52833-pac", "embassy-nrf/nrf52833"]
 nrf52840 = ["nrf52840-pac", "embassy-nrf/nrf52840"]
 critical-section-impl = ["critical-section/restore-state-bool"]
+"fem-simple-gpio" = ["nrf-mpsl-sys/fem-simple-gpio"]
+"fem-nrf21540-gpio" = ["nrf-mpsl-sys/fem-nrf21540-gpio"]
+"fem-nrf21540-gpio-spi" = ["nrf-mpsl-sys/fem-nrf21540-gpio-spi"]
 
 [dependencies]
 defmt = { version = "0.3", optional = true }
