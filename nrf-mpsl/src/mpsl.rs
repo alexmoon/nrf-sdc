@@ -1,6 +1,7 @@
 use core::ffi::CStr;
 use core::future::poll_fn;
 use core::marker::PhantomData;
+use core::mem::MaybeUninit;
 use core::task::Poll;
 
 use cortex_m::interrupt::InterruptNumber as _;
@@ -70,7 +71,12 @@ impl<'d> Drop for MultiprotocolServiceLayer<'d> {
     }
 }
 
-impl<'d> MultiprotocolServiceLayer<'d> {
+pub struct Builder<'d> {
+    // Prevent Send, Sync
+    _private: PhantomData<&'d ()>,
+}
+
+impl<'d> Builder<'d> {
     pub fn new<T, I>(p: Peripherals<'d>, _irq: I, clock_cfg: raw::mpsl_clock_lfclk_cfg_t) -> Result<Self, Error>
     where
         T: Interrupt,
@@ -94,9 +100,23 @@ impl<'d> MultiprotocolServiceLayer<'d> {
         TIMER0::set_priority(Priority::P0);
         POWER_CLOCK::set_priority(Priority::P4);
 
-        Ok(MultiprotocolServiceLayer { _private: PhantomData })
+        Ok(Self { _private: PhantomData })
     }
 
+    pub fn timeslot<const N: usize>(self, slots: u8, mem: &'d mut Mem<N>) -> Result<Self, Error> {
+        let ret = unsafe { raw::mpsl_timeslot_session_count_set(mem.0.as_mut_ptr() as *mut _, slots) };
+        RetVal::from(ret).to_result()?;
+        Ok(self)
+    }
+
+    pub fn build(self) -> MultiprotocolServiceLayer<'d> {
+        MultiprotocolServiceLayer {
+            _private: PhantomData
+        }
+    }
+}
+
+impl<'d> MultiprotocolServiceLayer<'d> {
     pub fn build_revision() -> Result<[u8; raw::MPSL_BUILD_REVISION_SIZE as usize], Error> {
         let mut rev = [0; raw::MPSL_BUILD_REVISION_SIZE as usize];
         let ret = unsafe { raw::mpsl_build_revision_get(rev.as_mut_ptr()) };
@@ -118,6 +138,21 @@ impl<'d> MultiprotocolServiceLayer<'d> {
 
     pub async fn request_hfclk(&self) -> Result<hfclk::Hfclk, Error> {
         hfclk::Hfclk::new()
+    }
+}
+
+#[repr(align(8))]
+pub struct Mem<const N: usize>(pub MaybeUninit<[u8; N]>);
+
+impl<const N: usize> Mem<N> {
+    pub fn new() -> Self {
+        Self(MaybeUninit::uninit())
+    }
+}
+
+impl<const N: usize> Default for Mem<N> {
+    fn default() -> Self {
+        Self::new()
     }
 }
 

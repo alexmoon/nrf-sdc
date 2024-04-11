@@ -56,6 +56,7 @@ pub use nrf_mpsl_sys as raw;
 pub(crate) mod fmt;
 
 mod error;
+mod flash;
 mod hfclk;
 mod mpsl;
 mod temp;
@@ -64,6 +65,7 @@ mod temp;
 mod critical_section_impl;
 
 pub use error::*;
+pub use flash::*;
 pub use hfclk::*;
 pub use mpsl::*;
 pub use temp::*;
