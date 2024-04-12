@@ -62,27 +62,33 @@ async fn main(spawner: Spawner) {
     pin_mut!(f);
 
     info!("starting erase");
-    unwrap!(f.as_mut().erase(0x80000, 0x81000).await);
+    unwrap!(f.as_mut().erase(0x80000, 0x82000).await);
     info!("erased!");
 
     let mut buf = [0; 4096];
-    info!("starting read");
-    unwrap!(f.as_mut().read(0x80000, &mut buf));
-    info!("read done!");
-    for b in buf.iter() {
-        assert_eq!(*b, 0xff);
+    for offset in (0x80000..0x82000).step_by(4096) {
+        info!("starting read");
+        unwrap!(f.as_mut().read(offset, &mut buf));
+        info!("read done!");
+        for b in buf.iter() {
+            assert_eq!(*b, 0xff);
+        }
     }
 
     info!("matched!");
 
     info!("starting write");
-    unwrap!(f.as_mut().write(0x80000, &[1, 2, 3, 4]).await);
+    for offset in (0x80000..0x82000).step_by(4) {
+        unwrap!(f.as_mut().write(offset, &[1, 2, 3, 4]).await);
+    }
     info!("write done!");
 
-    let mut buf = [0; 4];
-    info!("starting read");
-    unwrap!(f.as_mut().read(0x80000, &mut buf));
-    info!("read done!");
-    assert_eq!(&[1, 2, 3, 4], &buf[..]);
+    for offset in (0x80000..0x82000).step_by(4) {
+        let mut buf = [0; 4];
+        info!("starting read");
+        unwrap!(f.as_mut().read(offset, &mut buf));
+        info!("read done!");
+        assert_eq!(&[1, 2, 3, 4], &buf[..]);
+    }
     info!("matched!");
 }
