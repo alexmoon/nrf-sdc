@@ -414,9 +414,11 @@ impl FlashOp {
     }
 }
 
-impl<'d> ErrorType for Flash<'_> {
+impl<'d> ErrorType for Flash<'d> {
     type Error = FlashError;
 }
+
+impl<'d> embedded_storage_async::nor_flash::MultiwriteNorFlash for Flash<'d> {}
 
 impl NorFlashError for FlashError {
     fn kind(&self) -> NorFlashErrorKind {
