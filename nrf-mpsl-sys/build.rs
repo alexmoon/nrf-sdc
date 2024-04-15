@@ -114,7 +114,7 @@ fn main() {
                 "./third_party/nordic/nrfxlib/mpsl/fem/include/mpsl_fem_config_nrf21540_common.h",
                 "./third_party/nordic/nrfxlib/mpsl/fem/include/protocol/mpsl_fem_protocol_api.h",
                 "./third_party/nordic/nrfxlib/mpsl/fem/nrf21540_gpio_spi/include/mpsl_fem_config_nrf21540_gpio_spi.h",
-                "./third_party/nordic/nrfxlib/mpsl/fem/nrf21540_gpio_spi/include/mpsl_fem_config_nrf21540_power_model_builtin.h",
+                "./third_party/nordic/nrfxlib/mpsl/fem/nrf21540_gpio_spi/include/mpsl_fem_nrf21540_power_model_builtin.h",
             ]),
         ),
         _ => panic!("Only one front-end module feature may be enabled"),
