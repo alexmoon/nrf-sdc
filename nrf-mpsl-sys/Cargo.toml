@@ -22,9 +22,10 @@ include = [
 ]
 
 [features]
-"fem-simple-gpio" = []
-"fem-nrf21540-gpio" = []
-"fem-nrf21540-gpio-spi" = []
+fem = []
+"fem-simple-gpio" = ["fem"]
+"fem-nrf21540-gpio" = ["fem"]
+"fem-nrf21540-gpio-spi" = ["fem"]
 
 [dependencies]
 

@@ -76,50 +76,6 @@ fn bindgen(target: &Target) -> bindgen::Builder {
 fn main() {
     let target = Target::new(env::var("TARGET").unwrap());
 
-    let (fem_lib, fem_includes): (Option<&str>, Option<&[&str]>) = match (
-        env::var_os("CARGO_FEATURE_FEM_SIMPLE_GPIO"),
-        env::var_os("CARGO_FEATURE_FEM_NRF21540_GPIO"),
-        env::var_os("CARGO_FEATURE_FEM_NRF21540_GPIO_SPI"),
-    ) {
-        (None, None, None) => (None, None),
-        (Some(_), None, None) => (
-            Some("simple_gpio"),
-            Some(&[
-                "./third_party/nordic/nrfxlib/mpsl/fem/include/mpsl_fem_config_common.h",
-                "./third_party/nordic/nrfxlib/mpsl/fem/include/mpsl_fem_init.h",
-                "./third_party/nordic/nrfxlib/mpsl/fem/include/mpsl_fem_power_model.h",
-                "./third_party/nordic/nrfxlib/mpsl/fem/include/mpsl_fem_types.h",
-                "./third_party/nordic/nrfxlib/mpsl/fem/include/protocol/mpsl_fem_protocol_api.h",
-                "./third_party/nordic/nrfxlib/mpsl/fem/simple_gpio/include/mpsl_fem_config_simple_gpio.h",
-            ]),
-        ),
-        (None, Some(_), None) => (
-            Some("nrf21540_gpio"),
-            Some(&[
-                "./third_party/nordic/nrfxlib/mpsl/fem/include/mpsl_fem_config_common.h",
-                "./third_party/nordic/nrfxlib/mpsl/fem/include/mpsl_fem_init.h",
-                "./third_party/nordic/nrfxlib/mpsl/fem/include/mpsl_fem_power_model.h",
-                "./third_party/nordic/nrfxlib/mpsl/fem/include/mpsl_fem_types.h",
-                "./third_party/nordic/nrfxlib/mpsl/fem/include/mpsl_fem_config_nrf21540_common.h",
-                "./third_party/nordic/nrfxlib/mpsl/fem/include/protocol/mpsl_fem_protocol_api.h",
-                "./third_party/nordic/nrfxlib/mpsl/fem/nrf21540_gpio/include/mpsl_fem_config_nrf21540_gpio.h",
-            ]),
-        ),
-        (None, None, Some(_)) => (Some("nrf21540_gpio_spi"),
-            Some(&[
-                "./third_party/nordic/nrfxlib/mpsl/fem/include/mpsl_fem_config_common.h",
-                "./third_party/nordic/nrfxlib/mpsl/fem/include/mpsl_fem_init.h",
-                "./third_party/nordic/nrfxlib/mpsl/fem/include/mpsl_fem_power_model.h",
-                "./third_party/nordic/nrfxlib/mpsl/fem/include/mpsl_fem_types.h",
-                "./third_party/nordic/nrfxlib/mpsl/fem/include/mpsl_fem_config_nrf21540_common.h",
-                "./third_party/nordic/nrfxlib/mpsl/fem/include/protocol/mpsl_fem_protocol_api.h",
-                "./third_party/nordic/nrfxlib/mpsl/fem/nrf21540_gpio_spi/include/mpsl_fem_config_nrf21540_gpio_spi.h",
-                "./third_party/nordic/nrfxlib/mpsl/fem/nrf21540_gpio_spi/include/mpsl_fem_nrf21540_power_model_builtin.h",
-            ]),
-        ),
-        _ => panic!("Only one front-end module feature may be enabled"),
-    };
-
     let mut builder = bindgen(&target)
         .header("./include/stdlib.h")
         .header("./third_party/nordic/nrfxlib/mpsl/include/mpsl.h")
@@ -133,6 +89,46 @@ fn main() {
         .header("./third_party/nordic/nrfxlib/mpsl/include/nrf_errno.h")
         .header("./third_party/nordic/nrfxlib/mpsl/include/protocol/mpsl_cx_protocol_api.h")
         .header("./third_party/nordic/nrfxlib/mpsl/include/protocol/mpsl_dppi_protocol_api.h");
+
+    if env::var_os("CARGO_FEATURE_FEM").is_some() {
+        builder = builder
+            .header("./third_party/nordic/nrfxlib/mpsl/fem/include/mpsl_fem_config_common.h")
+            .header("./third_party/nordic/nrfxlib/mpsl/fem/include/mpsl_fem_init.h")
+            .header("./third_party/nordic/nrfxlib/mpsl/fem/include/mpsl_fem_power_model.h")
+            .header("./third_party/nordic/nrfxlib/mpsl/fem/include/mpsl_fem_types.h");
+    }
+
+    let (fem_lib, fem_includes): (Option<&str>, Option<&[&str]>) = match (
+        env::var_os("CARGO_FEATURE_FEM_SIMPLE_GPIO"),
+        env::var_os("CARGO_FEATURE_FEM_NRF21540_GPIO"),
+        env::var_os("CARGO_FEATURE_FEM_NRF21540_GPIO_SPI"),
+    ) {
+        (None, None, None) => (None, None),
+        (Some(_), None, None) => (
+            Some("simple_gpio"),
+            Some(&[
+                "./third_party/nordic/nrfxlib/mpsl/fem/include/protocol/mpsl_fem_protocol_api.h",
+                "./third_party/nordic/nrfxlib/mpsl/fem/simple_gpio/include/mpsl_fem_config_simple_gpio.h",
+            ]),
+        ),
+        (None, Some(_), None) => (
+            Some("nrf21540_gpio"),
+            Some(&[
+                "./third_party/nordic/nrfxlib/mpsl/fem/include/mpsl_fem_config_nrf21540_common.h",
+                "./third_party/nordic/nrfxlib/mpsl/fem/include/protocol/mpsl_fem_protocol_api.h",
+                "./third_party/nordic/nrfxlib/mpsl/fem/nrf21540_gpio/include/mpsl_fem_config_nrf21540_gpio.h",
+            ]),
+        ),
+        (None, None, Some(_)) => (Some("nrf21540_gpio_spi"),
+            Some(&[
+                "./third_party/nordic/nrfxlib/mpsl/fem/include/mpsl_fem_config_nrf21540_common.h",
+                "./third_party/nordic/nrfxlib/mpsl/fem/include/protocol/mpsl_fem_protocol_api.h",
+                "./third_party/nordic/nrfxlib/mpsl/fem/nrf21540_gpio_spi/include/mpsl_fem_config_nrf21540_gpio_spi.h",
+                "./third_party/nordic/nrfxlib/mpsl/fem/nrf21540_gpio_spi/include/mpsl_fem_nrf21540_power_model_builtin.h",
+            ]),
+        ),
+        _ => panic!("Only one front-end module feature may be enabled"),
+    };
 
     if let Some(fem_includes) = fem_includes {
         for include in fem_includes.iter() {
