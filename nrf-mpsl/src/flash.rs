@@ -18,6 +18,7 @@ use embassy_sync::blocking_mutex::raw::RawMutex;
 use embassy_sync::blocking_mutex::Mutex;
 use embassy_sync::waitqueue::WakerRegistration;
 use embedded_storage::nor_flash::{NorFlashError, NorFlashErrorKind, ErrorType};
+use core::sync::atomic::{compiler_fence, Ordering};
 use crate::pac::{Interrupt, NVIC};
 
 // A custom RawMutex implementation that also masks the timer0 interrupt
@@ -29,7 +30,9 @@ unsafe impl RawMutex for Timer0RawMutex {
         unsafe {
             let nvic = &*NVIC::PTR;
             nvic.icer[0].write(1 << Interrupt::TIMER0 as u8);
+            compiler_fence(Ordering::SeqCst);
             let r = f();
+            compiler_fence(Ordering::SeqCst);
             nvic.iser[0].write(1 << Interrupt::TIMER0 as u8);
             r
         }
