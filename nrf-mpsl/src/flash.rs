@@ -1,6 +1,5 @@
 use crate::pac;
 use crate::raw;
-use crate::Error;
 use crate::MultiprotocolServiceLayer;
 use crate::RetVal;
 use core::mem::MaybeUninit;
@@ -15,10 +14,27 @@ use embassy_nrf::{
     peripherals::NVMC,
     Peripheral, PeripheralRef,
 };
-use embassy_sync::blocking_mutex::raw::CriticalSectionRawMutex;
+use embassy_sync::blocking_mutex::raw::RawMutex;
 use embassy_sync::blocking_mutex::Mutex;
 use embassy_sync::waitqueue::WakerRegistration;
 use embedded_storage::nor_flash::{NorFlashError, NorFlashErrorKind, ErrorType};
+use crate::pac::{Interrupt, NVIC};
+
+// A custom RawMutex implementation that also masks the timer0 interrupt
+// which invokes the timeslot callback.
+struct Timer0RawMutex;
+unsafe impl RawMutex for Timer0RawMutex {
+    const INIT: Self = Timer0RawMutex;
+    fn lock<R>(&self, f: impl FnOnce() -> R) -> R {
+        unsafe {
+            let nvic = &*NVIC::PTR;
+            nvic.icer[0].write(1 << Interrupt::TIMER0 as u8);
+            let r = f();
+            nvic.iser[0].write(1 << Interrupt::TIMER0 as u8);
+            r
+        }
+    }
+}
 
 /// Error type for Flash operations.
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
@@ -42,7 +58,7 @@ pub struct Flash<'d> {
 
 /// Global state of the timeslot flash operation
 struct State {
-    inner: Mutex<CriticalSectionRawMutex, RefCell<InnerState>>,
+    inner: Mutex<Timer0RawMutex, RefCell<InnerState>>,
 }
 
 /// Inner state.
@@ -137,37 +153,28 @@ impl<'d> Flash<'d> {
     //
     // If the future is cancelled, or the operation completes, the session is closed.
     async fn do_op(&mut self, slot_duration_us: u32, op: FlashOp) -> Result<(), FlashError> {
-        let session_id: u8 = poll_fn(|cx| {
+        // Wait until no flash operation is running
+        poll_fn(|cx| {
             STATE.with_inner(|state| {
+                state.waker.register(cx.waker());
                 if let FlashOp::None = state.operation {
-                    let mut session_id: u8 = 0;
-                    let ret = unsafe { raw::mpsl_timeslot_session_open(Some(timeslot_session_callback), (&mut session_id) as *mut _) };
-                    match RetVal::from(ret).to_result() {
-                        Ok(_) => {
-                            Poll::Ready(Ok(session_id))
-                        }
-                        Err(Error::ENOMEM) => {
-                            state.waker.register(cx.waker());
-                            Poll::Pending
-                        }
-                        Err(e) => {
-                            Poll::Ready(Err(e))
-                        }
-                    }
+                    Poll::Ready(())
                 } else {
                     Poll::Pending
                 }
             })
-        }).await?;
+        }).await;
 
+        let mut session_id: u8 = 0;
+        let ret = unsafe { raw::mpsl_timeslot_session_open(Some(timeslot_session_callback), (&mut session_id) as *mut _) };
+        RetVal::from(ret).to_result()?;
+
+        // Make sure that session is closed if the future is dropped from here on.
         let _drop = OnDrop::new(|| {
-            STATE.with_inner(|state| {
-                state.operation = FlashOp::None;
-            });
             let _ = unsafe { raw::mpsl_timeslot_session_close(session_id) };
         });
 
-        // info!("Requesting timeslot");
+        // Prepare the operation and start the timeslot
         STATE.with_inner(|state| {
             state.result = None;
             state.operation = op;
@@ -182,17 +189,16 @@ impl<'d> Flash<'d> {
             let ret = unsafe { raw::mpsl_timeslot_request(session_id, &state.timeslot_request) };
             RetVal::from(ret).to_result()
         })?;
-        // info!("Timeslot requested");
 
+        // Wait until the operation has produced a result.
         poll_fn(|cx| {
             STATE.with_inner(|state| {
+                state.waker.register(cx.waker());
                 match state.result.take() {
                     Some(result) => {
-                        state.operation = FlashOp::None;
                         Poll::Ready(result)
                     }
                     None => {
-                        state.waker.register(cx.waker());
                         Poll::Pending
                     }
                 }
@@ -204,10 +210,8 @@ impl<'d> Flash<'d> {
         _drop.defuse();
 
         unsafe {
-            // info!("MPSL closing session {}", session_id);
             let ret = raw::mpsl_timeslot_session_close(session_id);
             RetVal::from(ret).to_result()?;
-            // info!("MPSL closed session {}", session_id);
         }
 
         Ok(())
@@ -283,6 +287,7 @@ unsafe extern "C" fn timeslot_session_callback(
 
         raw::MPSL_TIMESLOT_SIGNAL_SESSION_CLOSED => {
             STATE.with_inner(|state| {
+                state.operation = FlashOp::None;
                 state.waker.wake();
             });
             core::ptr::null_mut()
