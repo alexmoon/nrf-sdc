@@ -356,6 +356,9 @@ impl FlashOp {
                 // Enable erase and erase next page
                 let p = State::regs();
                 // Do at least one erase to avoid getting stuck. The timeslot parameters guarantees we should be able to at least one operation.
+                if *address >= *to {
+                    return ControlFlow::Break(())
+                }
                 loop {
                     p.config.write(|w| w.wen().een());
                     p.erasepagepartialcfg.write(|w| unsafe { w.bits(ERASE_PARTIAL_PAGE_DURATION_MS) });
@@ -383,17 +386,19 @@ impl FlashOp {
                 let p = State::regs();
                 let mut i = 0;
                 // Do at least one write to avoid getting stuck. The timeslot parameters guarantees we should be able to at least one operation.
-                loop {
-                    p.config.write(|w| w.wen().wen());
-                    while p.ready.read().ready().is_busy() {}
-                    unsafe {
-                        let w = core::ptr::read_unaligned(src.add(i));
-                        core::ptr::write_volatile(dest.add(i), w);
-                    }
-                    while p.ready.read().ready().is_busy() {}
-                    i += 1;
-                    if get_time() + WRITE_WORD_DURATION_US >= slot_duration_us || ((i as u32) >= *words) {
-                        break;
+                if *words > 0 {
+                    loop {
+                        p.config.write(|w| w.wen().wen());
+                        while p.ready.read().ready().is_busy() {}
+                        unsafe {
+                            let w = core::ptr::read_unaligned(src.add(i));
+                            core::ptr::write_volatile(dest.add(i), w);
+                        }
+                        while p.ready.read().ready().is_busy() {}
+                        i += 1;
+                        if get_time() + WRITE_WORD_DURATION_US >= slot_duration_us || ((i as u32) >= *words) {
+                            break;
+                        }
                     }
                 }
 
