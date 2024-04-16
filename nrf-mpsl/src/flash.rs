@@ -79,8 +79,8 @@ enum FlashOp {
 // Safety:
 // Timeslot request and return parameters are only modified before and after timeslot starts,
 // or within the callback.
-unsafe impl Send for State {}
-unsafe impl Sync for State {}
+unsafe impl Send for InnerState {}
+unsafe impl Sync for InnerState {}
 
 // Values derived from nRF SDK
 const TIMESLOT_TIMEOUT_PRIORITY_NORMAL_US: u32 = 30000;
