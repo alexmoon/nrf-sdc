@@ -382,7 +382,7 @@ impl FlashOp {
             Self::Write { dest, src, words } => {
                 let p = State::regs();
                 let mut i = 0;
-                // Do at least one erase to avoid getting stuck. The timeslot parameters guarantees we should be able to at least one operation.
+                // Do at least one write to avoid getting stuck. The timeslot parameters guarantees we should be able to at least one operation.
                 loop {
                     p.config.write(|w| w.wen().wen());
                     while p.ready.read().ready().is_busy() {}
