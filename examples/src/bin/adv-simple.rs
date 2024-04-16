@@ -72,7 +72,7 @@ async fn main(spawner: Spawner) {
         skip_wait_lfclk_started: mpsl::raw::MPSL_DEFAULT_SKIP_WAIT_LFCLK_STARTED != 0,
     };
     static MPSL: StaticCell<MultiprotocolServiceLayer> = StaticCell::new();
-    let mpsl = MPSL.init(unwrap!(mpsl::Builder::new(mpsl_p, Irqs, lfclk_cfg)).build());
+    let mpsl = MPSL.init(unwrap!(mpsl::MultiprotocolServiceLayer::new(mpsl_p, Irqs, lfclk_cfg)));
     spawner.must_spawn(mpsl_task(&*mpsl));
 
     let sdc_p = sdc::Peripherals::new(

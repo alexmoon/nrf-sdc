@@ -2,6 +2,7 @@ use core::cell::RefCell;
 use core::ffi::CStr;
 use core::future::poll_fn;
 use core::marker::PhantomData;
+use core::mem::MaybeUninit;
 use core::sync::atomic::{AtomicBool, AtomicPtr, Ordering};
 use core::task::{Poll, Waker};
 
@@ -18,7 +19,6 @@ use raw::{
     sdc_cfg_adv_buffer_cfg_t, sdc_cfg_buffer_cfg_t, sdc_cfg_buffer_count_t, sdc_cfg_role_count_t, sdc_cfg_t,
     SDC_CFG_TYPE_NONE, SDC_DEFAULT_RESOURCE_CFG_TAG,
 };
-pub use nrf_mpsl::Mem;
 
 use crate::rng_pool::RngPool;
 use crate::{pac, raw, Error, RetVal};
@@ -120,6 +120,21 @@ unsafe extern "C" fn rand_blocking(p_buff: *mut u8, length: u8) {
         (*rng).blocking_fill_bytes(buf);
     } else {
         panic!("rand_blocking called from Softdevice Controller when no RngPool is set");
+    }
+}
+
+#[repr(align(8))]
+pub struct Mem<const N: usize>(MaybeUninit<[u8; N]>);
+
+impl<const N: usize> Mem<N> {
+    pub fn new() -> Self {
+        Self(MaybeUninit::uninit())
+    }
+}
+
+impl<const N: usize> Default for Mem<N> {
+    fn default() -> Self {
+        Self::new()
     }
 }
 

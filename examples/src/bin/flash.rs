@@ -48,14 +48,14 @@ async fn main(spawner: Spawner) {
         skip_wait_lfclk_started: mpsl::raw::MPSL_DEFAULT_SKIP_WAIT_LFCLK_STARTED != 0,
     };
     static MPSL: StaticCell<MultiprotocolServiceLayer> = StaticCell::new();
-    static TIMESLOT_MEM: StaticCell<mpsl::Mem<1024>> = StaticCell::new();
+    static SESSION_MEM: StaticCell<mpsl::SessionMem<1>> = StaticCell::new();
 
-    let mpsl = MPSL.init(
-        unwrap!(mpsl::Builder::new(mpsl_p, Irqs, lfclk_cfg,))
-            .timeslot(1, TIMESLOT_MEM.init(mpsl::Mem::new()))
-            .unwrap()
-            .build(),
-    );
+    let mpsl = MPSL.init(unwrap!(mpsl::MultiprotocolServiceLayer::with_timeslots(
+        mpsl_p,
+        Irqs,
+        lfclk_cfg,
+        SESSION_MEM.init(mpsl::SessionMem::new())
+    )));
     spawner.must_spawn(mpsl_task(&*mpsl));
 
     let f = Flash::take(mpsl, p.NVMC);
