@@ -350,6 +350,10 @@ impl Builder {
         self.support(raw::sdc_support_periodic_adv_sync_transfer_receiver_peripheral)
     }
 
+    pub fn support_qos_channel_survey(self) -> Result<Self, Error> {
+        self.support(raw::sdc_support_qos_channel_survey)
+    }
+
     pub fn coex_adv_mode_configure(self, mode: core::ops::ControlFlow<(), ()>) -> Result<Self, Error> {
         let val = match mode {
             core::ops::ControlFlow::Break(()) => false,
@@ -1255,6 +1259,20 @@ pub mod vendor {
         }
     }
 
+    cmd! {
+        NordicQosChannelSurveyEnable(VENDOR_SPECIFIC, 0x010e) {
+            Params = NordicQosChannelSurveyEnableParams;
+            Return = ();
+        }
+    }
+
+    param! {
+        struct NordicQosChannelSurveyEnableParams {
+            enable: bool,
+            interval_us: u32,
+        }
+    }
+
     sdc_cmd!(ZephyrReadVersionInfo => sdc_hci_cmd_vs_zephyr_read_version_info() -> y);
     sdc_cmd!(ZephyrReadSupportedCommands => sdc_hci_cmd_vs_zephyr_read_supported_commands() -> y);
     sdc_cmd!(ZephyrWriteBdAddr => sdc_hci_cmd_vs_zephyr_write_bd_addr(x));
@@ -1276,6 +1294,7 @@ pub mod vendor {
     sdc_cmd!(NordicSetAutoPowerControlRequestParam => sdc_hci_cmd_vs_set_auto_power_control_request_param(x));
     sdc_cmd!(NordicSetAdvRandomness => sdc_hci_cmd_vs_set_adv_randomness(x));
     sdc_cmd!(NordicCompatModeWindowOffsetSet => sdc_hci_cmd_vs_compat_mode_window_offset_set(x));
+    sdc_cmd!(NordicQosChannelSurveyEnable => sdc_hci_cmd_vs_qos_channel_survey_enable(x));
 
     impl<'d> ControllerCmdSync<ZephyrReadStaticAddrs> for super::SoftdeviceController<'d> {
         async fn exec(
