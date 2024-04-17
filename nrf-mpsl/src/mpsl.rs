@@ -1,6 +1,7 @@
 use core::ffi::CStr;
 use core::future::poll_fn;
 use core::marker::PhantomData;
+use core::mem::MaybeUninit;
 use core::task::Poll;
 
 use cortex_m::interrupt::InterruptNumber as _;
@@ -70,6 +71,11 @@ impl<'d> Drop for MultiprotocolServiceLayer<'d> {
     }
 }
 
+pub struct Builder<'d> {
+    // Prevent Send, Sync
+    _private: PhantomData<&'d ()>,
+}
+
 impl<'d> MultiprotocolServiceLayer<'d> {
     pub fn new<T, I>(p: Peripherals<'d>, _irq: I, clock_cfg: raw::mpsl_clock_lfclk_cfg_t) -> Result<Self, Error>
     where
@@ -94,7 +100,27 @@ impl<'d> MultiprotocolServiceLayer<'d> {
         TIMER0::set_priority(Priority::P0);
         POWER_CLOCK::set_priority(Priority::P4);
 
-        Ok(MultiprotocolServiceLayer { _private: PhantomData })
+        Ok(Self { _private: PhantomData })
+    }
+
+    pub fn with_timeslots<T, I, const SLOTS: usize>(
+        p: Peripherals<'d>,
+        _irq: I,
+        clock_cfg: raw::mpsl_clock_lfclk_cfg_t,
+        mem: &'d mut SessionMem<SLOTS>,
+    ) -> Result<Self, Error>
+    where
+        T: Interrupt,
+        I: Binding<T, LowPrioInterruptHandler>
+            + Binding<interrupt::typelevel::RADIO, HighPrioInterruptHandler>
+            + Binding<interrupt::typelevel::TIMER0, HighPrioInterruptHandler>
+            + Binding<interrupt::typelevel::RTC0, HighPrioInterruptHandler>
+            + Binding<interrupt::typelevel::POWER_CLOCK, ClockInterruptHandler>,
+    {
+        let me = Self::new(p, _irq, clock_cfg)?;
+        let ret = unsafe { raw::mpsl_timeslot_session_count_set(mem.0.as_mut_ptr() as *mut _, SLOTS as u8) };
+        RetVal::from(ret).to_result()?;
+        Ok(me)
     }
 
     pub fn build_revision() -> Result<[u8; raw::MPSL_BUILD_REVISION_SIZE as usize], Error> {
@@ -118,6 +144,21 @@ impl<'d> MultiprotocolServiceLayer<'d> {
 
     pub async fn request_hfclk(&self) -> Result<hfclk::Hfclk, Error> {
         hfclk::Hfclk::new()
+    }
+}
+
+#[repr(align(4))]
+pub struct SessionMem<const N: usize>(MaybeUninit<[[u8; raw::MPSL_TIMESLOT_CONTEXT_SIZE as usize]; N]>);
+
+impl<const N: usize> SessionMem<N> {
+    pub fn new() -> Self {
+        Self(MaybeUninit::uninit())
+    }
+}
+
+impl<const N: usize> Default for SessionMem<N> {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
