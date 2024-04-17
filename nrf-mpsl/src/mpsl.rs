@@ -103,7 +103,12 @@ impl<'d> MultiprotocolServiceLayer<'d> {
         Ok(Self { _private: PhantomData })
     }
 
-    pub fn with_timeslots<T, I, const SLOTS: usize>(p: Peripherals<'d>, _irq: I, clock_cfg: raw::mpsl_clock_lfclk_cfg_t, mem: &'d mut SessionMem<SLOTS>) -> Result<Self, Error>
+    pub fn with_timeslots<T, I, const SLOTS: usize>(
+        p: Peripherals<'d>,
+        _irq: I,
+        clock_cfg: raw::mpsl_clock_lfclk_cfg_t,
+        mem: &'d mut SessionMem<SLOTS>,
+    ) -> Result<Self, Error>
     where
         T: Interrupt,
         I: Binding<T, LowPrioInterruptHandler>

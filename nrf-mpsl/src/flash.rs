@@ -1,25 +1,21 @@
-use crate::pac;
-use crate::raw;
-use crate::MultiprotocolServiceLayer;
-use crate::RetVal;
-use core::mem::MaybeUninit;
 use core::cell::RefCell;
 use core::future::poll_fn;
+use core::mem::MaybeUninit;
 use core::ops::ControlFlow;
 use core::slice;
+use core::sync::atomic::{compiler_fence, Ordering};
 use core::task::Poll;
-use embassy_nrf::{
-    into_ref,
-    nvmc::{FLASH_SIZE, PAGE_SIZE},
-    peripherals::NVMC,
-    Peripheral, PeripheralRef,
-};
+
+use embassy_nrf::nvmc::{FLASH_SIZE, PAGE_SIZE};
+use embassy_nrf::peripherals::NVMC;
+use embassy_nrf::{into_ref, Peripheral, PeripheralRef};
 use embassy_sync::blocking_mutex::raw::RawMutex;
 use embassy_sync::blocking_mutex::Mutex;
 use embassy_sync::waitqueue::WakerRegistration;
-use embedded_storage::nor_flash::{NorFlashError, NorFlashErrorKind, ErrorType};
-use core::sync::atomic::{compiler_fence, Ordering};
+use embedded_storage::nor_flash::{ErrorType, NorFlashError, NorFlashErrorKind};
+
 use crate::pac::{Interrupt, NVIC};
+use crate::{pac, raw, MultiprotocolServiceLayer, RetVal};
 
 // A custom RawMutex implementation that also masks the timer0 interrupt
 // which invokes the timeslot callback.
@@ -50,7 +46,6 @@ pub enum FlashError {
     /// Unaligned operation or using unaligned buffers.
     Unaligned,
 }
-
 
 /// Represents a flash that can be used with the MPSL timeslot API to
 /// ensure it does not affect radio transmissions.
@@ -166,10 +161,12 @@ impl<'d> Flash<'d> {
                     Poll::Pending
                 }
             })
-        }).await;
+        })
+        .await;
 
         let mut session_id: u8 = 0;
-        let ret = unsafe { raw::mpsl_timeslot_session_open(Some(timeslot_session_callback), (&mut session_id) as *mut _) };
+        let ret =
+            unsafe { raw::mpsl_timeslot_session_open(Some(timeslot_session_callback), (&mut session_id) as *mut _) };
         RetVal::from(ret).to_result()?;
 
         // Make sure that session is closed if the future is dropped from here on.
@@ -198,12 +195,8 @@ impl<'d> Flash<'d> {
             STATE.with_inner(|state| {
                 state.waker.register(cx.waker());
                 match state.result.take() {
-                    Some(result) => {
-                        Poll::Ready(result)
-                    }
-                    None => {
-                        Poll::Pending
-                    }
+                    Some(result) => Poll::Ready(result),
+                    None => Poll::Pending,
                 }
             })
         })
@@ -228,26 +221,32 @@ impl<'d> Flash<'d> {
             return Err(FlashError::Unaligned);
         }
 
-        self.do_op(TIMESLOT_LENGTH_ERASE_US, FlashOp::Erase { elapsed: 0, address: from, to }).await?;
+        self.do_op(
+            TIMESLOT_LENGTH_ERASE_US,
+            FlashOp::Erase {
+                elapsed: 0,
+                address: from,
+                to,
+            },
+        )
+        .await?;
         Ok(())
     }
-
-
 
     pub async fn write(&mut self, offset: u32, data: &[u8]) -> Result<(), FlashError> {
         if offset as usize + data.len() > FLASH_SIZE {
             return Err(FlashError::OutOfBounds);
         }
-        if offset as usize % 4 != 0 || data.len() as usize % 4 != 0 {
+        if offset as usize % 4 != 0 || data.len() % 4 != 0 {
             return Err(FlashError::Unaligned);
         }
 
         let src = data.as_ptr() as *const u32;
         let dest = offset as *mut u32;
         let words = data.len() as u32 / WORD_SIZE;
-        self.do_op(TIMESLOT_LENGTH_WRITE_US, FlashOp::Write { dest, words, src }).await?;
+        self.do_op(TIMESLOT_LENGTH_WRITE_US, FlashOp::Write { dest, words, src })
+            .await?;
         Ok(())
-
     }
 }
 
@@ -255,7 +254,6 @@ unsafe extern "C" fn timeslot_session_callback(
     session_id: u8,
     signal: u32,
 ) -> *mut raw::mpsl_timeslot_signal_return_param_t {
-
     // Read current time spent inside a slot
     //
     // Safety: guaranteed by MPSL to provide values when called inside slot callback.
@@ -266,27 +264,26 @@ unsafe extern "C" fn timeslot_session_callback(
     }
 
     match signal {
-        raw::MPSL_TIMESLOT_SIGNAL_START => {
-            STATE.with_inner(|state| {
-                match state.operation.perform(|| get_timeslot_time_us(), state.slot_duration_us) {
-                    ControlFlow::Continue(_) => {
-                        state.return_param.callback_action = raw::MPSL_TIMESLOT_SIGNAL_ACTION_REQUEST as u8;
-                        state.timeslot_request.params.earliest.priority = raw::MPSL_TIMESLOT_PRIORITY_NORMAL as u8;
-                        state.timeslot_request.params.earliest.timeout_us = TIMESLOT_TIMEOUT_PRIORITY_NORMAL_US;
-                        state.return_param.params.request.p_next = &mut state.timeslot_request;
-                    }
-                    ControlFlow::Break(_) => {
-                        state.result.replace(Ok(()));
-                        state.return_param.callback_action = raw::MPSL_TIMESLOT_SIGNAL_ACTION_END as u8;
-                        state.waker.wake();
-                    }
+        raw::MPSL_TIMESLOT_SIGNAL_START => STATE.with_inner(|state| {
+            match state
+                .operation
+                .perform(|| get_timeslot_time_us(), state.slot_duration_us)
+            {
+                ControlFlow::Continue(_) => {
+                    state.return_param.callback_action = raw::MPSL_TIMESLOT_SIGNAL_ACTION_REQUEST as u8;
+                    state.timeslot_request.params.earliest.priority = raw::MPSL_TIMESLOT_PRIORITY_NORMAL as u8;
+                    state.timeslot_request.params.earliest.timeout_us = TIMESLOT_TIMEOUT_PRIORITY_NORMAL_US;
+                    state.return_param.params.request.p_next = &mut state.timeslot_request;
                 }
-                return &mut state.return_param as *mut _;
-            })
-        }
-        raw::MPSL_TIMESLOT_SIGNAL_SESSION_IDLE => {
-            core::ptr::null_mut()
-        }
+                ControlFlow::Break(_) => {
+                    state.result.replace(Ok(()));
+                    state.return_param.callback_action = raw::MPSL_TIMESLOT_SIGNAL_ACTION_END as u8;
+                    state.waker.wake();
+                }
+            }
+            &mut state.return_param as *mut _
+        }),
+        raw::MPSL_TIMESLOT_SIGNAL_SESSION_IDLE => core::ptr::null_mut(),
 
         raw::MPSL_TIMESLOT_SIGNAL_SESSION_CLOSED => {
             STATE.with_inner(|state| {
@@ -297,19 +294,17 @@ unsafe extern "C" fn timeslot_session_callback(
         }
         raw::MPSL_TIMESLOT_SIGNAL_CANCELLED | raw::MPSL_TIMESLOT_SIGNAL_BLOCKED => {
             STATE.with_inner(|state| {
-                    state.timeslot_request.params.earliest.priority = raw::MPSL_TIMESLOT_PRIORITY_HIGH as u8;
-                    state.timeslot_request.params.earliest.timeout_us = raw::MPSL_TIMESLOT_EARLIEST_TIMEOUT_MAX_US;
-                    let ret = unsafe { raw::mpsl_timeslot_request(session_id, &state.timeslot_request) };
-                    assert!(ret == 0);
+                state.timeslot_request.params.earliest.priority = raw::MPSL_TIMESLOT_PRIORITY_HIGH as u8;
+                state.timeslot_request.params.earliest.timeout_us = raw::MPSL_TIMESLOT_EARLIEST_TIMEOUT_MAX_US;
+                let ret = unsafe { raw::mpsl_timeslot_request(session_id, &state.timeslot_request) };
+                assert!(ret == 0);
             });
             core::ptr::null_mut()
         }
         raw::MPSL_TIMESLOT_SIGNAL_OVERSTAYED => {
             panic!("Used too much of our timeslot");
         }
-        _ => {
-            core::ptr::null_mut()
-        }
+        _ => core::ptr::null_mut(),
     }
 }
 
@@ -360,16 +355,17 @@ impl State {
 impl FlashOp {
     fn perform<F: Fn() -> u32>(&mut self, get_time: F, slot_duration_us: u32) -> core::ops::ControlFlow<()> {
         match self {
-            Self::Erase { elapsed, address, to} => {
+            Self::Erase { elapsed, address, to } => {
                 // Enable erase and erase next page
                 let p = State::regs();
                 // Do at least one erase to avoid getting stuck. The timeslot parameters guarantees we should be able to at least one operation.
                 if *address >= *to {
-                    return ControlFlow::Break(())
+                    return ControlFlow::Break(());
                 }
                 loop {
                     p.config.write(|w| w.wen().een());
-                    p.erasepagepartialcfg.write(|w| unsafe { w.bits(ERASE_PARTIAL_PAGE_DURATION_MS) });
+                    p.erasepagepartialcfg
+                        .write(|w| unsafe { w.bits(ERASE_PARTIAL_PAGE_DURATION_MS) });
                     while p.ready.read().ready().is_busy() {}
 
                     p.erasepagepartial.write(|w| unsafe { w.bits(*address) });
@@ -378,9 +374,9 @@ impl FlashOp {
 
                     *elapsed += ERASE_PARTIAL_PAGE_DURATION_US;
                     if *elapsed > ERASE_PAGE_DURATION_US {
-                        *address = *address + PAGE_SIZE as u32;
+                        *address += PAGE_SIZE as u32;
                         if *address >= *to {
-                            return ControlFlow::Break(())
+                            return ControlFlow::Break(());
                         }
                     }
                     if get_time() + ERASE_PARTIAL_PAGE_DURATION_US >= slot_duration_us {
@@ -388,7 +384,6 @@ impl FlashOp {
                     }
                 }
                 ControlFlow::Continue(())
-
             }
             Self::Write { dest, src, words } => {
                 let p = State::regs();

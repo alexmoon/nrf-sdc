@@ -665,8 +665,9 @@ macro_rules! sdc_cmd {
 
 /// Bluetooth HCI Link Control commands (§7.1)
 mod link_control {
-    use crate::raw;
     use bt_hci::cmd::link_control::*;
+
+    use crate::raw;
 
     sdc_cmd!(Disconnect => sdc_hci_cmd_lc_disconnect(x));
     sdc_cmd!(async ReadRemoteVersionInformation => sdc_hci_cmd_lc_read_remote_version_information(x));
@@ -674,11 +675,13 @@ mod link_control {
 
 /// Bluetooth HCI Controller & Baseband commands (§7.3)
 mod controller_baseband {
-    use crate::raw;
-    use bt_hci::cmd::{controller_baseband::*, Cmd};
+    use bt_hci::cmd::controller_baseband::*;
+    use bt_hci::cmd::Cmd;
     use bt_hci::controller::{CmdError, ControllerCmdSync};
     use bt_hci::param::ConnHandleCompletedPackets;
     use bt_hci::WriteHci;
+
+    use crate::raw;
 
     impl<'d> ControllerCmdSync<Reset> for super::SoftdeviceController<'d> {
         async fn exec(&self, _cmd: &Reset) -> Result<<Reset as bt_hci::cmd::SyncCmd>::Return, CmdError<Self::Error>> {
@@ -712,8 +715,9 @@ mod controller_baseband {
 
 /// Bluetooth HCI Informational parameters (§7.4)
 mod info {
-    use crate::raw;
     use bt_hci::cmd::info::*;
+
+    use crate::raw;
 
     sdc_cmd!(ReadLocalVersionInformation => sdc_hci_cmd_ip_read_local_version_information() -> y);
     sdc_cmd!(ReadLocalSupportedCmds => sdc_hci_cmd_ip_read_local_supported_commands() -> y);
@@ -723,8 +727,9 @@ mod info {
 
 /// Bluetooth HCI Status parameters (§7.5)
 mod status {
-    use crate::raw;
     use bt_hci::cmd::status::*;
+
+    use crate::raw;
 
     sdc_cmd!(ReadRssi => sdc_hci_cmd_sp_read_rssi(x) -> y);
 }
@@ -733,11 +738,13 @@ mod status {
 mod le {
     use core::sync::atomic::Ordering;
 
-    use crate::raw;
-    use bt_hci::cmd::{le::*, Cmd};
+    use bt_hci::cmd::le::*;
+    use bt_hci::cmd::Cmd;
     use bt_hci::controller::{CmdError, ControllerCmdAsync, ControllerCmdSync};
     use bt_hci::param::{AdvHandle, AdvSet, ConnHandle, InitiatingPhy, ScanningPhy, SyncHandle};
     use bt_hci::{FromHciBytes, WriteHci};
+
+    use crate::raw;
 
     const MAX_PHY_COUNT: usize = 3;
     const MAX_ADV_SET: usize = 63;
@@ -994,10 +1001,11 @@ mod le {
 
 /// Bluetooth HCI vendor specific commands
 pub mod vendor {
-    use crate::raw;
     use bt_hci::controller::{CmdError, ControllerCmdSync};
     use bt_hci::param::{BdAddr, ConnHandle, Duration};
     use bt_hci::{cmd, param, FromHciBytes};
+
+    use crate::raw;
 
     param!(
         struct ZephyrStaticAddr {
