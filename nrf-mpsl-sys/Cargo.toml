@@ -6,6 +6,7 @@ license-file = "third_party/nordic/nrfxlib/LICENSE"
 name = "nrf-mpsl-sys"
 repository = "https://github.com/alexmoon/nrf-sdc"
 version = "0.1.0"
+rust-version = "1.77"
 
 include = [
     "./*.md",

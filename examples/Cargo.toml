@@ -3,6 +3,8 @@ authors = ["Alex Moon <alex@moonspot.org>"]
 edition = "2021"
 name = "nrf-sdc-examples"
 version = "0.0.0"
+rust-version = "1.77"
+publish = false
 
 [[bin]]
 name = "adv-simple"

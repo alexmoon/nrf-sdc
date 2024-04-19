@@ -1,0 +1,24 @@
+name: Check Rust
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: true
+      - name: Install nightly
+        run: rustup toolchain add --component=rustfmt nightly
+      - name: Formatting
+        run: cargo +nightly fmt -- --check
+      - name: Checks
+        run: ./ci.sh
