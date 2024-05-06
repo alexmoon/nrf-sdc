@@ -8,7 +8,8 @@ use core::task::{Poll, Waker};
 
 use bt_hci::cmd::le::LeSetPeriodicAdvResponseData;
 use bt_hci::cmd::Cmd;
-use bt_hci::controller::Controller;
+use bt_hci::controller::blocking::TryError;
+use bt_hci::controller::{blocking, Controller, ErrorType};
 use bt_hci::{AsHciBytes, FixedSizeValue, FromHciBytes, WriteHci};
 use embassy_nrf::{peripherals, Peripheral, PeripheralRef};
 use embassy_sync::blocking_mutex::raw::NoopRawMutex;
@@ -582,9 +583,11 @@ impl<'d> SoftdeviceController<'d> {
     }
 }
 
-impl<'a> Controller for SoftdeviceController<'a> {
+impl<'a> ErrorType for SoftdeviceController<'a> {
     type Error = Error;
+}
 
+impl<'a> Controller for SoftdeviceController<'a> {
     async fn write_acl_data(&self, packet: &bt_hci::data::AclPacket<'_>) -> Result<(), Self::Error> {
         let mut buf = [0u8; raw::HCI_DATA_PACKET_MAX_SIZE as usize];
         packet.write_hci(buf.as_mut_slice()).map_err(|err| match err {
@@ -615,6 +618,118 @@ impl<'a> Controller for SoftdeviceController<'a> {
                 bt_hci::FromHciBytesError::InvalidSize => Error::ENOMEM,
                 bt_hci::FromHciBytesError::InvalidValue => Error::EINVAL,
             })
+    }
+}
+
+impl<'a> blocking::Controller for SoftdeviceController<'a> {
+    fn try_write_acl_data(&self, packet: &bt_hci::data::AclPacket<'_>) -> Result<(), blocking::TryError<Self::Error>> {
+        let mut buf = [0u8; raw::HCI_DATA_PACKET_MAX_SIZE as usize];
+        packet
+            .write_hci(buf.as_mut_slice())
+            .map_err(|err| match err {
+                embedded_io::SliceWriteError::Full => Error::ENOMEM,
+                _ => unreachable!(),
+            })
+            .map_err(into_try_err)?;
+        Ok(self.hci_data_put(buf.as_slice()).map_err(into_try_err)?)
+    }
+
+    fn try_write_sync_data(
+        &self,
+        _packet: &bt_hci::data::SyncPacket<'_>,
+    ) -> Result<(), blocking::TryError<Self::Error>> {
+        unimplemented!()
+    }
+
+    fn try_write_iso_data(&self, packet: &bt_hci::data::IsoPacket<'_>) -> Result<(), blocking::TryError<Self::Error>> {
+        let mut buf = [0u8; raw::HCI_DATA_PACKET_MAX_SIZE as usize];
+        packet
+            .write_hci(buf.as_mut_slice())
+            .map_err(|err| match err {
+                embedded_io::SliceWriteError::Full => Error::ENOMEM,
+                _ => unreachable!(),
+            })
+            .map_err(into_try_err)?;
+        Ok(self.hci_iso_data_put(buf.as_slice()).map_err(into_try_err)?)
+    }
+
+    fn try_read<'b>(
+        &self,
+        buf: &'b mut [u8],
+    ) -> Result<bt_hci::ControllerToHostPacket<'b>, blocking::TryError<Self::Error>> {
+        let kind = self.try_hci_get(buf).map_err(into_try_err)?;
+        bt_hci::ControllerToHostPacket::from_hci_bytes_with_kind(kind, buf)
+            .map(|(x, _)| x)
+            .map_err(|err| match err {
+                bt_hci::FromHciBytesError::InvalidSize => Error::ENOMEM,
+                bt_hci::FromHciBytesError::InvalidValue => Error::EINVAL,
+            })
+            .map_err(into_try_err)
+    }
+
+    fn write_acl_data(&self, packet: &bt_hci::data::AclPacket) -> Result<(), Self::Error> {
+        loop {
+            match self.try_write_acl_data(packet) {
+                Ok(v) => {
+                    return Ok(v);
+                }
+                Err(TryError::Error(e)) => {
+                    return Err(e);
+                }
+                Err(TryError::Busy) => {}
+            }
+        }
+    }
+
+    fn write_sync_data(&self, packet: &bt_hci::data::SyncPacket) -> Result<(), Self::Error> {
+        loop {
+            match self.try_write_sync_data(packet) {
+                Ok(v) => {
+                    return Ok(v);
+                }
+                Err(TryError::Error(e)) => {
+                    return Err(e);
+                }
+                Err(TryError::Busy) => {}
+            }
+        }
+    }
+
+    fn write_iso_data(&self, packet: &bt_hci::data::IsoPacket) -> Result<(), Self::Error> {
+        loop {
+            match self.try_write_iso_data(packet) {
+                Ok(v) => {
+                    return Ok(v);
+                }
+                Err(TryError::Error(e)) => {
+                    return Err(e);
+                }
+                Err(TryError::Busy) => {}
+            }
+        }
+    }
+
+    fn read<'b>(&self, buf: &'b mut [u8]) -> Result<bt_hci::ControllerToHostPacket<'b>, Self::Error> {
+        loop {
+            // Safety: the buffer can be reused after try_read has returned.
+            let buf = unsafe { core::slice::from_raw_parts_mut(buf.as_mut_ptr(), buf.len()) };
+            match self.try_read(buf) {
+                Ok(v) => {
+                    return Ok(v);
+                }
+                Err(TryError::Error(e)) => {
+                    return Err(e);
+                }
+                Err(TryError::Busy) => {}
+            }
+        }
+    }
+}
+
+fn into_try_err(e: Error) -> blocking::TryError<Error> {
+    match e {
+        Error::EAGAIN => blocking::TryError::Busy,
+        other => blocking::TryError::Error(other),
     }
 }
 
