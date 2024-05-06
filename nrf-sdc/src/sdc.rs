@@ -8,12 +8,14 @@ use core::task::{Poll, Waker};
 
 use bt_hci::cmd::le::LeSetPeriodicAdvResponseData;
 use bt_hci::cmd::Cmd;
-use bt_hci::controller::Controller;
+use bt_hci::controller::blocking::TryError;
+use bt_hci::controller::{blocking, Controller};
 use bt_hci::{AsHciBytes, FixedSizeValue, FromHciBytes, WriteHci};
 use embassy_nrf::{peripherals, Peripheral, PeripheralRef};
 use embassy_sync::blocking_mutex::raw::NoopRawMutex;
 use embassy_sync::signal::Signal;
 use embassy_sync::waitqueue::AtomicWaker;
+use embedded_io::ErrorType;
 use nrf_mpsl::MultiprotocolServiceLayer;
 use raw::{
     sdc_cfg_adv_buffer_cfg_t, sdc_cfg_buffer_cfg_t, sdc_cfg_buffer_count_t, sdc_cfg_role_count_t, sdc_cfg_t,
@@ -582,9 +584,11 @@ impl<'d> SoftdeviceController<'d> {
     }
 }
 
-impl<'a> Controller for SoftdeviceController<'a> {
+impl<'a> ErrorType for SoftdeviceController<'a> {
     type Error = Error;
+}
 
+impl<'a> Controller for SoftdeviceController<'a> {
     async fn write_acl_data(&self, packet: &bt_hci::data::AclPacket<'_>) -> Result<(), Self::Error> {
         let mut buf = [0u8; raw::HCI_DATA_PACKET_MAX_SIZE as usize];
         packet.write_hci(buf.as_mut_slice()).map_err(|err| match err {
@@ -618,6 +622,118 @@ impl<'a> Controller for SoftdeviceController<'a> {
     }
 }
 
+impl<'a> blocking::Controller for SoftdeviceController<'a> {
+    fn try_write_acl_data(&self, packet: &bt_hci::data::AclPacket<'_>) -> Result<(), blocking::TryError<Self::Error>> {
+        let mut buf = [0u8; raw::HCI_DATA_PACKET_MAX_SIZE as usize];
+        packet
+            .write_hci(buf.as_mut_slice())
+            .map_err(|err| match err {
+                embedded_io::SliceWriteError::Full => Error::ENOMEM,
+                _ => unreachable!(),
+            })
+            .map_err(into_try_err)?;
+        Ok(self.hci_data_put(buf.as_slice()).map_err(into_try_err)?)
+    }
+
+    fn try_write_sync_data(
+        &self,
+        _packet: &bt_hci::data::SyncPacket<'_>,
+    ) -> Result<(), blocking::TryError<Self::Error>> {
+        unimplemented!()
+    }
+
+    fn try_write_iso_data(&self, packet: &bt_hci::data::IsoPacket<'_>) -> Result<(), blocking::TryError<Self::Error>> {
+        let mut buf = [0u8; raw::HCI_DATA_PACKET_MAX_SIZE as usize];
+        packet
+            .write_hci(buf.as_mut_slice())
+            .map_err(|err| match err {
+                embedded_io::SliceWriteError::Full => Error::ENOMEM,
+                _ => unreachable!(),
+            })
+            .map_err(into_try_err)?;
+        Ok(self.hci_iso_data_put(buf.as_slice()).map_err(into_try_err)?)
+    }
+
+    fn try_read<'b>(
+        &self,
+        buf: &'b mut [u8],
+    ) -> Result<bt_hci::ControllerToHostPacket<'b>, blocking::TryError<Self::Error>> {
+        let kind = self.try_hci_get(buf).map_err(into_try_err)?;
+        bt_hci::ControllerToHostPacket::from_hci_bytes_with_kind(kind, buf)
+            .map(|(x, _)| x)
+            .map_err(|err| match err {
+                bt_hci::FromHciBytesError::InvalidSize => Error::ENOMEM,
+                bt_hci::FromHciBytesError::InvalidValue => Error::EINVAL,
+            })
+            .map_err(into_try_err)
+    }
+
+    fn write_acl_data(&self, packet: &bt_hci::data::AclPacket) -> Result<(), Self::Error> {
+        loop {
+            match self.try_write_acl_data(packet) {
+                Ok(v) => {
+                    return Ok(v);
+                }
+                Err(TryError::Error(e)) => {
+                    return Err(e);
+                }
+                Err(TryError::Busy) => {}
+            }
+        }
+    }
+
+    fn write_sync_data(&self, packet: &bt_hci::data::SyncPacket) -> Result<(), Self::Error> {
+        loop {
+            match self.try_write_sync_data(packet) {
+                Ok(v) => {
+                    return Ok(v);
+                }
+                Err(TryError::Error(e)) => {
+                    return Err(e);
+                }
+                Err(TryError::Busy) => {}
+            }
+        }
+    }
+
+    fn write_iso_data(&self, packet: &bt_hci::data::IsoPacket) -> Result<(), Self::Error> {
+        loop {
+            match self.try_write_iso_data(packet) {
+                Ok(v) => {
+                    return Ok(v);
+                }
+                Err(TryError::Error(e)) => {
+                    return Err(e);
+                }
+                Err(TryError::Busy) => {}
+            }
+        }
+    }
+
+    fn read<'b>(&self, buf: &'b mut [u8]) -> Result<bt_hci::ControllerToHostPacket<'b>, Self::Error> {
+        loop {
+            // Safety: the buffer can be reused after try_read has returned.
+            let buf = unsafe { core::slice::from_raw_parts_mut(buf.as_mut_ptr(), buf.len()) };
+            match self.try_read(buf) {
+                Ok(v) => {
+                    return Ok(v);
+                }
+                Err(TryError::Error(e)) => {
+                    return Err(e);
+                }
+                Err(TryError::Busy) => {}
+            }
+        }
+    }
+}
+
+fn into_try_err(e: Error) -> blocking::TryError<Error> {
+    match e {
+        Error::EAGAIN => blocking::TryError::Busy,
+        other => blocking::TryError::Error(other),
+    }
+}
+
 macro_rules! sdc_cmd {
     (async $cmd:ty => $raw:ident()) => {
         sdc_cmd!(async $cmd => raw_cmd($raw));
@@ -631,9 +747,9 @@ macro_rules! sdc_cmd {
         #[automatically_derived]
         #[allow(unused_variables)]
         impl<'d> bt_hci::controller::ControllerCmdAsync<$cmd> for $crate::sdc::SoftdeviceController<'d> {
-            async fn exec(&self, cmd: &$cmd) -> Result<(), bt_hci::controller::CmdError<Self::Error>> {
+            async fn exec(&self, cmd: &$cmd) -> Result<(), bt_hci::cmd::Error<Self::Error>> {
                 $(self.check_adv_cmd($ext_adv)?;)?
-                unsafe { self.$method(raw::$raw$(, <$params as bt_hci::cmd::Cmd>::params(cmd))?) }.map_err(bt_hci::controller::CmdError::Hci)
+                unsafe { self.$method(raw::$raw$(, <$params as bt_hci::cmd::Cmd>::params(cmd))?) }.map_err(bt_hci::cmd::Error::Hci)
             }
         }
     };
@@ -658,7 +774,7 @@ macro_rules! sdc_cmd {
         #[automatically_derived]
         #[allow(unused_variables)]
         impl<'d> bt_hci::controller::ControllerCmdSync<$cmd> for $crate::sdc::SoftdeviceController<'d> {
-            async fn exec(&self, cmd: &$cmd) -> Result<<$cmd as bt_hci::cmd::SyncCmd>::Return, bt_hci::controller::CmdError<Self::Error>> {
+            async fn exec(&self, cmd: &$cmd) -> Result<<$cmd as bt_hci::cmd::SyncCmd>::Return, bt_hci::cmd::Error<Self::Error>> {
                 $(self.check_adv_cmd($ext_adv)?;)?
                 let ret = unsafe { self.$method(raw::$raw$(, <$params as bt_hci::cmd::Cmd>::params(cmd))?) }?;
                 Ok(ret)
@@ -680,8 +796,8 @@ mod link_control {
 /// Bluetooth HCI Controller & Baseband commands (§7.3)
 mod controller_baseband {
     use bt_hci::cmd::controller_baseband::*;
-    use bt_hci::cmd::Cmd;
-    use bt_hci::controller::{CmdError, ControllerCmdSync};
+    use bt_hci::cmd::{Cmd, Error as CmdError};
+    use bt_hci::controller::ControllerCmdSync;
     use bt_hci::param::ConnHandleCompletedPackets;
     use bt_hci::WriteHci;
 
@@ -690,7 +806,7 @@ mod controller_baseband {
     impl<'d> ControllerCmdSync<Reset> for super::SoftdeviceController<'d> {
         async fn exec(&self, _cmd: &Reset) -> Result<<Reset as bt_hci::cmd::SyncCmd>::Return, CmdError<Self::Error>> {
             *self.using_ext_adv_cmds.borrow_mut() = None;
-            unsafe { self.raw_cmd(raw::sdc_hci_cmd_cb_reset) }.map_err(bt_hci::controller::CmdError::Hci)
+            unsafe { self.raw_cmd(raw::sdc_hci_cmd_cb_reset) }.map_err(bt_hci::cmd::Error::Hci)
         }
     }
 
@@ -743,8 +859,8 @@ mod le {
     use core::sync::atomic::Ordering;
 
     use bt_hci::cmd::le::*;
-    use bt_hci::cmd::Cmd;
-    use bt_hci::controller::{CmdError, ControllerCmdAsync, ControllerCmdSync};
+    use bt_hci::cmd::{Cmd, Error as CmdError};
+    use bt_hci::controller::{ControllerCmdAsync, ControllerCmdSync};
     use bt_hci::param::{AdvHandle, AdvSet, ConnHandle, InitiatingPhy, ScanningPhy, SyncHandle};
     use bt_hci::{FromHciBytes, WriteHci};
 
@@ -1005,7 +1121,8 @@ mod le {
 
 /// Bluetooth HCI vendor specific commands
 pub mod vendor {
-    use bt_hci::controller::{CmdError, ControllerCmdSync};
+    use bt_hci::cmd::Error as CmdError;
+    use bt_hci::controller::ControllerCmdSync;
     use bt_hci::param::{BdAddr, ConnHandle, Duration};
     use bt_hci::{cmd, param, FromHciBytes};
 

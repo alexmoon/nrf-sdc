@@ -28,4 +28,4 @@ embassy-futures = { git = "https://github.com/embassy-rs/embassy.git", branch = 
 embassy-time = { git = "https://github.com/embassy-rs/embassy.git", branch = "main" }
 embassy-time-driver = { git = "https://github.com/embassy-rs/embassy.git", branch = "main" }
 embassy-embedded-hal = { git = "https://github.com/embassy-rs/embassy.git", branch = "main" }
-bt-hci = { git = "https://github.com/alexmoon/bt-hci.git" }
+bt-hci = { git = "https://github.com/alexmoon/bt-hci.git", branch = "main" }
