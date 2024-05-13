@@ -632,7 +632,7 @@ impl<'a> blocking::Controller for SoftdeviceController<'a> {
                 _ => unreachable!(),
             })
             .map_err(into_try_err)?;
-        Ok(self.hci_data_put(buf.as_slice()).map_err(into_try_err)?)
+        self.hci_data_put(buf.as_slice()).map_err(into_try_err)
     }
 
     fn try_write_sync_data(
@@ -651,7 +651,7 @@ impl<'a> blocking::Controller for SoftdeviceController<'a> {
                 _ => unreachable!(),
             })
             .map_err(into_try_err)?;
-        Ok(self.hci_iso_data_put(buf.as_slice()).map_err(into_try_err)?)
+        self.hci_iso_data_put(buf.as_slice()).map_err(into_try_err)
     }
 
     fn try_read<'b>(
@@ -671,12 +671,8 @@ impl<'a> blocking::Controller for SoftdeviceController<'a> {
     fn write_acl_data(&self, packet: &bt_hci::data::AclPacket) -> Result<(), Self::Error> {
         loop {
             match self.try_write_acl_data(packet) {
-                Ok(v) => {
-                    return Ok(v);
-                }
-                Err(TryError::Error(e)) => {
-                    return Err(e);
-                }
+                Ok(v) => return Ok(v),
+                Err(TryError::Error(e)) => return Err(e),
                 Err(TryError::Busy) => {}
             }
         }
@@ -685,12 +681,8 @@ impl<'a> blocking::Controller for SoftdeviceController<'a> {
     fn write_sync_data(&self, packet: &bt_hci::data::SyncPacket) -> Result<(), Self::Error> {
         loop {
             match self.try_write_sync_data(packet) {
-                Ok(v) => {
-                    return Ok(v);
-                }
-                Err(TryError::Error(e)) => {
-                    return Err(e);
-                }
+                Ok(v) => return Ok(v),
+                Err(TryError::Error(e)) => return Err(e),
                 Err(TryError::Busy) => {}
             }
         }
@@ -699,12 +691,8 @@ impl<'a> blocking::Controller for SoftdeviceController<'a> {
     fn write_iso_data(&self, packet: &bt_hci::data::IsoPacket) -> Result<(), Self::Error> {
         loop {
             match self.try_write_iso_data(packet) {
-                Ok(v) => {
-                    return Ok(v);
-                }
-                Err(TryError::Error(e)) => {
-                    return Err(e);
-                }
+                Ok(v) => return Ok(v),
+                Err(TryError::Error(e)) => return Err(e),
                 Err(TryError::Busy) => {}
             }
         }
@@ -715,12 +703,8 @@ impl<'a> blocking::Controller for SoftdeviceController<'a> {
             // Safety: the buffer can be reused after try_read has returned.
             let buf = unsafe { core::slice::from_raw_parts_mut(buf.as_mut_ptr(), buf.len()) };
             match self.try_read(buf) {
-                Ok(v) => {
-                    return Ok(v);
-                }
-                Err(TryError::Error(e)) => {
-                    return Err(e);
-                }
+                Ok(v) => return Ok(v),
+                Err(TryError::Error(e)) => return Err(e),
                 Err(TryError::Busy) => {}
             }
         }
