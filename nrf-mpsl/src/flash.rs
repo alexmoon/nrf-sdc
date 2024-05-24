@@ -96,6 +96,9 @@ enum FlashOp {
 unsafe impl Send for InnerState {}
 unsafe impl Sync for InnerState {}
 
+const TIMESLOT_FLASH_HFCLK_CFG: u8 = raw::MPSL_TIMESLOT_HFCLK_CFG_NO_GUARANTEE as u8;
+const TIMESLOT_FLASH_PRIORITY: u8 = raw::MPSL_TIMESLOT_PRIORITY_NORMAL as u8;
+
 // Values derived from nRF SDK
 const TIMESLOT_TIMEOUT_PRIORITY_NORMAL_US: u32 = 30000;
 // Extra slack for non-flash activity
@@ -181,8 +184,8 @@ impl<'d> Flash<'d> {
             state.slot_duration_us = slot_duration_us;
             state.timeslot_request.request_type = raw::MPSL_TIMESLOT_REQ_TYPE_EARLIEST as u8;
             state.timeslot_request.params.earliest = raw::mpsl_timeslot_request_earliest_t {
-                hfclk: raw::MPSL_TIMESLOT_HFCLK_CFG_NO_GUARANTEE as u8,
-                priority: raw::MPSL_TIMESLOT_PRIORITY_NORMAL as u8,
+                hfclk: TIMESLOT_FLASH_HFCLK_CFG,
+                priority: TIMESLOT_FLASH_PRIORITY,
                 length_us: slot_duration_us + TIMESLOT_SLACK_US,
                 timeout_us: TIMESLOT_TIMEOUT_PRIORITY_NORMAL_US,
             };
@@ -276,6 +279,9 @@ unsafe extern "C" fn timeslot_session_callback(
                     state.return_param.params.request.p_next = &mut state.timeslot_request;
                 }
                 ControlFlow::Break(_) => {
+                    let p = State::regs();
+                    p.config.write(|w| w.wen().ren());
+                    while p.ready.read().ready().is_busy() {}
                     state.result.replace(Ok(()));
                     state.return_param.callback_action = raw::MPSL_TIMESLOT_SIGNAL_ACTION_END as u8;
                     state.waker.wake();
@@ -321,8 +327,8 @@ impl State {
                     request_type: raw::MPSL_TIMESLOT_REQ_TYPE_EARLIEST as u8,
                     params: raw::mpsl_timeslot_request_t__bindgen_ty_1 {
                         earliest: raw::mpsl_timeslot_request_earliest_t {
-                            hfclk: raw::MPSL_TIMESLOT_HFCLK_CFG_NO_GUARANTEE as u8,
-                            priority: raw::MPSL_TIMESLOT_PRIORITY_NORMAL as u8,
+                            hfclk: TIMESLOT_FLASH_HFCLK_CFG,
+                            priority: TIMESLOT_FLASH_PRIORITY,
                             length_us: 0,
                             timeout_us: TIMESLOT_TIMEOUT_PRIORITY_NORMAL_US,
                         },
