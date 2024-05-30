@@ -69,7 +69,7 @@ version = "0.1.0"
 source = "git+https://github.com/alexmoon/bt-hci.git?branch=main#32eba64fb2cebe96445aa520fb07ec9a750d7b3a"
 dependencies = [
  "defmt",
- "embassy-sync",
+ "embassy-sync 0.5.0",
  "embedded-io",
  "embedded-io-async",
  "futures-intrusive",
@@ -265,7 +265,7 @@ source = "git+https://github.com/embassy-rs/embassy.git?branch=main#460cf79513d7
 dependencies = [
  "defmt",
  "embassy-futures",
- "embassy-sync",
+ "embassy-sync 0.5.0",
  "embassy-time",
  "embedded-hal 0.2.7",
  "embedded-hal 1.0.0",
@@ -339,7 +339,7 @@ dependencies = [
  "document-features",
  "embassy-embedded-hal",
  "embassy-hal-internal 0.1.0 (git+https://github.com/embassy-rs/embassy.git?branch=main)",
- "embassy-sync",
+ "embassy-sync 0.5.0",
  "embassy-time-driver",
  "embassy-usb-driver",
  "embedded-hal 0.2.7",
@@ -372,6 +372,19 @@ dependencies = [
  "cfg-if",
  "critical-section",
  "defmt",
+ "embedded-io-async",
+ "futures-util",
+ "heapless",
+]
+
+[[package]]
+name = "embassy-sync"
+version = "0.6.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b3e0c49ff02ebe324faf3a8653ba91582e2d0a7fdef5bc88f449d5aa1bfcc05c"
+dependencies = [
+ "cfg-if",
+ "critical-section",
  "embedded-io-async",
  "futures-util",
  "heapless",
@@ -702,7 +715,7 @@ dependencies = [
  "critical-section",
  "defmt",
  "embassy-nrf",
- "embassy-sync",
+ "embassy-sync 0.6.0",
  "embedded-io",
  "embedded-storage",
  "embedded-storage-async",
@@ -734,7 +747,7 @@ dependencies = [
  "defmt",
  "embassy-hal-internal 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "embassy-nrf",
- "embassy-sync",
+ "embassy-sync 0.6.0",
  "embedded-io",
  "embedded-io-async",
  "log",
