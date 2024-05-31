@@ -66,10 +66,10 @@ checksum = "ed570934406eb16438a4e976b1b4500774099c13b8cb96eec99f620f05090ddf"
 [[package]]
 name = "bt-hci"
 version = "0.1.0"
-source = "git+https://github.com/alexmoon/bt-hci.git?branch=main#32eba64fb2cebe96445aa520fb07ec9a750d7b3a"
+source = "git+https://github.com/alexmoon/bt-hci.git?branch=main#f8683ff7dc6326474b9d7ac0c00206139f206b6a"
 dependencies = [
  "defmt",
- "embassy-sync 0.5.0",
+ "embassy-sync 0.6.0",
  "embedded-io",
  "embedded-io-async",
  "futures-intrusive",
