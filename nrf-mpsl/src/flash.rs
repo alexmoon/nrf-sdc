@@ -178,7 +178,7 @@ impl<'d> Flash<'d> {
         });
 
         // Prepare the operation and start the timeslot
-        STATE.with_inner(|state| {
+        let request = STATE.with_inner(|state| {
             state.result = None;
             state.operation = op;
             state.slot_duration_us = slot_duration_us;
@@ -189,9 +189,11 @@ impl<'d> Flash<'d> {
                 length_us: slot_duration_us + TIMESLOT_SLACK_US,
                 timeout_us: TIMESLOT_TIMEOUT_PRIORITY_NORMAL_US,
             };
-            let ret = unsafe { raw::mpsl_timeslot_request(session_id, &state.timeslot_request) };
-            RetVal::from(ret).to_result()
-        })?;
+            core::ptr::from_ref(&state.timeslot_request)
+        });
+
+        let ret = unsafe { raw::mpsl_timeslot_request(session_id, request) };
+        RetVal::from(ret).to_result()?;
 
         // Wait until the operation has produced a result.
         poll_fn(|cx| {
