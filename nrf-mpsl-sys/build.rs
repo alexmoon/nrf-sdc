@@ -82,7 +82,6 @@ fn main() {
         .header("./third_party/nordic/nrfxlib/mpsl/include/mpsl_clock.h")
         .header("./third_party/nordic/nrfxlib/mpsl/include/mpsl_coex.h")
         .header("./third_party/nordic/nrfxlib/mpsl/include/mpsl_cx_abstract_interface.h")
-        .header("./third_party/nordic/nrfxlib/mpsl/include/mpsl_radio_notification.h")
         .header("./third_party/nordic/nrfxlib/mpsl/include/mpsl_temp.h")
         .header("./third_party/nordic/nrfxlib/mpsl/include/mpsl_timeslot.h")
         .header("./third_party/nordic/nrfxlib/mpsl/include/mpsl_tx_power.h")
