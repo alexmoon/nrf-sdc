@@ -6,18 +6,19 @@ use bt_hci::cmd::SyncCmd;
 use bt_hci::param::BdAddr;
 use defmt::unwrap;
 use embassy_executor::Spawner;
-use embassy_nrf::bind_interrupts;
 use embassy_nrf::gpio::{Level, Output, OutputDrive};
+use embassy_nrf::peripherals::RNG;
+use embassy_nrf::rng::Rng;
+use embassy_nrf::{bind_interrupts, rng};
 use embassy_time::{Duration, Timer};
 use nrf_sdc::{self as sdc, mpsl, pac};
 use sdc::mpsl::MultiprotocolServiceLayer;
-use sdc::rng_pool::RngPool;
 use sdc::vendor::ZephyrWriteBdAddr;
 use static_cell::StaticCell;
 use {defmt_rtt as _, panic_probe as _};
 
 bind_interrupts!(struct Irqs {
-    RNG => sdc::rng_pool::InterruptHandler;
+    RNG => rng::InterruptHandler<RNG>;
     SWI0_EGU0 => mpsl::LowPrioInterruptHandler;
     POWER_CLOCK => mpsl::ClockInterruptHandler;
     RADIO => mpsl::HighPrioInterruptHandler;
@@ -27,7 +28,7 @@ bind_interrupts!(struct Irqs {
 
 fn build_sdc<'d, const N: usize>(
     p: nrf_sdc::Peripherals<'d>,
-    rng: &'d RngPool,
+    rng: &'d mut Rng<RNG>,
     mpsl: &'d MultiprotocolServiceLayer,
     mem: &'d mut sdc::Mem<N>,
 ) -> Result<nrf_sdc::SoftdeviceController<'d>, nrf_sdc::Error> {
@@ -80,11 +81,10 @@ async fn main(spawner: Spawner) {
         p.PPI_CH25, p.PPI_CH26, p.PPI_CH27, p.PPI_CH28, p.PPI_CH29,
     );
 
-    let mut pool = [0; 256];
-    let rng = sdc::rng_pool::RngPool::new(p.RNG, Irqs, &mut pool, 64);
+    let mut rng = Rng::new(p.RNG, Irqs);
 
     let mut sdc_mem = sdc::Mem::<1648>::new();
-    let sdc = unwrap!(build_sdc(sdc_p, &rng, mpsl, &mut sdc_mem));
+    let sdc = unwrap!(build_sdc(sdc_p, &mut rng, mpsl, &mut sdc_mem));
 
     // Set the bluetooth address
     unwrap!(ZephyrWriteBdAddr::new(bd_addr()).exec(&sdc).await);

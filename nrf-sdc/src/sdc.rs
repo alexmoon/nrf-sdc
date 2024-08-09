@@ -17,16 +17,16 @@ use embassy_sync::signal::Signal;
 use embassy_sync::waitqueue::AtomicWaker;
 use embedded_io::ErrorType;
 use nrf_mpsl::MultiprotocolServiceLayer;
+use rand_core::CryptoRngCore;
 use raw::{
     sdc_cfg_adv_buffer_cfg_t, sdc_cfg_buffer_cfg_t, sdc_cfg_buffer_count_t, sdc_cfg_role_count_t, sdc_cfg_t,
     SDC_CFG_TYPE_NONE, SDC_DEFAULT_RESOURCE_CFG_TAG,
 };
 
-use crate::rng_pool::RngPool;
 use crate::{pac, raw, Error, RetVal};
 
 static WAKER: AtomicWaker = AtomicWaker::new();
-static RNG_POOL: AtomicPtr<RngPool> = AtomicPtr::new(core::ptr::null_mut());
+static SDC_RNG: AtomicPtr<()> = AtomicPtr::new(core::ptr::null_mut());
 
 pub struct Peripherals<'d> {
     pub ecb: pac::ECB,
@@ -95,34 +95,19 @@ extern "C" fn sdc_callback() {
     WAKER.wake()
 }
 
-unsafe extern "C" fn rand_prio_low_get(p_buff: *mut u8, length: u8) -> u8 {
-    let rng = RNG_POOL.load(Ordering::Acquire);
-    if !rng.is_null() {
-        let buf = core::slice::from_raw_parts_mut(p_buff, usize::from(length));
-        (*rng).try_fill_bytes(buf) as u8
-    } else {
-        0
+/// SAFETY: This function must only be called while a `SoftdeviceController` instance
+/// is alive, with the same type parameter as was passed to `Builder::build`, and must
+/// be synchronized with other MPSL accesses.
+///
+/// The softdevice controller calls this function exclusively from `mpsl_low_priority_process`,
+/// which is appropriately synchronized.
+unsafe extern "C" fn rand_blocking<R: CryptoRngCore + Send>(p_buff: *mut u8, length: u8) {
+    let rng = SDC_RNG.load(Ordering::Acquire) as *mut R;
+    if rng.is_null() {
+        panic!("rand_blocking called from Softdevice Controller when no rng is set");
     }
-}
-
-unsafe extern "C" fn rand_prio_high_get(p_buff: *mut u8, length: u8) -> u8 {
-    let rng = RNG_POOL.load(Ordering::Acquire);
-    if !rng.is_null() {
-        let buf = core::slice::from_raw_parts_mut(p_buff, usize::from(length));
-        (*rng).try_fill_bytes(buf) as u8
-    } else {
-        0
-    }
-}
-
-unsafe extern "C" fn rand_blocking(p_buff: *mut u8, length: u8) {
-    let rng = RNG_POOL.load(Ordering::Acquire);
-    if !rng.is_null() {
-        let buf = core::slice::from_raw_parts_mut(p_buff, usize::from(length));
-        (*rng).blocking_fill_bytes(buf);
-    } else {
-        panic!("rand_blocking called from Softdevice Controller when no RngPool is set");
-    }
+    let buf = core::slice::from_raw_parts_mut(p_buff, usize::from(length));
+    (*rng).fill_bytes(buf);
 }
 
 #[repr(align(8))]
@@ -385,10 +370,10 @@ impl Builder {
     }
 
     /// SAFETY: `SoftdeviceController` must not have its lifetime end without running its destructor, e.g. using `mem::forget`.
-    pub fn build<'d, const N: usize>(
+    pub fn build<'d, R: CryptoRngCore + Send, const N: usize>(
         self,
         p: Peripherals<'d>,
-        rng: &'d RngPool,
+        rng: &'d mut R,
         mpsl: &'d MultiprotocolServiceLayer,
         mem: &'d mut Mem<N>,
     ) -> Result<SoftdeviceController<'d>, Error> {
@@ -407,11 +392,17 @@ impl Builder {
             }
         }
 
-        RNG_POOL.store(rng as *const _ as *mut _, Ordering::Release);
+        unwrap!(
+            SDC_RNG.compare_exchange(
+                core::ptr::null_mut(),
+                rng as *mut _ as _,
+                Ordering::Release,
+                Ordering::Relaxed
+            ),
+            "SoftdeviceController already initialized!"
+        );
         let rand_source = raw::sdc_rand_source_t {
-            rand_prio_low_get: Some(rand_prio_low_get),
-            rand_prio_high_get: Some(rand_prio_high_get),
-            rand_poll: Some(rand_blocking),
+            rand_poll: Some(rand_blocking::<R>),
         };
         let ret = unsafe { raw::sdc_rand_source_register(&rand_source) };
         RetVal::from(ret).to_result()?;
@@ -447,7 +438,7 @@ pub struct SoftdeviceController<'d> {
 impl<'d> Drop for SoftdeviceController<'d> {
     fn drop(&mut self) {
         unsafe { raw::sdc_disable() };
-        RNG_POOL.store(core::ptr::null_mut(), Ordering::Release);
+        SDC_RNG.store(core::ptr::null_mut(), Ordering::Release);
     }
 }
 
@@ -481,7 +472,8 @@ impl<'d> SoftdeviceController<'d> {
     pub fn try_hci_get(&self, buf: &mut [u8]) -> Result<bt_hci::PacketKind, Error> {
         assert!(buf.len() >= raw::HCI_MSG_BUFFER_MAX_SIZE as usize);
         let mut msg_type: raw::sdc_hci_msg_type_t = 0;
-        let ret = unsafe { raw::sdc_hci_get(buf.as_mut_ptr(), &mut msg_type) };
+
+        let ret = unsafe { raw::sdc_hci_get(buf.as_mut_ptr(), (&mut msg_type) as *mut _ as *mut u8) };
         RetVal::from(ret).to_result()?;
         let kind = match msg_type {
             raw::SDC_HCI_MSG_TYPE_DATA => bt_hci::PacketKind::AclData,
@@ -522,13 +514,6 @@ impl<'d> SoftdeviceController<'d> {
 
     pub fn register_waker(&self, waker: &Waker) {
         WAKER.register(waker);
-    }
-
-    pub fn ecb_block_encrypt(&self, key: &[u8; 16], cleartext: &[u8], ciphertext: &mut [u8]) -> Result<(), Error> {
-        assert_eq!(cleartext.len(), 16);
-        assert_eq!(ciphertext.len(), 16);
-        let ret = unsafe { raw::sdc_soc_ecb_block_encrypt(key.as_ptr(), cleartext.as_ptr(), ciphertext.as_mut_ptr()) };
-        RetVal::from(ret).to_result().and(Ok(()))
     }
 
     #[inline(always)]
@@ -1245,7 +1230,7 @@ pub mod vendor {
             handle: ConnHandle,
             interval_us: u32,
             latency: u16,
-            supervision_timeout: Duration<10_1000>,
+            supervision_timeout: Duration<10_000>,
         }
     }
 
@@ -1265,7 +1250,7 @@ pub mod vendor {
 
     cmd! {
         NordicEventLengthSet(VENDOR_SPECIFIC, 0x0105) {
-            Params = bool;
+            Params = u32;
             Return = ();
         }
     }
@@ -1329,25 +1314,6 @@ pub mod vendor {
     }
 
     cmd! {
-        NordicSetAutoPowerControlRequestParam(VENDOR_SPECIFIC, 0x010b) {
-            Params = NordicSetAutoPowerControlRequestParamParams;
-            Return = ();
-        }
-    }
-
-    param! {
-        struct NordicSetAutoPowerControlRequestParamParams {
-            enable: bool,
-            beta: u16,
-            lower_limit: i8,
-            upper_limit: i8,
-            lower_target_rssi: i8,
-            upper_target_rssi: i8,
-            wait_period: u8,
-        }
-    }
-
-    cmd! {
         NordicSetAdvRandomness(VENDOR_SPECIFIC, 0x010c) {
             Params = NordicSetAdvRandomnessParams;
             Return = ();
@@ -1370,15 +1336,115 @@ pub mod vendor {
 
     cmd! {
         NordicQosChannelSurveyEnable(VENDOR_SPECIFIC, 0x010e) {
-            Params = NordicQosChannelSurveyEnableParams;
+            NordicQosChannelSurveyEnableParams {
+                enable: bool,
+                interval_us: u32,
+            }
             Return = ();
         }
     }
 
-    param! {
-        struct NordicQosChannelSurveyEnableParams {
-            enable: bool,
-            interval_us: u32,
+    cmd! {
+        NordicSetPowerControlRequestParams(VENDOR_SPECIFIC, 0x0110) {
+            NordicSetPowerControlRequestParamsParams {
+                auto_enable: bool,
+                apr_enable: bool,
+                beta: u16,
+                lower_limit: i8,
+                upper_limit: i8,
+                lower_target_rssi: i8,
+                upper_target_rssi: i8,
+                wait_period_ms: Duration<1_000>,
+                apr_margin: u8,
+            }
+            Return = ();
+        }
+    }
+
+    cmd! {
+        NordicReadAverageRssi(VENDOR_SPECIFIC, 0x111) {
+            Params = ConnHandle;
+            NordicReadAverageRssiReturn {
+                avg_rssi: i8,
+            }
+            Handle = handle: ConnHandle;
+        }
+    }
+
+    cmd! {
+        NordicCentralAclEventSpacingSet(VENDOR_SPECIFIC, 0x112) {
+            Params = u32;
+            Return = ();
+        }
+    }
+
+    cmd! {
+        NordicSetConnEventTrigger(VENDOR_SPECIFIC, 0x113) {
+            NordicSetConnEventTriggerParams {
+                conn_handle: ConnHandle,
+                role: u8,
+                ppi_ch_id: u8,
+                task_endpoint: u32,
+                conn_evt_counter_start: u16,
+                period_in_events: u16,
+            }
+            Return = ();
+        }
+    }
+
+    cmd! {
+        NordicGetNextConnEventCounter(VENDOR_SPECIFIC, 0x114) {
+            Params = ConnHandle;
+            NordicGetNextConnEventCounterReturn {
+                next_conn_event_counter: u16,
+            }
+            Handle = handle: ConnHandle;
+        }
+    }
+
+    cmd! {
+        NordicAllowParallelConnectionEstablishments(VENDOR_SPECIFIC, 0x115) {
+            Params = bool;
+            Return = ();
+        }
+    }
+
+    cmd! {
+        NordicMinValOfMaxAclTxPayloadSet(VENDOR_SPECIFIC, 0x116) {
+            Params = u8;
+            Return = ();
+        }
+    }
+
+    cmd! {
+        NordicIsoReadTxTimestamp(VENDOR_SPECIFIC, 0x117) {
+            Params = ConnHandle;
+            NordicIsoReadTxTimestampReturn {
+                packet_sequence_number: u16,
+                tx_time_stamp: u32,
+            }
+            Handle = handle: ConnHandle;
+        }
+    }
+
+    cmd! {
+        NordicBigReservedTimeSet(VENDOR_SPECIFIC, 0x118) {
+            Params = u32;
+            Return = ();
+        }
+    }
+
+    cmd! {
+        NordicCigReservedTimeSet(VENDOR_SPECIFIC, 0x119) {
+            Params = u32;
+            Return = ();
+        }
+    }
+
+    cmd! {
+        NordicCisSubeventLengthSet(VENDOR_SPECIFIC, 0x11a) {
+            Params = u32;
+            Return = ();
         }
     }
 
@@ -1400,10 +1466,20 @@ pub mod vendor {
     sdc_cmd!(NordicCoexPriorityConfig => sdc_hci_cmd_vs_coex_priority_config(x));
     sdc_cmd!(NordicPeripheralLatencyModeSet => sdc_hci_cmd_vs_peripheral_latency_mode_set(x));
     sdc_cmd!(NordicWriteRemoteTxPower => sdc_hci_cmd_vs_write_remote_tx_power(x));
-    sdc_cmd!(NordicSetAutoPowerControlRequestParam => sdc_hci_cmd_vs_set_auto_power_control_request_param(x));
     sdc_cmd!(NordicSetAdvRandomness => sdc_hci_cmd_vs_set_adv_randomness(x));
     sdc_cmd!(NordicCompatModeWindowOffsetSet => sdc_hci_cmd_vs_compat_mode_window_offset_set(x));
     sdc_cmd!(NordicQosChannelSurveyEnable => sdc_hci_cmd_vs_qos_channel_survey_enable(x));
+    sdc_cmd!(NordicSetPowerControlRequestParams => sdc_hci_cmd_vs_set_power_control_request_params(x));
+    sdc_cmd!(NordicReadAverageRssi => sdc_hci_cmd_vs_read_average_rssi(x) -> y);
+    sdc_cmd!(NordicCentralAclEventSpacingSet => sdc_hci_cmd_vs_central_acl_event_spacing_set(x));
+    sdc_cmd!(NordicSetConnEventTrigger => sdc_hci_cmd_vs_set_conn_event_trigger(x));
+    sdc_cmd!(NordicGetNextConnEventCounter => sdc_hci_cmd_vs_get_next_conn_event_counter(x) -> y);
+    sdc_cmd!(NordicAllowParallelConnectionEstablishments => sdc_hci_cmd_vs_allow_parallel_connection_establishments(x));
+    sdc_cmd!(NordicMinValOfMaxAclTxPayloadSet => sdc_hci_cmd_vs_min_val_of_max_acl_tx_payload_set(x));
+    sdc_cmd!(NordicIsoReadTxTimestamp => sdc_hci_cmd_vs_iso_read_tx_timestamp(x) -> y);
+    sdc_cmd!(NordicBigReservedTimeSet => sdc_hci_cmd_vs_big_reserved_time_set(x));
+    sdc_cmd!(NordicCigReservedTimeSet => sdc_hci_cmd_vs_cig_reserved_time_set(x));
+    sdc_cmd!(NordicCisSubeventLengthSet => sdc_hci_cmd_vs_cis_subevent_length_set(x));
 
     impl<'d> ControllerCmdSync<ZephyrReadStaticAddrs> for super::SoftdeviceController<'d> {
         async fn exec(

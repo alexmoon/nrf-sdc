@@ -178,6 +178,7 @@ fn bindgen(target: &Target, mem_fns: Rc<RefCell<Vec<u8>>>) -> bindgen::Builder {
         .clang_arg(format!("-mfloat-abi={}", target.float_abi))
         .clang_arg("-mthumb")
         .clang_arg("-I./third_party/arm/CMSIS_5/CMSIS/Core/Include")
+        .clang_arg("-I./third_party/nordic/nrfx")
         .clang_arg("-I./third_party/nordic/nrfx/mdk")
         .clang_arg("-I./third_party/nordic/nrfxlib/softdevice_controller/include")
         .clang_arg(format!("-D{}", target.chip))
