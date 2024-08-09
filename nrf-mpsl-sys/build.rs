@@ -80,6 +80,7 @@ fn main() {
         .header("./include/stdlib.h")
         .header("./third_party/nordic/nrfxlib/mpsl/include/mpsl.h")
         .header("./third_party/nordic/nrfxlib/mpsl/include/mpsl_clock.h")
+        .header("./third_party/nordic/nrfxlib/mpsl/include/mpsl_ecb.h")
         .header("./third_party/nordic/nrfxlib/mpsl/include/mpsl_coex.h")
         .header("./third_party/nordic/nrfxlib/mpsl/include/mpsl_cx_abstract_interface.h")
         .header("./third_party/nordic/nrfxlib/mpsl/include/mpsl_temp.h")

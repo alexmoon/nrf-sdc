@@ -402,8 +402,6 @@ impl Builder {
             "SoftdeviceController already initialized!"
         );
         let rand_source = raw::sdc_rand_source_t {
-            rand_prio_low_get: None,
-            rand_prio_high_get: None,
             rand_poll: Some(rand_blocking::<R>),
         };
         let ret = unsafe { raw::sdc_rand_source_register(&rand_source) };
@@ -474,7 +472,8 @@ impl<'d> SoftdeviceController<'d> {
     pub fn try_hci_get(&self, buf: &mut [u8]) -> Result<bt_hci::PacketKind, Error> {
         assert!(buf.len() >= raw::HCI_MSG_BUFFER_MAX_SIZE as usize);
         let mut msg_type: raw::sdc_hci_msg_type_t = 0;
-        let ret = unsafe { raw::sdc_hci_get(buf.as_mut_ptr(), &mut msg_type) };
+
+        let ret = unsafe { raw::sdc_hci_get(buf.as_mut_ptr(), (&mut msg_type) as *mut _ as *mut u8) };
         RetVal::from(ret).to_result()?;
         let kind = match msg_type {
             raw::SDC_HCI_MSG_TYPE_DATA => bt_hci::PacketKind::AclData,
@@ -515,13 +514,6 @@ impl<'d> SoftdeviceController<'d> {
 
     pub fn register_waker(&self, waker: &Waker) {
         WAKER.register(waker);
-    }
-
-    pub fn ecb_block_encrypt(&self, key: &[u8; 16], cleartext: &[u8], ciphertext: &mut [u8]) -> Result<(), Error> {
-        assert_eq!(cleartext.len(), 16);
-        assert_eq!(ciphertext.len(), 16);
-        let ret = unsafe { raw::sdc_soc_ecb_block_encrypt(key.as_ptr(), cleartext.as_ptr(), ciphertext.as_mut_ptr()) };
-        RetVal::from(ret).to_result().and(Ok(()))
     }
 
     #[inline(always)]

@@ -145,6 +145,21 @@ impl<'d> MultiprotocolServiceLayer<'d> {
     pub async fn request_hfclk(&self) -> Result<hfclk::Hfclk, Error> {
         hfclk::Hfclk::new()
     }
+
+    pub fn ecb_block_encrypt(&self, key: &[u8; 16], cleartext: &[u8], ciphertext: &mut [u8]) -> Result<(), Error> {
+        assert_eq!(cleartext.len(), 16);
+        assert_eq!(ciphertext.len(), 16);
+        unsafe {
+            raw::mpsl_ecb_block_encrypt_extended(
+                key.as_ptr(),
+                cleartext.as_ptr(),
+                ciphertext.as_mut_ptr(),
+                // TODO: Support flags
+                0,
+            )
+        };
+        Ok(())
+    }
 }
 
 #[repr(align(4))]
