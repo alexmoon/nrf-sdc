@@ -28,4 +28,12 @@ embassy-futures = { git = "https://github.com/embassy-rs/embassy.git", branch = 
 embassy-time = { git = "https://github.com/embassy-rs/embassy.git", branch = "main" }
 embassy-time-driver = { git = "https://github.com/embassy-rs/embassy.git", branch = "main" }
 embassy-embedded-hal = { git = "https://github.com/embassy-rs/embassy.git", branch = "main" }
+#
+#embassy-executor = { path = "../embassy/embassy-executor" }
+#embassy-nrf = {path = "../embassy/embassy-nrf"}
+#embassy-sync = {path = "../embassy/embassy-sync"}
+#embassy-futures = {path = "../embassy/embassy-futures"}
+#embassy-time = {path = "../embassy/embassy-time"}
+#embassy-time-driver = {path = "../embassy/embassy-time-driver"}
+#embassy-embedded-hal = {path = "../embassy/embassy-embedded-hal"}
 bt-hci = { git = "https://github.com/alexmoon/bt-hci.git", branch = "main" }

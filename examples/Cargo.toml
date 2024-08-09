@@ -11,18 +11,20 @@ name = "adv-simple"
 
 [dependencies]
 nrf-sdc = { version = "0.1.0", path = "../nrf-sdc", features = ["defmt", "nrf52840", "peripheral"] }
+nrf-mpsl = { version = "0.1.0", path = "../nrf-mpsl", features = ["defmt", "critical-section-impl"] }
 bt-hci = { version = "0.1.0", default-features = false }
 
-embassy-executor = { version = "0.5", features = ["task-arena-size-32768", "arch-cortex-m", "executor-thread", "defmt", "integrated-timers", "executor-interrupt"] }
-embassy-time = { version = "0.3.0", features = ["defmt", "defmt-timestamp-uptime"] }
-embassy-nrf = { version = "0.1.0", features = ["defmt", "nrf52840", "time-driver-rtc1", "gpiote", "unstable-pac"] }
+embassy-executor = { version = "0.6", features = ["task-arena-size-32768", "arch-cortex-m", "executor-thread", "defmt", "integrated-timers", "executor-interrupt"] }
+embassy-time = { version = "0.3", features = ["defmt", "defmt-timestamp-uptime"] }
+embassy-nrf = { version = "0.2.0", features = ["defmt", "nrf52840", "time-driver-rtc1", "gpiote", "unstable-pac"] }
+embassy-sync = { version = "0.6.0", features = ["defmt"] }
 
 defmt = "0.3"
 defmt-rtt = "0.4.0"
 
 futures = { version = "0.3", default-features = false }
 
-cortex-m = { version = "0.7.6", features = ["critical-section-single-core"] }
+cortex-m = { version = "0.7.6" }
 cortex-m-rt = "0.7.0"
 panic-probe = { version = "0.3", features = ["print-defmt"] }
 static_cell = "2"
