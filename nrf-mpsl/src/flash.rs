@@ -107,12 +107,21 @@ const TIMESLOT_SLACK_US: u32 = 1000;
 // Values according to nRF52 product specification
 const ERASE_PAGE_DURATION_US: u32 = 85_000;
 const WRITE_WORD_DURATION_US: u32 = 41;
+
+#[cfg(not(feature = "nrf52832"))]
 const ERASE_PARTIAL_PAGE_DURATION_MS: u32 = 10;
+#[cfg(not(feature = "nrf52832"))]
 const ERASE_PARTIAL_PAGE_DURATION_US: u32 = ERASE_PARTIAL_PAGE_DURATION_MS * 1000;
+
 const WORD_SIZE: u32 = 4;
 
 // Values derived from Zephyr
+#[cfg(not(feature = "nrf52832"))]
 const TIMESLOT_LENGTH_ERASE_US: u32 = ERASE_PARTIAL_PAGE_DURATION_US;
+
+#[cfg(feature = "nrf52832")]
+const TIMESLOT_LENGTH_ERASE_US: u32 = ERASE_PAGE_DURATION_US;
+
 const TIMESLOT_LENGTH_WRITE_US: u32 = 7500;
 
 static STATE: State = State::new();
@@ -264,7 +273,7 @@ unsafe extern "C" fn timeslot_session_callback(
     // Safety: guaranteed by MPSL to provide values when called inside slot callback.
     unsafe fn get_timeslot_time_us() -> u32 {
         let p = unsafe { &*pac::TIMER0::ptr() };
-        p.tasks_capture[0].write(|w| w.tasks_capture().set_bit());
+        p.tasks_capture[0].write(|w| unsafe { w.bits(1) });
         p.cc[0].read().cc().bits()
     }
 
@@ -361,37 +370,71 @@ impl State {
 }
 
 impl FlashOp {
+    #[cfg(not(feature = "nrf52832"))]
+    fn erase<F: Fn() -> u32>(
+        get_time: F,
+        slot_duration_us: u32,
+        elapsed: &mut u32,
+        address: &mut u32,
+        to: u32,
+    ) -> core::ops::ControlFlow<()> {
+        let p = State::regs();
+        loop {
+            // Enable erase and erase next page
+            p.config.write(|w| w.wen().een());
+            p.erasepagepartialcfg
+                .write(|w| unsafe { w.bits(ERASE_PARTIAL_PAGE_DURATION_MS) });
+            while p.ready.read().ready().is_busy() {}
+
+            p.erasepagepartial.write(|w| unsafe { w.bits(*address) });
+            while p.ready.read().ready().is_busy() {}
+            p.config.write(|w| w.wen().ren());
+
+            *elapsed += ERASE_PARTIAL_PAGE_DURATION_US;
+            if *elapsed > ERASE_PAGE_DURATION_US {
+                *address += PAGE_SIZE as u32;
+                if *address >= to {
+                    return ControlFlow::Break(());
+                }
+            }
+            if get_time() + ERASE_PARTIAL_PAGE_DURATION_US >= slot_duration_us {
+                return ControlFlow::Continue(());
+            }
+        }
+    }
+
+    // No partial erase for this chip, just do one page at a time
+    #[allow(unused_variables)]
+    #[cfg(feature = "nrf52832")]
+    fn erase<F: Fn() -> u32>(
+        get_time: F,
+        slot_duration_us: u32,
+        elapsed: &mut u32,
+        address: &mut u32,
+        to: u32,
+    ) -> core::ops::ControlFlow<()> {
+        let p = State::regs();
+        p.config.write(|w| w.wen().een());
+        while p.ready.read().ready().is_busy() {}
+        p.erasepage().write(|w| unsafe { w.bits(*address) });
+        while p.ready.read().ready().is_busy() {}
+        p.config.write(|w| w.wen().ren());
+        *address += PAGE_SIZE as u32;
+        if *address >= to {
+            return ControlFlow::Break(());
+        } else {
+            ControlFlow::Continue(())
+        }
+    }
+
     fn perform<F: Fn() -> u32>(&mut self, get_time: F, slot_duration_us: u32) -> core::ops::ControlFlow<()> {
         match self {
             Self::Erase { elapsed, address, to } => {
-                // Enable erase and erase next page
-                let p = State::regs();
                 // Do at least one erase to avoid getting stuck. The timeslot parameters guarantees we should be able to at least one operation.
                 if *address >= *to {
                     return ControlFlow::Break(());
                 }
-                loop {
-                    p.config.write(|w| w.wen().een());
-                    p.erasepagepartialcfg
-                        .write(|w| unsafe { w.bits(ERASE_PARTIAL_PAGE_DURATION_MS) });
-                    while p.ready.read().ready().is_busy() {}
-
-                    p.erasepagepartial.write(|w| unsafe { w.bits(*address) });
-                    while p.ready.read().ready().is_busy() {}
-                    p.config.write(|w| w.wen().ren());
-
-                    *elapsed += ERASE_PARTIAL_PAGE_DURATION_US;
-                    if *elapsed > ERASE_PAGE_DURATION_US {
-                        *address += PAGE_SIZE as u32;
-                        if *address >= *to {
-                            return ControlFlow::Break(());
-                        }
-                    }
-                    if get_time() + ERASE_PARTIAL_PAGE_DURATION_US >= slot_duration_us {
-                        break;
-                    }
-                }
-                ControlFlow::Continue(())
+                Self::erase(get_time, slot_duration_us, elapsed, address, *to)
             }
             Self::Write { dest, src, words } => {
                 let p = State::regs();

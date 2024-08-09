@@ -42,5 +42,5 @@ nrf52840-pac  = { version = "0.12.0", features = ["rt"], optional = true }
 
 nrf-mpsl-sys = { version = "0.1.0", path = "../nrf-mpsl-sys" }
 
-embassy-nrf = { version = "0.1.0" }
+embassy-nrf = { version = "0.2.0" }
 embassy-sync = { version = "0.6.0" }
