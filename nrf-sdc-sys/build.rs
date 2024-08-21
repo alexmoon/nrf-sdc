@@ -34,7 +34,7 @@ mod parser {
             one_of(|c: char| c.is_alpha() || c == '_'),
             take_while(0.., |c: char| c.is_alphanum() || c == '_'),
         )
-            .recognize()
+            .take()
             .parse_next(i)
     }
 
