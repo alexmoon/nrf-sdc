@@ -36,4 +36,3 @@ embassy-embedded-hal = { git = "https://github.com/embassy-rs/embassy.git", bran
 #embassy-time = {path = "../embassy/embassy-time"}
 #embassy-time-driver = {path = "../embassy/embassy-time-driver"}
 #embassy-embedded-hal = {path = "../embassy/embassy-embedded-hal"}
-bt-hci = { git = "https://github.com/alexmoon/bt-hci.git", branch = "main" }
