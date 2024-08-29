@@ -3,6 +3,7 @@
 
 use defmt::info;
 use bt_hci::cmd::controller_baseband::{SetEventMask, Reset};
+use sdc::rng_pool::RngPool;
 use bt_hci::controller::Controller;
 use bt_hci::data::{AclPacket, AclPacketBoundary, AclBroadcastFlag};
 use bt_hci::cmd::le::LeSetRandomAddr;
@@ -34,7 +35,7 @@ use nrf_sdc::SoftdeviceController;
 use {defmt_rtt as _, panic_probe as _};
 
 bind_interrupts!(struct Irqs {
-    RNG => rng::InterruptHandler<RNG>;
+    RNG => sdc::rng_pool::InterruptHandler;
     SWI0_EGU0 => nrf_sdc::mpsl::LowPrioInterruptHandler;
     POWER_CLOCK => nrf_sdc::mpsl::ClockInterruptHandler;
     RADIO => nrf_sdc::mpsl::HighPrioInterruptHandler;
@@ -58,7 +59,7 @@ const L2CAP_MTU: usize = 27;
 
 fn build_sdc<'d, const N: usize>(
     p: nrf_sdc::Peripherals<'d>,
-    rng: &'d mut rng::Rng<RNG>,
+    rng: &'d RngPool,
     mpsl: &'d MultiprotocolServiceLayer,
     mem: &'d mut sdc::Mem<N>,
 ) -> Result<nrf_sdc::SoftdeviceController<'d>, nrf_sdc::Error> {
@@ -105,10 +106,14 @@ async fn main(spawner: Spawner) {
         p.PPI_CH25, p.PPI_CH26, p.PPI_CH27, p.PPI_CH28, p.PPI_CH29,
     );
 
-    let rng = rng::Rng::new(p.RNG, Irqs);
-    static RNG: StaticCell<rng::Rng<'static, RNG>> = StaticCell::new();
+    static POOL: StaticCell<[u8; 256]> = StaticCell::new();
+    let pool = POOL.init([0; 256]);
+    let rng = sdc::rng_pool::RngPool::new(p.RNG, Irqs, pool, 64);
+
+    static RNG: StaticCell<RngPool> = StaticCell::new();
     let rng = RNG.init(rng);
-    static SDC_MEM: StaticCell<sdc::Mem<16656>> = StaticCell::new();
+
+    static SDC_MEM: StaticCell<sdc::Mem<16920>> = StaticCell::new();
     let sdc_mem = SDC_MEM.init(sdc::Mem::new());
 
     let sdc = unwrap!(build_sdc(sdc_p, rng, mpsl, sdc_mem));
@@ -195,7 +200,7 @@ async fn sdc_task(sdc: &'static SoftdeviceController<'static>) {
                     info!("LeConnectionComplete {:?}", e.handle);
                     assert!(handle.is_none());
                     handle.replace(e.handle);
-                    unwrap!(Spawner::for_current_executor().await.spawn(timeout_task(sdc, Duration::from_secs(2), e.handle)));
+                    unwrap!(Spawner::for_current_executor().await.spawn(timeout_task(sdc, Duration::from_millis(600), e.handle)));
                 }
                 Event::DisconnectionComplete(e) => {
                     info!("DisconnectionComplete: {:?}", e.handle);

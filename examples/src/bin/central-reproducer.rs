@@ -7,6 +7,7 @@ use bt_hci::cmd::le::LeSetRandomAddr;
 use bt_hci::cmd::controller_baseband::{SetEventMask, Reset};
 use bt_hci::cmd::le::LeSetAdvData;
 use bt_hci::cmd::le::LeSetAdvEnable;
+use sdc::rng_pool::RngPool;
 use bt_hci::cmd::le::LeCreateConn;
 use bt_hci::event::{Event, le::LeEvent};
 use bt_hci::ControllerToHostPacket;
@@ -35,7 +36,7 @@ use sdc::vendor::ZephyrWriteBdAddr;
 use {defmt_rtt as _, panic_probe as _};
 
 bind_interrupts!(struct Irqs {
-    RNG => rng::InterruptHandler<RNG>;
+    RNG => sdc::rng_pool::InterruptHandler;
     SWI0_EGU0 => nrf_sdc::mpsl::LowPrioInterruptHandler;
     POWER_CLOCK => nrf_sdc::mpsl::ClockInterruptHandler;
     RADIO => nrf_sdc::mpsl::HighPrioInterruptHandler;
@@ -59,7 +60,7 @@ const L2CAP_MTU: usize = 27;
 
 fn build_sdc<'d, const N: usize>(
     p: nrf_sdc::Peripherals<'d>,
-    rng: &'d mut rng::Rng<RNG>,
+    rng: &'d RngPool,
     mpsl: &'d MultiprotocolServiceLayer,
     mem: &'d mut sdc::Mem<N>,
 ) -> Result<nrf_sdc::SoftdeviceController<'d>, nrf_sdc::Error> {
@@ -104,9 +105,11 @@ async fn main(spawner: Spawner) {
         p.PPI_CH25, p.PPI_CH26, p.PPI_CH27, p.PPI_CH28, p.PPI_CH29,
     );
 
-    let mut rng = rng::Rng::new(p.RNG, Irqs);
+    static POOL: StaticCell<[u8; 256]> = StaticCell::new();
+    let pool = POOL.init([0; 256]);
+    let rng = sdc::rng_pool::RngPool::new(p.RNG, Irqs, pool, 64);
 
-    static RNG: StaticCell<rng::Rng<'static, RNG>> = StaticCell::new();
+    static RNG: StaticCell<RngPool> = StaticCell::new();
     let rng = RNG.init(rng);
     static SDC_MEM: StaticCell<sdc::Mem<16384>> = StaticCell::new();
     let sdc_mem = SDC_MEM.init(sdc::Mem::new());
