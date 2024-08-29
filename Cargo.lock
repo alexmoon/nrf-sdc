@@ -79,6 +79,7 @@ source = "git+https://github.com/alexmoon/bt-hci.git?branch=main#b9cd5954f6bd89b
 dependencies = [
  "defmt",
  "embassy-sync",
+ "embassy-time",
  "embedded-io",
  "embedded-io-async",
  "futures-intrusive",
