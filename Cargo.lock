@@ -80,6 +80,7 @@ checksum = "499d74e90e6b1e61660adc8fb5f17aeac9487bced16f57c1f91a8783736ada53"
 dependencies = [
  "defmt",
  "embassy-sync",
+ "embassy-time",
  "embedded-io",
  "embedded-io-async",
  "futures-intrusive",
