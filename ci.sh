@@ -15,7 +15,7 @@ cargo clippy -p nrf-mpsl --features nrf52805
 cargo clippy -p nrf-mpsl --features nrf52810
 cargo clippy -p nrf-mpsl --features nrf52811
 cargo clippy -p nrf-mpsl --features nrf52820
-# cargo clippy -p nrf-mpsl --features nrf52832
+cargo clippy -p nrf-mpsl --features nrf52832
 cargo clippy -p nrf-mpsl --features nrf52833
 cargo clippy -p nrf-mpsl --features nrf52840
 cargo clippy -p nrf-mpsl --features nrf52840,defmt
@@ -33,7 +33,7 @@ cargo clippy -p nrf-sdc --features nrf52805,peripheral,central
 cargo clippy -p nrf-sdc --features nrf52810,peripheral,central
 cargo clippy -p nrf-sdc --features nrf52811,peripheral,central
 cargo clippy -p nrf-sdc --features nrf52820,peripheral,central
-# cargo clippy -p nrf-sdc --features nrf52832,peripheral,central
+cargo clippy -p nrf-sdc --features nrf52832,peripheral,central
 cargo clippy -p nrf-sdc --features nrf52833,peripheral,central
 cargo clippy -p nrf-sdc --features nrf52840,peripheral
 cargo clippy -p nrf-sdc --features nrf52840,central

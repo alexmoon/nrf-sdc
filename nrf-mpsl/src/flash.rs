@@ -404,12 +404,11 @@ impl FlashOp {
     }
 
     // No partial erase for this chip, just do one page at a time
-    #[allow(unused_variables)]
     #[cfg(feature = "nrf52832")]
     fn erase<F: Fn() -> u32>(
-        get_time: F,
-        slot_duration_us: u32,
-        elapsed: &mut u32,
+        _get_time: F,
+        _slot_duration_us: u32,
+        _elapsed: &mut u32,
         address: &mut u32,
         to: u32,
     ) -> core::ops::ControlFlow<()> {
@@ -421,7 +420,7 @@ impl FlashOp {
         p.config.write(|w| w.wen().ren());
         *address += PAGE_SIZE as u32;
         if *address >= to {
-            return ControlFlow::Break(());
+            ControlFlow::Break(())
         } else {
             ControlFlow::Continue(())
         }
