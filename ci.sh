@@ -4,7 +4,8 @@ set -euxo pipefail
 
 export RUSTFLAGS=-Dwarnings
 
-cargo clippy -p nrf-sdc-examples
+cargo clippy -p nrf-sdc-examples --features nrf52832
+cargo clippy -p nrf-sdc-examples --features nrf52840
 
 cargo clippy -p nrf-mpsl-sys
 cargo clippy -p nrf-mpsl-sys --features fem-simple-gpio

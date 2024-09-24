@@ -23,6 +23,16 @@ async fn mpsl_task(mpsl: &'static MultiprotocolServiceLayer<'static>) -> ! {
     mpsl.run().await
 }
 
+const PAGE_SIZE: usize = 4096;
+
+#[cfg(feature = "nrf52832")]
+const ERASE_START: u32 = 0x60000;
+
+#[cfg(feature = "nrf52840")]
+const ERASE_START: u32 = 0x80000;
+
+const ERASE_STOP: u32 = ERASE_START + 0x2000;
+
 #[embassy_executor::main]
 async fn main(spawner: Spawner) {
     let p = embassy_nrf::init(Default::default());
@@ -60,11 +70,11 @@ async fn main(spawner: Spawner) {
     pin_mut!(f);
 
     info!("starting erase");
-    unwrap!(f.as_mut().erase(0x80000, 0x82000).await);
+    unwrap!(f.as_mut().erase(ERASE_START, ERASE_STOP).await);
     info!("erased!");
 
-    let mut buf = [0; 4096];
-    for offset in (0x80000..0x82000).step_by(4096) {
+    let mut buf = [0; PAGE_SIZE];
+    for offset in (ERASE_START..ERASE_STOP).step_by(PAGE_SIZE) {
         info!("starting read");
         unwrap!(f.as_mut().read(offset, &mut buf));
         info!("read done!");
@@ -76,12 +86,12 @@ async fn main(spawner: Spawner) {
     info!("matched!");
 
     info!("starting write");
-    for offset in (0x80000..0x82000).step_by(4) {
+    for offset in (ERASE_START..ERASE_STOP).step_by(4) {
         unwrap!(f.as_mut().write(offset, &[1, 2, 3, 4]).await);
     }
     info!("write done!");
 
-    for offset in (0x80000..0x82000).step_by(4) {
+    for offset in (ERASE_START..ERASE_STOP).step_by(4) {
         let mut buf = [0; 4];
         info!("starting read");
         unwrap!(f.as_mut().read(offset, &mut buf));
