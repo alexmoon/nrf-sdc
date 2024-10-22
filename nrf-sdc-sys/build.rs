@@ -190,7 +190,6 @@ fn bindgen(target: &Target, mem_fns: Rc<RefCell<Vec<u8>>>) -> bindgen::Builder {
         .allowlist_var("HCI_.*")
         .allowlist_var("__MEM_.*")
         .prepend_enum_name(false)
-        .rustfmt_bindings(true)
         .parse_callbacks(Box::new(Callback { mem_fns }))
 }
 
