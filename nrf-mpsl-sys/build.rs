@@ -22,6 +22,7 @@ impl ParseCallbacks for Callback {
     }
 }
 
+#[derive(Debug)]
 struct Target {
     target: String,
     cpu: &'static str,
@@ -69,7 +70,6 @@ fn bindgen(target: &Target) -> bindgen::Builder {
         .allowlist_var("NRF_E.*")
         .allowlist_var("UINT8_MAX")
         .prepend_enum_name(false)
-        .rustfmt_bindings(true)
         .parse_callbacks(Box::new(Callback))
 }
 
