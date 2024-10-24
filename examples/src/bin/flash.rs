@@ -11,7 +11,7 @@ use static_cell::StaticCell;
 use {defmt_rtt as _, panic_probe as _};
 
 bind_interrupts!(struct Irqs {
-    SWI0_EGU0 => mpsl::LowPrioInterruptHandler;
+    SWI5_EGU5 => mpsl::LowPrioInterruptHandler;
     POWER_CLOCK => mpsl::ClockInterruptHandler;
     RADIO => mpsl::HighPrioInterruptHandler;
     TIMER0 => mpsl::HighPrioInterruptHandler;
