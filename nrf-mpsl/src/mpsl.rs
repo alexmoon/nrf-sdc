@@ -5,15 +5,23 @@ use core::mem::MaybeUninit;
 use core::task::Poll;
 
 use cortex_m::interrupt::InterruptNumber as _;
-use embassy_nrf::interrupt::typelevel::{Binding, Handler, Interrupt, POWER_CLOCK, RADIO, RTC0, TIMER0};
-use embassy_nrf::interrupt::Priority;
-use embassy_nrf::{interrupt, peripherals, Peripheral, PeripheralRef};
+use embassy_nrf::interrupt::typelevel::{Handler, Interrupt, POWER_CLOCK, RADIO, RTC0, TIMER0};
+use embassy_nrf::interrupt::{InterruptExt, Priority};
+use embassy_nrf::{bind_interrupts, interrupt, peripherals, Peripheral, PeripheralRef};
 use embassy_sync::waitqueue::AtomicWaker;
 
 use crate::error::{Error, RetVal};
 use crate::{hfclk, pac, raw, temp};
 
 static WAKER: AtomicWaker = AtomicWaker::new();
+
+bind_interrupts!(struct Irqs {
+    SWI5_EGU5 => LowPrioInterruptHandler;
+    POWER_CLOCK => ClockInterruptHandler;
+    RADIO => HighPrioInterruptHandler;
+    TIMER0 => HighPrioInterruptHandler;
+    RTC0 => HighPrioInterruptHandler;
+});
 
 pub struct Peripherals<'d> {
     pub clock: pac::CLOCK,
@@ -77,22 +85,16 @@ pub struct Builder<'d> {
 }
 
 impl<'d> MultiprotocolServiceLayer<'d> {
-    pub fn new<T, I>(p: Peripherals<'d>, _irq: I, clock_cfg: raw::mpsl_clock_lfclk_cfg_t) -> Result<Self, Error>
-    where
-        T: Interrupt,
-        I: Binding<T, LowPrioInterruptHandler>
-            + Binding<interrupt::typelevel::RADIO, HighPrioInterruptHandler>
-            + Binding<interrupt::typelevel::TIMER0, HighPrioInterruptHandler>
-            + Binding<interrupt::typelevel::RTC0, HighPrioInterruptHandler>
-            + Binding<interrupt::typelevel::POWER_CLOCK, ClockInterruptHandler>,
-    {
+    pub fn new(p: Peripherals<'d>, clock_cfg: raw::mpsl_clock_lfclk_cfg_t) -> Result<Self, Error> {
         // Peripherals are used by the MPSL library, so we merely take ownership and ignore them
         let _ = p;
 
-        T::set_priority(Priority::P4);
-        T::unpend();
+        let irq = interrupt::SWI5_EGU5;
 
-        let ret = unsafe { raw::mpsl_init(&clock_cfg, raw::IRQn_Type::from(T::IRQ.number()), Some(assert_handler)) };
+        irq.set_priority(Priority::P4);
+        irq.unpend();
+
+        let ret = unsafe { raw::mpsl_init(&clock_cfg, raw::IRQn_Type::from(irq.number()), Some(assert_handler)) };
         RetVal::from(ret).to_result()?;
 
         RADIO::set_priority(Priority::P0);
@@ -103,21 +105,12 @@ impl<'d> MultiprotocolServiceLayer<'d> {
         Ok(Self { _private: PhantomData })
     }
 
-    pub fn with_timeslots<T, I, const SLOTS: usize>(
+    pub fn with_timeslots<const SLOTS: usize>(
         p: Peripherals<'d>,
-        _irq: I,
         clock_cfg: raw::mpsl_clock_lfclk_cfg_t,
         mem: &'d mut SessionMem<SLOTS>,
-    ) -> Result<Self, Error>
-    where
-        T: Interrupt,
-        I: Binding<T, LowPrioInterruptHandler>
-            + Binding<interrupt::typelevel::RADIO, HighPrioInterruptHandler>
-            + Binding<interrupt::typelevel::TIMER0, HighPrioInterruptHandler>
-            + Binding<interrupt::typelevel::RTC0, HighPrioInterruptHandler>
-            + Binding<interrupt::typelevel::POWER_CLOCK, ClockInterruptHandler>,
-    {
-        let me = Self::new(p, _irq, clock_cfg)?;
+    ) -> Result<Self, Error> {
+        let me = Self::new(p, clock_cfg)?;
         let ret = unsafe { raw::mpsl_timeslot_session_count_set(mem.0.as_mut_ptr() as *mut _, SLOTS as u8) };
         RetVal::from(ret).to_result()?;
         Ok(me)

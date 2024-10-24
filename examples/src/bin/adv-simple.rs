@@ -19,11 +19,6 @@ use {defmt_rtt as _, panic_probe as _};
 
 bind_interrupts!(struct Irqs {
     RNG => rng::InterruptHandler<RNG>;
-    SWI5_EGU5 => mpsl::LowPrioInterruptHandler;
-    POWER_CLOCK => mpsl::ClockInterruptHandler;
-    RADIO => mpsl::HighPrioInterruptHandler;
-    TIMER0 => mpsl::HighPrioInterruptHandler;
-    RTC0 => mpsl::HighPrioInterruptHandler;
 });
 
 fn build_sdc<'d, const N: usize>(
@@ -73,7 +68,7 @@ async fn main(spawner: Spawner) {
         skip_wait_lfclk_started: mpsl::raw::MPSL_DEFAULT_SKIP_WAIT_LFCLK_STARTED != 0,
     };
     static MPSL: StaticCell<MultiprotocolServiceLayer> = StaticCell::new();
-    let mpsl = MPSL.init(unwrap!(mpsl::MultiprotocolServiceLayer::new(mpsl_p, Irqs, lfclk_cfg)));
+    let mpsl = MPSL.init(unwrap!(mpsl::MultiprotocolServiceLayer::new(mpsl_p, lfclk_cfg)));
     spawner.must_spawn(mpsl_task(&*mpsl));
 
     let sdc_p = sdc::Peripherals::new(

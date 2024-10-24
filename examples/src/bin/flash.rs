@@ -3,20 +3,11 @@
 
 use defmt::{info, unwrap};
 use embassy_executor::Spawner;
-use embassy_nrf::bind_interrupts;
 use futures::pin_mut;
 use mpsl::{pac, Flash, MultiprotocolServiceLayer};
 use nrf_sdc::mpsl;
 use static_cell::StaticCell;
 use {defmt_rtt as _, panic_probe as _};
-
-bind_interrupts!(struct Irqs {
-    SWI5_EGU5 => mpsl::LowPrioInterruptHandler;
-    POWER_CLOCK => mpsl::ClockInterruptHandler;
-    RADIO => mpsl::HighPrioInterruptHandler;
-    TIMER0 => mpsl::HighPrioInterruptHandler;
-    RTC0 => mpsl::HighPrioInterruptHandler;
-});
 
 #[embassy_executor::task]
 async fn mpsl_task(mpsl: &'static MultiprotocolServiceLayer<'static>) -> ! {
@@ -60,7 +51,6 @@ async fn main(spawner: Spawner) {
 
     let mpsl = MPSL.init(unwrap!(mpsl::MultiprotocolServiceLayer::with_timeslots(
         mpsl_p,
-        Irqs,
         lfclk_cfg,
         SESSION_MEM.init(mpsl::SessionMem::new())
     )));
