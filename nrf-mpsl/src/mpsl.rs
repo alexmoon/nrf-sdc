@@ -16,7 +16,10 @@ use crate::{hfclk, pac, raw, temp};
 static WAKER: AtomicWaker = AtomicWaker::new();
 
 bind_interrupts!(struct Irqs {
+    #[cfg(not(any(feature = "nrf52805", feature = "nrf52810", feature = "nrf52811")))]
     SWI5_EGU5 => LowPrioInterruptHandler;
+    #[cfg(any(feature = "nrf52805", feature = "nrf52810", feature = "nrf52811"))]
+    SWI5 => LowPrioInterruptHandler;
     POWER_CLOCK => ClockInterruptHandler;
     RADIO => HighPrioInterruptHandler;
     TIMER0 => HighPrioInterruptHandler;
@@ -89,7 +92,10 @@ impl<'d> MultiprotocolServiceLayer<'d> {
         // Peripherals are used by the MPSL library, so we merely take ownership and ignore them
         let _ = p;
 
+        #[cfg(not(any(feature = "nrf52805", feature = "nrf52810", feature = "nrf52811")))]
         let irq = interrupt::SWI5_EGU5;
+        #[cfg(any(feature = "nrf52805", feature = "nrf52810", feature = "nrf52811"))]
+        let irq = interrupt::SWI5;
 
         irq.set_priority(Priority::P4);
         irq.unpend();
