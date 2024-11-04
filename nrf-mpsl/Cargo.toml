@@ -9,18 +9,18 @@ version = "0.1.0"
 rust-version = "1.77"
 
 [features]
-nrf52805 = ["nrf52805-pac", "embassy-nrf/nrf52805"]
-nrf52810 = ["nrf52810-pac", "embassy-nrf/nrf52810"]
-nrf52811 = ["nrf52811-pac", "embassy-nrf/nrf52811"]
-nrf52820 = ["nrf52820-pac", "embassy-nrf/nrf52820"]
-nrf52832 = ["nrf52832-pac", "embassy-nrf/nrf52832"]
-nrf52833 = ["nrf52833-pac", "embassy-nrf/nrf52833"]
-nrf52840 = ["nrf52840-pac", "embassy-nrf/nrf52840"]
+nrf52805 = ["embassy-nrf/nrf52805"]
+nrf52810 = ["embassy-nrf/nrf52810"]
+nrf52811 = ["embassy-nrf/nrf52811"]
+nrf52820 = ["embassy-nrf/nrf52820"]
+nrf52832 = ["embassy-nrf/nrf52832"]
+nrf52833 = ["embassy-nrf/nrf52833"]
+nrf52840 = ["embassy-nrf/nrf52840"]
 critical-section-impl = ["critical-section/restore-state-bool"]
 fem = ["nrf-mpsl-sys/fem"]
-"fem-simple-gpio" = ["nrf-mpsl-sys/fem-simple-gpio"]
-"fem-nrf21540-gpio" = ["nrf-mpsl-sys/fem-nrf21540-gpio"]
-"fem-nrf21540-gpio-spi" = ["nrf-mpsl-sys/fem-nrf21540-gpio-spi"]
+fem-simple-gpio = ["nrf-mpsl-sys/fem-simple-gpio"]
+fem-nrf21540-gpio = ["nrf-mpsl-sys/fem-nrf21540-gpio"]
+fem-nrf21540-gpio-spi = ["nrf-mpsl-sys/fem-nrf21540-gpio-spi"]
 
 [dependencies]
 defmt = { version = "0.3", optional = true }
@@ -32,15 +32,7 @@ embedded-storage-async = "0.4.1"
 
 cortex-m = "0.7.2"
 
-nrf52805-pac  = { version = "0.12.0", features = ["rt"], optional = true }
-nrf52810-pac  = { version = "0.12.0", features = ["rt"], optional = true }
-nrf52811-pac  = { version = "0.12.0", features = ["rt"], optional = true }
-nrf52820-pac  = { version = "0.12.0", features = ["rt"], optional = true }
-nrf52832-pac  = { version = "0.12.0", features = ["rt"], optional = true }
-nrf52833-pac  = { version = "0.12.0", features = ["rt"], optional = true }
-nrf52840-pac  = { version = "0.12.0", features = ["rt"], optional = true }
-
 nrf-mpsl-sys = { version = "0.1.0", path = "../nrf-mpsl-sys" }
 
-embassy-nrf = { version = "0.2.0" }
+embassy-nrf = { version = "0.2.0", features = ["unstable-pac"]}
 embassy-sync = { version = "0.6.0" }
