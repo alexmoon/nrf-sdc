@@ -6,16 +6,18 @@ use core::slice;
 use core::sync::atomic::{compiler_fence, Ordering};
 use core::task::Poll;
 
+use cortex_m::peripheral::NVIC;
+use embassy_nrf::interrupt::Interrupt;
 use embassy_nrf::nvmc::{FLASH_SIZE, PAGE_SIZE};
+use embassy_nrf::pac::nvmc::vals::Wen;
 use embassy_nrf::peripherals::NVMC;
-use embassy_nrf::{into_ref, Peripheral, PeripheralRef};
+use embassy_nrf::{into_ref, pac, Peripheral, PeripheralRef};
 use embassy_sync::blocking_mutex::raw::RawMutex;
 use embassy_sync::blocking_mutex::Mutex;
 use embassy_sync::waitqueue::WakerRegistration;
 use embedded_storage::nor_flash::{ErrorType, NorFlashError, NorFlashErrorKind};
 
-use crate::pac::{Interrupt, NVIC};
-use crate::{pac, raw, MultiprotocolServiceLayer, RetVal};
+use crate::{raw, MultiprotocolServiceLayer, RetVal};
 
 // A custom RawMutex implementation that also masks the timer0 interrupt
 // which invokes the timeslot callback.
@@ -272,9 +274,9 @@ unsafe extern "C" fn timeslot_session_callback(
     //
     // Safety: guaranteed by MPSL to provide values when called inside slot callback.
     unsafe fn get_timeslot_time_us() -> u32 {
-        let p = unsafe { &*pac::TIMER0::ptr() };
-        p.tasks_capture[0].write(|w| unsafe { w.bits(1) });
-        p.cc[0].read().cc().bits()
+        let p = pac::TIMER0;
+        p.tasks_capture(0).write_value(1);
+        p.cc(0).read()
     }
 
     match signal {
@@ -290,9 +292,9 @@ unsafe extern "C" fn timeslot_session_callback(
                     state.return_param.params.request.p_next = &mut state.timeslot_request;
                 }
                 ControlFlow::Break(_) => {
-                    let p = State::regs();
-                    p.config.write(|w| w.wen().ren());
-                    while p.ready.read().ready().is_busy() {}
+                    let p = pac::NVMC;
+                    p.config().write(|w| w.set_wen(Wen::REN));
+                    while !p.ready().read().ready() {}
                     state.result.replace(Ok(()));
                     state.return_param.callback_action = raw::MPSL_TIMESLOT_SIGNAL_ACTION_END as u8;
                     state.waker.wake();
@@ -363,10 +365,6 @@ impl State {
             f(&mut inner)
         })
     }
-
-    fn regs() -> &'static pac::nvmc::RegisterBlock {
-        unsafe { &*pac::NVMC::ptr() }
-    }
 }
 
 impl FlashOp {
@@ -378,17 +376,16 @@ impl FlashOp {
         address: &mut u32,
         to: u32,
     ) -> core::ops::ControlFlow<()> {
-        let p = State::regs();
+        let p = pac::NVMC;
         loop {
             // Enable erase and erase next page
-            p.config.write(|w| w.wen().een());
-            p.erasepagepartialcfg
-                .write(|w| unsafe { w.bits(ERASE_PARTIAL_PAGE_DURATION_MS) });
-            while p.ready.read().ready().is_busy() {}
+            p.config().write(|w| w.set_wen(Wen::EEN));
+            p.erasepagepartialcfg().write(|w| w.0 = ERASE_PARTIAL_PAGE_DURATION_MS);
+            while !p.ready().read().ready() {}
 
-            p.erasepagepartial.write(|w| unsafe { w.bits(*address) });
-            while p.ready.read().ready().is_busy() {}
-            p.config.write(|w| w.wen().ren());
+            p.erasepagepartial().write_value(*address);
+            while !p.ready().read().ready() {}
+            p.config().write(|w| w.set_wen(Wen::REN));
 
             *elapsed += ERASE_PARTIAL_PAGE_DURATION_US;
             if *elapsed > ERASE_PAGE_DURATION_US {
@@ -412,12 +409,12 @@ impl FlashOp {
         address: &mut u32,
         to: u32,
     ) -> core::ops::ControlFlow<()> {
-        let p = State::regs();
-        p.config.write(|w| w.wen().een());
-        while p.ready.read().ready().is_busy() {}
-        p.erasepage().write(|w| unsafe { w.bits(*address) });
-        while p.ready.read().ready().is_busy() {}
-        p.config.write(|w| w.wen().ren());
+        let p = pac::NVMC;
+        p.config().write(|w| w.set_wen(Wen::EEN));
+        while !p.ready().read().ready() {}
+        p.erasepage().write_value(*address);
+        while !p.ready().read().ready() {}
+        p.config().write(|w| w.set_wen(Wen::REN));
         *address += PAGE_SIZE as u32;
         if *address >= to {
             ControlFlow::Break(())
@@ -436,18 +433,18 @@ impl FlashOp {
                 Self::erase(get_time, slot_duration_us, elapsed, address, *to)
             }
             Self::Write { dest, src, words } => {
-                let p = State::regs();
+                let p = pac::NVMC;
                 let mut i = 0;
                 // Do at least one write to avoid getting stuck. The timeslot parameters guarantees we should be able to at least one operation.
                 if *words > 0 {
                     loop {
-                        p.config.write(|w| w.wen().wen());
-                        while p.ready.read().ready().is_busy() {}
+                        p.config().write(|w| w.set_wen(Wen::WEN));
+                        while !p.ready().read().ready() {}
                         unsafe {
                             let w = core::ptr::read_unaligned(src.add(i));
                             core::ptr::write_volatile(dest.add(i), w);
                         }
-                        while p.ready.read().ready().is_busy() {}
+                        while !p.ready().read().ready() {}
                         i += 1;
                         if get_time() + WRITE_WORD_DURATION_US >= slot_duration_us || ((i as u32) >= *words) {
                             break;

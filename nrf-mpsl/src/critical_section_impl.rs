@@ -1,7 +1,8 @@
 use core::arch::asm;
 use core::sync::atomic::{compiler_fence, AtomicBool, Ordering};
 
-use crate::pac::{Interrupt, NVIC};
+use cortex_m::peripheral::NVIC;
+use embassy_nrf::interrupt::Interrupt;
 
 const RESERVED_IRQS: u32 =
     (1 << (Interrupt::RADIO as u8)) | (1 << (Interrupt::RTC0 as u8)) | (1 << (Interrupt::TIMER0 as u8));

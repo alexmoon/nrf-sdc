@@ -23,15 +23,21 @@ use raw::{
     SDC_CFG_TYPE_NONE, SDC_DEFAULT_RESOURCE_CFG_TAG,
 };
 
-use crate::{pac, raw, Error, RetVal};
+use crate::{raw, Error, RetVal};
 
 static WAKER: AtomicWaker = AtomicWaker::new();
 static SDC_RNG: AtomicPtr<()> = AtomicPtr::new(core::ptr::null_mut());
 
+/// Struct containing all peripherals required for the SDC to operate.
+///
+/// This is used to enforce at compile-time that your code doesn't use
+/// these peripherals.
+///
+/// However, there's extra restrictions that are not enforced at compile-time
+/// that you must ensure to fulfill manually:
+///
+/// - Do not use the `ECB`, `CCM` or `AAR` peripherals directly.
 pub struct Peripherals<'d> {
-    pub ecb: pac::ECB,
-    pub aar: pac::AAR,
-
     pub ppi_ch17: PeripheralRef<'d, peripherals::PPI_CH17>,
     pub ppi_ch18: PeripheralRef<'d, peripherals::PPI_CH18>,
     pub ppi_ch20: PeripheralRef<'d, peripherals::PPI_CH20>,
@@ -49,8 +55,6 @@ pub struct Peripherals<'d> {
 impl<'d> Peripherals<'d> {
     #[allow(clippy::too_many_arguments)]
     pub fn new(
-        ecb: pac::ECB,
-        aar: pac::AAR,
         ppi_ch17: impl Peripheral<P = peripherals::PPI_CH17> + 'd,
         ppi_ch18: impl Peripheral<P = peripherals::PPI_CH18> + 'd,
         ppi_ch20: impl Peripheral<P = peripherals::PPI_CH20> + 'd,
@@ -65,8 +69,6 @@ impl<'d> Peripherals<'d> {
         ppi_ch29: impl Peripheral<P = peripherals::PPI_CH29> + 'd,
     ) -> Self {
         Peripherals {
-            ecb,
-            aar,
             ppi_ch17: ppi_ch17.into_ref(),
             ppi_ch18: ppi_ch18.into_ref(),
             ppi_ch20: ppi_ch20.into_ref(),

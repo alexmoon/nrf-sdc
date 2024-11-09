@@ -11,13 +11,27 @@ use embassy_nrf::{interrupt, peripherals, Peripheral, PeripheralRef};
 use embassy_sync::waitqueue::AtomicWaker;
 
 use crate::error::{Error, RetVal};
-use crate::{hfclk, pac, raw, temp};
+use crate::{hfclk, raw, temp};
 
 static WAKER: AtomicWaker = AtomicWaker::new();
 
+/// Struct containing all peripherals required for the MPSL to operate.
+///
+/// This is used to enforce at compile-time that your code doesn't use
+/// these peripherals.
+///
+/// However, there's extra restrictions that are not enforced at compile-time
+/// that you must ensure to fulfill manually:
+///
+/// - Do not use `cpsid/cpsie` directly for globally disabling/enabling interrupts,
+///   as this can disrupt timing. Do not use the `critical-section` implementation of
+///   `cortex-m`, use the one from this crate instead.
+/// - Do not use `NVMC` directly as this causes the CPU to stall during flash operations.
+///   Use the [`Flash`](crate::Flash) implementation from this crate instead, which
+///   uses the timeslot system to schedule flash operations at times that don't disrupt radio.
+/// - Do not use `RADIO` directly, except during timeslots you've allocated.
+/// - Do not use `CLOCKS` directly, use the functions provided by this crate instead.
 pub struct Peripherals<'d> {
-    pub clock: pac::CLOCK,
-    pub radio: pac::RADIO,
     pub rtc0: PeripheralRef<'d, peripherals::RTC0>,
     pub timer0: PeripheralRef<'d, peripherals::TIMER0>,
     pub temp: PeripheralRef<'d, peripherals::TEMP>,
@@ -30,8 +44,6 @@ pub struct Peripherals<'d> {
 impl<'d> Peripherals<'d> {
     #[allow(clippy::too_many_arguments)]
     pub fn new(
-        clock: pac::CLOCK,
-        radio: pac::RADIO,
         rtc0: impl Peripheral<P = peripherals::RTC0> + 'd,
         timer0: impl Peripheral<P = peripherals::TIMER0> + 'd,
         temp: impl Peripheral<P = peripherals::TEMP> + 'd,
@@ -40,8 +52,6 @@ impl<'d> Peripherals<'d> {
         ppi_ch31: impl Peripheral<P = peripherals::PPI_CH31> + 'd,
     ) -> Self {
         Peripherals {
-            clock,
-            radio,
             rtc0: rtc0.into_ref(),
             timer0: timer0.into_ref(),
             temp: temp.into_ref(),

@@ -9,9 +9,9 @@ use embassy_executor::Spawner;
 use embassy_nrf::gpio::{Level, Output, OutputDrive};
 use embassy_nrf::peripherals::RNG;
 use embassy_nrf::rng::Rng;
-use embassy_nrf::{bind_interrupts, rng};
+use embassy_nrf::{bind_interrupts, pac, rng};
 use embassy_time::{Duration, Timer};
-use nrf_sdc::{self as sdc, mpsl, pac};
+use nrf_sdc::{self as sdc, mpsl};
 use sdc::mpsl::MultiprotocolServiceLayer;
 use sdc::vendor::ZephyrWriteBdAddr;
 use static_cell::StaticCell;
@@ -36,13 +36,11 @@ fn build_sdc<'d, const N: usize>(
 }
 
 fn bd_addr() -> BdAddr {
-    unsafe {
-        let ficr = &*pac::FICR::ptr();
-        let high = u64::from(ficr.deviceid[1].read().bits());
-        let addr = high << 32 | u64::from(ficr.deviceid[0].read().bits());
-        let addr = addr | 0x0000_c000_0000_0000;
-        BdAddr::new(unwrap!(addr.to_le_bytes()[..6].try_into()))
-    }
+    let ficr = pac::FICR;
+    let high = u64::from(ficr.deviceid(1).read());
+    let addr = high << 32 | u64::from(ficr.deviceid(0).read());
+    let addr = addr | 0x0000_c000_0000_0000;
+    BdAddr::new(unwrap!(addr.to_le_bytes()[..6].try_into()))
 }
 
 #[embassy_executor::task]
@@ -53,18 +51,8 @@ async fn mpsl_task(mpsl: &'static MultiprotocolServiceLayer<'static>) -> ! {
 #[embassy_executor::main]
 async fn main(spawner: Spawner) {
     let p = embassy_nrf::init(Default::default());
-    let pac_p = pac::Peripherals::take().unwrap();
 
-    let mpsl_p = mpsl::Peripherals::new(
-        pac_p.CLOCK,
-        pac_p.RADIO,
-        p.RTC0,
-        p.TIMER0,
-        p.TEMP,
-        p.PPI_CH19,
-        p.PPI_CH30,
-        p.PPI_CH31,
-    );
+    let mpsl_p = mpsl::Peripherals::new(p.RTC0, p.TIMER0, p.TEMP, p.PPI_CH19, p.PPI_CH30, p.PPI_CH31);
     let lfclk_cfg = mpsl::raw::mpsl_clock_lfclk_cfg_t {
         source: mpsl::raw::MPSL_CLOCK_LF_SRC_RC as u8,
         rc_ctiv: mpsl::raw::MPSL_RECOMMENDED_RC_CTIV as u8,
@@ -77,8 +65,8 @@ async fn main(spawner: Spawner) {
     spawner.must_spawn(mpsl_task(&*mpsl));
 
     let sdc_p = sdc::Peripherals::new(
-        pac_p.ECB, pac_p.AAR, p.PPI_CH17, p.PPI_CH18, p.PPI_CH20, p.PPI_CH21, p.PPI_CH22, p.PPI_CH23, p.PPI_CH24,
-        p.PPI_CH25, p.PPI_CH26, p.PPI_CH27, p.PPI_CH28, p.PPI_CH29,
+        p.PPI_CH17, p.PPI_CH18, p.PPI_CH20, p.PPI_CH21, p.PPI_CH22, p.PPI_CH23, p.PPI_CH24, p.PPI_CH25, p.PPI_CH26,
+        p.PPI_CH27, p.PPI_CH28, p.PPI_CH29,
     );
 
     let mut rng = Rng::new(p.RNG, Irqs);
