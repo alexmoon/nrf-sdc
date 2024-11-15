@@ -41,15 +41,16 @@ struct Target {
     target: String,
     cpu: &'static str,
     float_abi: &'static str,
+    chip_family: &'static str,
     chip: &'static str,
 }
 
 impl Target {
     fn new(target: String) -> Self {
-        let (cpu, float_abi, chip) = match target.as_str() {
-            "thumbv7em-none-eabihf" => ("cortex-m4", "hard", "NRF52840_XXAA"),
-            "thumbv7em-none-eabi" => ("cortex-m4", "soft", "NRF52840_XXAA"),
-            "thumbv8m.main-none-eabi" => ("cortex-m33", "soft", "NRF5340_XXAA"),
+        let (cpu, float_abi, chip_family, chip) = match target.as_str() {
+            "thumbv7em-none-eabihf" => ("cortex-m4", "hard", "nrf52", "NRF52840_XXAA"),
+            "thumbv7em-none-eabi" => ("cortex-m4", "soft", "nrf52", "NRF52840_XXAA"),
+            "thumbv8m.main-none-eabi" => ("cortex-m33", "soft", "nrf53", "NRF5340_XXAA"),
             _ => panic!("Unsupported target: {:?}", target),
         };
 
@@ -57,6 +58,7 @@ impl Target {
             target,
             cpu,
             float_abi,
+            chip_family,
             chip,
         }
     }
@@ -96,8 +98,9 @@ fn main() {
         .header("./third_party/nordic/nrfxlib/mpsl/include/mpsl.h")
         .header("./third_party/nordic/nrfxlib/mpsl/include/mpsl_clock.h")
         .header("./third_party/nordic/nrfxlib/mpsl/include/mpsl_ecb.h")
-        .header("./third_party/nordic/nrfxlib/mpsl/include/mpsl_coex.h")
         .header("./third_party/nordic/nrfxlib/mpsl/include/mpsl_cx_abstract_interface.h")
+        .header("./third_party/nordic/nrfxlib/mpsl/include/mpsl_pm.h")
+        .header("./third_party/nordic/nrfxlib/mpsl/include/mpsl_pm_config.h")
         .header("./third_party/nordic/nrfxlib/mpsl/include/mpsl_temp.h")
         .header("./third_party/nordic/nrfxlib/mpsl/include/mpsl_timeslot.h")
         .header("./third_party/nordic/nrfxlib/mpsl/include/mpsl_tx_power.h")
@@ -162,7 +165,7 @@ fn main() {
         path.push("third_party/nordic/nrfxlib/mpsl");
         path.push(dir);
         path.push("lib");
-        path.push(target.cpu);
+        path.push(target.chip_family);
         path.push(format!("{}-float", target.float_abi));
         path
     }
