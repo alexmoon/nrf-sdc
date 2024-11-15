@@ -255,9 +255,9 @@ dependencies = [
 
 [[package]]
 name = "doxygen-rs"
-version = "0.3.1"
+version = "0.4.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "02796cce256c1561e0ab1041c2d830ab6a6176dbeade23b5f93a2387858d0d34"
+checksum = "415b6ec780d34dcf624666747194393603d0373b7141eef01d12ee58881507d9"
 dependencies = [
  "phf",
 ]

@@ -32,4 +32,4 @@ fem = []
 
 [build-dependencies]
 bindgen = "0.70.1"
-doxygen-rs = "0.3.0"
+doxygen-rs = "0.4.2"
