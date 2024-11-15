@@ -1425,7 +1425,7 @@ pub mod vendor {
     }
 
     cmd! {
-        NordicSetEventStartTask(VENDOR_SPECIFIC, 0x11b) {
+        NordicSetEventStartTask(VENDOR_SPECIFIC, 0x11e) {
             NordicSetEventStartTaskParams {
                 handle_type: u8,
                 handle: u16,
