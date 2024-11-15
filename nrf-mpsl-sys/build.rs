@@ -20,6 +20,20 @@ impl ParseCallbacks for Callback {
                 .replace("mpsl_fem_event_type_t::", ""),
         ))
     }
+
+    fn enum_variant_behavior(
+        &self,
+        _enum_name: Option<&str>,
+        original_variant_name: &str,
+        _variant_value: bindgen::callbacks::EnumVariantValue,
+    ) -> Option<bindgen::callbacks::EnumVariantCustomBehavior> {
+        // IRQn values differ between chips, so hide them
+        if original_variant_name.ends_with("_IRQn") {
+            Some(bindgen::callbacks::EnumVariantCustomBehavior::Hide)
+        } else {
+            None
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -69,6 +83,7 @@ fn bindgen(target: &Target) -> bindgen::Builder {
         .allowlist_var("MPSL_.*")
         .allowlist_var("NRF_E.*")
         .allowlist_var("UINT8_MAX")
+        .blocklist_var("NRF_.*_BASE")
         .prepend_enum_name(false)
         .parse_callbacks(Box::new(Callback))
 }
