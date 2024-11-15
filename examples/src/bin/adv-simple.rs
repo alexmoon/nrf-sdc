@@ -19,8 +19,8 @@ use {defmt_rtt as _, panic_probe as _};
 
 bind_interrupts!(struct Irqs {
     RNG => rng::InterruptHandler<RNG>;
-    SWI0_EGU0 => mpsl::LowPrioInterruptHandler;
-    POWER_CLOCK => mpsl::ClockInterruptHandler;
+    EGU0_SWI0 => mpsl::LowPrioInterruptHandler;
+    CLOCK_POWER => mpsl::ClockInterruptHandler;
     RADIO => mpsl::HighPrioInterruptHandler;
     TIMER0 => mpsl::HighPrioInterruptHandler;
     RTC0 => mpsl::HighPrioInterruptHandler;
