@@ -1083,7 +1083,7 @@ mod le {
 pub mod vendor {
     use bt_hci::cmd::Error as CmdError;
     use bt_hci::controller::ControllerCmdSync;
-    use bt_hci::param::{BdAddr, ConnHandle, Duration};
+    use bt_hci::param::{BdAddr, ChannelMap, ConnHandle, Duration};
     use bt_hci::{cmd, param, FromHciBytes};
 
     use crate::raw;
@@ -1254,13 +1254,6 @@ pub mod vendor {
     }
 
     cmd! {
-        NordicCoexScanModeConfig(VENDOR_SPECIFIC, 0x0107) {
-            Params = u8;
-            Return = ();
-        }
-    }
-
-    cmd! {
         NordicPeripheralLatencyModeSet(VENDOR_SPECIFIC, 0x0109) {
             Params = NordicPeripheralLatencyModeSetParams;
             Return = ();
@@ -1425,12 +1418,44 @@ pub mod vendor {
     }
 
     cmd! {
+        NordicScanChannelMapSet(VENDOR_SPECIFIC, 0x11b) {
+            Params = ChannelMap;
+            Return = ();
+        }
+    }
+
+    cmd! {
+        NordicScanAcceptExtAdvPacketsSet(VENDOR_SPECIFIC, 0x11c) {
+            Params = bool;
+            Return = ();
+        }
+    }
+
+    cmd! {
+        NordicSetRolePriority(VENDOR_SPECIFIC, 0x11d) {
+            NordicSetRolePriorityParams {
+                handle_type: u8,
+                handle: u16,
+                priority: u8,
+            }
+            Return = ();
+        }
+    }
+
+    cmd! {
         NordicSetEventStartTask(VENDOR_SPECIFIC, 0x11e) {
             NordicSetEventStartTaskParams {
                 handle_type: u8,
                 handle: u16,
                 task_address: u32,
             }
+            Return = ();
+        }
+    }
+
+    cmd! {
+        NordicConnAnchorPointUpdateEventReportEnable(VENDOR_SPECIFIC, 0x11f) {
+            Params = bool;
             Return = ();
         }
     }
