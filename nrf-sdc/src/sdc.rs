@@ -343,17 +343,6 @@ impl Builder {
         self.support(raw::sdc_support_qos_channel_survey)
     }
 
-    pub fn coex_adv_mode_configure(self, mode: core::ops::ControlFlow<(), ()>) -> Result<Self, Error> {
-        let val = match mode {
-            core::ops::ControlFlow::Break(()) => false,
-            core::ops::ControlFlow::Continue(()) => true,
-        };
-
-        RetVal::from(unsafe { raw::sdc_coex_adv_mode_configure(val) })
-            .to_result()
-            .and(Ok(self))
-    }
-
     pub fn default_tx_power(self, dbm: i8) -> Result<Self, Error> {
         RetVal::from(unsafe { raw::sdc_default_tx_power_set(dbm) })
             .to_result()
@@ -1094,7 +1083,7 @@ mod le {
 pub mod vendor {
     use bt_hci::cmd::Error as CmdError;
     use bt_hci::controller::ControllerCmdSync;
-    use bt_hci::param::{BdAddr, ConnHandle, Duration};
+    use bt_hci::param::{BdAddr, ChannelMap, ConnHandle, Duration};
     use bt_hci::{cmd, param, FromHciBytes};
 
     use crate::raw;
@@ -1265,28 +1254,6 @@ pub mod vendor {
     }
 
     cmd! {
-        NordicCoexScanModeConfig(VENDOR_SPECIFIC, 0x0107) {
-            Params = u8;
-            Return = ();
-        }
-    }
-
-    cmd! {
-        NordicCoexPriorityConfig(VENDOR_SPECIFIC, 0x0108) {
-            Params = NordicCoexPriorityConfigParams;
-            Return = ();
-        }
-    }
-
-    param! {
-        struct NordicCoexPriorityConfigParams {
-            role: u8,
-            priority: u8,
-            escalation_threshold: u8,
-        }
-    }
-
-    cmd! {
         NordicPeripheralLatencyModeSet(VENDOR_SPECIFIC, 0x0109) {
             Params = NordicPeripheralLatencyModeSetParams;
             Return = ();
@@ -1450,6 +1417,49 @@ pub mod vendor {
         }
     }
 
+    cmd! {
+        NordicScanChannelMapSet(VENDOR_SPECIFIC, 0x11b) {
+            Params = ChannelMap;
+            Return = ();
+        }
+    }
+
+    cmd! {
+        NordicScanAcceptExtAdvPacketsSet(VENDOR_SPECIFIC, 0x11c) {
+            Params = bool;
+            Return = ();
+        }
+    }
+
+    cmd! {
+        NordicSetRolePriority(VENDOR_SPECIFIC, 0x11d) {
+            NordicSetRolePriorityParams {
+                handle_type: u8,
+                handle: u16,
+                priority: u8,
+            }
+            Return = ();
+        }
+    }
+
+    cmd! {
+        NordicSetEventStartTask(VENDOR_SPECIFIC, 0x11e) {
+            NordicSetEventStartTaskParams {
+                handle_type: u8,
+                handle: u16,
+                task_address: u32,
+            }
+            Return = ();
+        }
+    }
+
+    cmd! {
+        NordicConnAnchorPointUpdateEventReportEnable(VENDOR_SPECIFIC, 0x11f) {
+            Params = bool;
+            Return = ();
+        }
+    }
+
     sdc_cmd!(ZephyrReadVersionInfo => sdc_hci_cmd_vs_zephyr_read_version_info() -> y);
     sdc_cmd!(ZephyrReadSupportedCommands => sdc_hci_cmd_vs_zephyr_read_supported_commands() -> y);
     sdc_cmd!(ZephyrWriteBdAddr => sdc_hci_cmd_vs_zephyr_write_bd_addr(x));
@@ -1464,8 +1474,6 @@ pub mod vendor {
     sdc_cmd!(NordicQosConnEventReportEnable => sdc_hci_cmd_vs_qos_conn_event_report_enable(x));
     sdc_cmd!(NordicEventLengthSet => sdc_hci_cmd_vs_event_length_set(x));
     sdc_cmd!(NordicPeriodicAdvEventLengthSet => sdc_hci_cmd_vs_periodic_adv_event_length_set(x));
-    sdc_cmd!(NordicCoexScanModeConfig => sdc_hci_cmd_vs_coex_scan_mode_config(x));
-    sdc_cmd!(NordicCoexPriorityConfig => sdc_hci_cmd_vs_coex_priority_config(x));
     sdc_cmd!(NordicPeripheralLatencyModeSet => sdc_hci_cmd_vs_peripheral_latency_mode_set(x));
     sdc_cmd!(NordicWriteRemoteTxPower => sdc_hci_cmd_vs_write_remote_tx_power(x));
     sdc_cmd!(NordicSetAdvRandomness => sdc_hci_cmd_vs_set_adv_randomness(x));
@@ -1482,6 +1490,11 @@ pub mod vendor {
     sdc_cmd!(NordicBigReservedTimeSet => sdc_hci_cmd_vs_big_reserved_time_set(x));
     sdc_cmd!(NordicCigReservedTimeSet => sdc_hci_cmd_vs_cig_reserved_time_set(x));
     sdc_cmd!(NordicCisSubeventLengthSet => sdc_hci_cmd_vs_cis_subevent_length_set(x));
+    sdc_cmd!(NordicScanChannelMapSet => sdc_hci_cmd_vs_scan_channel_map_set(x));
+    sdc_cmd!(NordicScanAcceptExtAdvPacketsSet => sdc_hci_cmd_vs_scan_accept_ext_adv_packets_set(x));
+    sdc_cmd!(NordicSetRolePriority => sdc_hci_cmd_vs_set_role_priority(x));
+    sdc_cmd!(NordicSetEventStartTask => sdc_hci_cmd_vs_set_event_start_task(x));
+    sdc_cmd!(NordicConnAnchorPointUpdateEventReportEnable => sdc_hci_cmd_vs_conn_anchor_point_update_event_report_enable(x));
 
     impl<'d> ControllerCmdSync<ZephyrReadStaticAddrs> for super::SoftdeviceController<'d> {
         async fn exec(

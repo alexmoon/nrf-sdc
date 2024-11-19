@@ -148,15 +148,16 @@ struct Target {
     target: String,
     cpu: &'static str,
     float_abi: &'static str,
+    chip_family: &'static str,
     chip: &'static str,
 }
 
 impl Target {
     fn new(target: String) -> Self {
-        let (cpu, float_abi, chip) = match target.as_str() {
-            "thumbv7em-none-eabihf" => ("cortex-m4", "hard", "NRF52840_XXAA"),
-            "thumbv7em-none-eabi" => ("cortex-m4", "soft", "NRF52840_XXAA"),
-            "thumbv8m.main-none-eabi" => ("cortex-m33", "soft", "NRF5340_XXAA"),
+        let (cpu, float_abi, chip_family, chip) = match target.as_str() {
+            "thumbv7em-none-eabihf" => ("cortex-m4", "hard", "nrf52", "NRF52840_XXAA"),
+            "thumbv7em-none-eabi" => ("cortex-m4", "soft", "nrf52", "NRF52840_XXAA"),
+            "thumbv8m.main-none-eabi" => ("cortex-m33", "soft", "nrf53", "NRF5340_XXAA"),
             _ => panic!("Unsupported target: {:?}", target),
         };
 
@@ -164,6 +165,7 @@ impl Target {
             target,
             cpu,
             float_abi,
+            chip_family,
             chip,
         }
     }
@@ -229,7 +231,7 @@ fn main() {
 
     let mut lib_path = PathBuf::from(env::var_os("CARGO_MANIFEST_DIR").unwrap());
     lib_path.push("third_party/nordic/nrfxlib/softdevice_controller/lib");
-    lib_path.push(target.cpu);
+    lib_path.push(target.chip_family);
     lib_path.push(format!("{}-float", target.float_abi));
 
     println!("cargo:rustc-link-search={}", lib_path.to_str().unwrap());
