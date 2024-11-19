@@ -1490,7 +1490,11 @@ pub mod vendor {
     sdc_cmd!(NordicBigReservedTimeSet => sdc_hci_cmd_vs_big_reserved_time_set(x));
     sdc_cmd!(NordicCigReservedTimeSet => sdc_hci_cmd_vs_cig_reserved_time_set(x));
     sdc_cmd!(NordicCisSubeventLengthSet => sdc_hci_cmd_vs_cis_subevent_length_set(x));
+    sdc_cmd!(NordicScanChannelMapSet => sdc_hci_cmd_vs_scan_channel_map_set(x));
+    sdc_cmd!(NordicScanAcceptExtAdvPacketsSet => sdc_hci_cmd_vs_scan_accept_ext_adv_packets_set(x));
+    sdc_cmd!(NordicSetRolePriority => sdc_hci_cmd_vs_set_role_priority(x));
     sdc_cmd!(NordicSetEventStartTask => sdc_hci_cmd_vs_set_event_start_task(x));
+    sdc_cmd!(NordicConnAnchorPointUpdateEventReportEnable => sdc_hci_cmd_vs_conn_anchor_point_update_event_report_enable(x));
 
     impl<'d> ControllerCmdSync<ZephyrReadStaticAddrs> for super::SoftdeviceController<'d> {
         async fn exec(
