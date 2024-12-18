@@ -88,7 +88,8 @@ impl<'d> Peripherals<'d> {
 unsafe extern "C" fn fault_handler(file: *const core::ffi::c_char, line: u32) {
     panic!(
         "SoftdeviceController: {}:{}",
-        CStr::from_ptr(file).to_str().unwrap_or("bad filename"),
+        // SAFETY: the SDC should always give us valid utf8 strings.
+        unsafe { core::str::from_utf8_unchecked(CStr::from_ptr(file).to_bytes()) },
         line
     )
 }

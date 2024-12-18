@@ -70,7 +70,8 @@ pub struct MultiprotocolServiceLayer<'d> {
 unsafe extern "C" fn assert_handler(file: *const core::ffi::c_char, line: u32) {
     panic!(
         "MultiprotocolServiceLayer: {}:{}",
-        CStr::from_ptr(file).to_str().unwrap_or("bad filename"),
+        // SAFETY: the SDC should always give us valid utf8 strings.
+        unsafe { core::str::from_utf8_unchecked(CStr::from_ptr(file).to_bytes()) },
         line
     )
 }
