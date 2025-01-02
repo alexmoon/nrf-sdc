@@ -469,11 +469,11 @@ impl FlashOp {
     }
 }
 
-impl<'d> ErrorType for Flash<'d> {
+impl ErrorType for Flash<'_> {
     type Error = FlashError;
 }
 
-impl<'d> embedded_storage_async::nor_flash::MultiwriteNorFlash for Flash<'d> {}
+impl embedded_storage_async::nor_flash::MultiwriteNorFlash for Flash<'_> {}
 
 impl NorFlashError for FlashError {
     fn kind(&self) -> NorFlashErrorKind {
@@ -485,7 +485,7 @@ impl NorFlashError for FlashError {
     }
 }
 
-impl<'d> embedded_storage::nor_flash::ReadNorFlash for Flash<'d> {
+impl embedded_storage::nor_flash::ReadNorFlash for Flash<'_> {
     const READ_SIZE: usize = 1;
     fn read(&mut self, offset: u32, bytes: &mut [u8]) -> Result<(), Self::Error> {
         Self::read(self, offset, bytes)

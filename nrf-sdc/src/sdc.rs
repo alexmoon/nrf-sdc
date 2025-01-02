@@ -427,7 +427,7 @@ pub struct SoftdeviceController<'d> {
     _private: PhantomData<&'d *mut ()>,
 }
 
-impl<'d> Drop for SoftdeviceController<'d> {
+impl Drop for SoftdeviceController<'_> {
     fn drop(&mut self) {
         unsafe { raw::sdc_disable() };
         SDC_RNG.store(core::ptr::null_mut(), Ordering::Release);
@@ -561,7 +561,7 @@ impl<'d> SoftdeviceController<'d> {
     }
 }
 
-impl<'a> ErrorType for SoftdeviceController<'a> {
+impl ErrorType for SoftdeviceController<'_> {
     type Error = Error;
 }
 
@@ -599,7 +599,7 @@ impl<'a> Controller for SoftdeviceController<'a> {
     }
 }
 
-impl<'a> blocking::Controller for SoftdeviceController<'a> {
+impl blocking::Controller for SoftdeviceController<'_> {
     fn try_write_acl_data(&self, packet: &bt_hci::data::AclPacket<'_>) -> Result<(), blocking::TryError<Self::Error>> {
         let mut buf = [0u8; raw::HCI_DATA_PACKET_MAX_SIZE as usize];
         packet
