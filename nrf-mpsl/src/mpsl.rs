@@ -76,7 +76,7 @@ unsafe extern "C" fn assert_handler(file: *const core::ffi::c_char, line: u32) {
     )
 }
 
-impl<'d> Drop for MultiprotocolServiceLayer<'d> {
+impl Drop for MultiprotocolServiceLayer<'_> {
     fn drop(&mut self) {
         unsafe { raw::mpsl_uninit() };
     }

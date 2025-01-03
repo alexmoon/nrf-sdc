@@ -21,13 +21,13 @@ opt-level = 'z'
 overflow-checks = false
 
 [patch.crates-io]
-embassy-executor = { git = "https://github.com/embassy-rs/embassy.git", rev = "fe79af56141adfeacb3cfcefc4400da0c5aabb5f" }
-embassy-nrf = { git = "https://github.com/embassy-rs/embassy.git", rev = "fe79af56141adfeacb3cfcefc4400da0c5aabb5f" }
-embassy-sync = { git = "https://github.com/embassy-rs/embassy.git", rev = "fe79af56141adfeacb3cfcefc4400da0c5aabb5f" }
-embassy-futures = { git = "https://github.com/embassy-rs/embassy.git", rev = "fe79af56141adfeacb3cfcefc4400da0c5aabb5f" }
-embassy-time = { git = "https://github.com/embassy-rs/embassy.git", rev = "fe79af56141adfeacb3cfcefc4400da0c5aabb5f" }
-embassy-time-driver = { git = "https://github.com/embassy-rs/embassy.git", rev = "fe79af56141adfeacb3cfcefc4400da0c5aabb5f" }
-embassy-embedded-hal = { git = "https://github.com/embassy-rs/embassy.git", rev = "fe79af56141adfeacb3cfcefc4400da0c5aabb5f" }
+embassy-executor = { git = "https://github.com/embassy-rs/embassy.git", rev = "cefdbfab2f1efb0797f661a9d8cc0aa686fe881a" }
+embassy-nrf = { git = "https://github.com/embassy-rs/embassy.git", rev = "cefdbfab2f1efb0797f661a9d8cc0aa686fe881a" }
+embassy-sync = { git = "https://github.com/embassy-rs/embassy.git", rev = "cefdbfab2f1efb0797f661a9d8cc0aa686fe881a" }
+embassy-futures = { git = "https://github.com/embassy-rs/embassy.git", rev = "cefdbfab2f1efb0797f661a9d8cc0aa686fe881a" }
+embassy-time = { git = "https://github.com/embassy-rs/embassy.git", rev = "cefdbfab2f1efb0797f661a9d8cc0aa686fe881a" }
+embassy-time-driver = { git = "https://github.com/embassy-rs/embassy.git", rev = "cefdbfab2f1efb0797f661a9d8cc0aa686fe881a" }
+embassy-embedded-hal = { git = "https://github.com/embassy-rs/embassy.git", rev = "cefdbfab2f1efb0797f661a9d8cc0aa686fe881a" }
 #
 #embassy-executor = { path = "../embassy/embassy-executor" }
 #embassy-nrf = {path = "../embassy/embassy-nrf"}

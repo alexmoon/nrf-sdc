@@ -12,10 +12,10 @@ name = "adv-simple"
 [dependencies]
 nrf-sdc = { version = "0.1.0", path = "../nrf-sdc", features = ["defmt", "peripheral"] }
 nrf-mpsl = { version = "0.1.0", path = "../nrf-mpsl", features = ["defmt", "critical-section-impl"] }
-bt-hci = { version = "0.1.0", default-features = false }
+bt-hci = { version = "0.2.0", default-features = false }
 
-embassy-executor = { version = "0.6", features = ["task-arena-size-32768", "arch-cortex-m", "executor-thread", "defmt", "integrated-timers", "executor-interrupt"] }
-embassy-time = { version = "0.3", features = ["defmt", "defmt-timestamp-uptime"] }
+embassy-executor = { version = "0.7", features = ["task-arena-size-32768", "arch-cortex-m", "executor-thread", "defmt", "executor-interrupt"] }
+embassy-time = { version = "0.4", features = ["defmt", "defmt-timestamp-uptime"] }
 embassy-nrf = { version = "0.2.0", features = ["defmt", "time-driver-rtc1", "gpiote", "unstable-pac"] }
 embassy-sync = { version = "0.6.0", features = ["defmt"] }
 
