@@ -16,8 +16,8 @@ bt-hci = { version = "0.2.0", default-features = false }
 
 embassy-executor = { version = "0.7", features = ["task-arena-size-32768", "arch-cortex-m", "executor-thread", "defmt", "executor-interrupt"] }
 embassy-time = { version = "0.4", features = ["defmt", "defmt-timestamp-uptime"] }
-embassy-nrf = { version = "0.2.0", features = ["defmt", "time-driver-rtc1", "gpiote", "unstable-pac"] }
-embassy-sync = { version = "0.6.0", features = ["defmt"] }
+embassy-nrf = { version = "0.3.0", features = ["defmt", "time-driver-rtc1", "gpiote", "unstable-pac"] }
+embassy-sync = { version = "0.6.1", features = ["defmt"] }
 
 defmt = "0.3"
 defmt-rtt = "0.4.0"
