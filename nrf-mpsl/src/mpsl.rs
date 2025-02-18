@@ -5,7 +5,7 @@ use core::mem::MaybeUninit;
 use core::task::Poll;
 
 use cortex_m::interrupt::InterruptNumber as _;
-use embassy_nrf::interrupt::typelevel::{Binding, Handler, Interrupt, POWER_CLOCK, RADIO, RTC0, TIMER0};
+use embassy_nrf::interrupt::typelevel::{Binding, Handler, Interrupt, CLOCK_POWER, RADIO, RTC0, TIMER0};
 use embassy_nrf::interrupt::Priority;
 use embassy_nrf::{interrupt, peripherals, Peripheral, PeripheralRef};
 use embassy_sync::waitqueue::AtomicWaker;
@@ -94,7 +94,7 @@ impl<'d> MultiprotocolServiceLayer<'d> {
             + Binding<interrupt::typelevel::RADIO, HighPrioInterruptHandler>
             + Binding<interrupt::typelevel::TIMER0, HighPrioInterruptHandler>
             + Binding<interrupt::typelevel::RTC0, HighPrioInterruptHandler>
-            + Binding<interrupt::typelevel::POWER_CLOCK, ClockInterruptHandler>,
+            + Binding<interrupt::typelevel::CLOCK_POWER, ClockInterruptHandler>,
     {
         // Peripherals are used by the MPSL library, so we merely take ownership and ignore them
         let _ = p;
@@ -108,7 +108,7 @@ impl<'d> MultiprotocolServiceLayer<'d> {
         RADIO::set_priority(Priority::P0);
         RTC0::set_priority(Priority::P0);
         TIMER0::set_priority(Priority::P0);
-        POWER_CLOCK::set_priority(Priority::P4);
+        CLOCK_POWER::set_priority(Priority::P4);
 
         Ok(Self { _private: PhantomData })
     }
@@ -125,7 +125,7 @@ impl<'d> MultiprotocolServiceLayer<'d> {
             + Binding<interrupt::typelevel::RADIO, HighPrioInterruptHandler>
             + Binding<interrupt::typelevel::TIMER0, HighPrioInterruptHandler>
             + Binding<interrupt::typelevel::RTC0, HighPrioInterruptHandler>
-            + Binding<interrupt::typelevel::POWER_CLOCK, ClockInterruptHandler>,
+            + Binding<interrupt::typelevel::CLOCK_POWER, ClockInterruptHandler>,
     {
         let me = Self::new(p, _irq, clock_cfg)?;
         let ret = unsafe { raw::mpsl_timeslot_session_count_set(mem.0.as_mut_ptr() as *mut _, SLOTS as u8) };
@@ -196,7 +196,7 @@ impl<T: Interrupt> Handler<T> for LowPrioInterruptHandler {
 }
 
 pub struct ClockInterruptHandler;
-impl Handler<interrupt::typelevel::POWER_CLOCK> for ClockInterruptHandler {
+impl Handler<interrupt::typelevel::CLOCK_POWER> for ClockInterruptHandler {
     unsafe fn on_interrupt() {
         raw::MPSL_IRQ_CLOCK_Handler();
     }
