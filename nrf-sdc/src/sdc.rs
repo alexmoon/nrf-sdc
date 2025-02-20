@@ -10,6 +10,7 @@ use bt_hci::cmd::le::LeSetPeriodicAdvResponseData;
 use bt_hci::cmd::Cmd;
 use bt_hci::controller::blocking::TryError;
 use bt_hci::controller::{blocking, Controller};
+use bt_hci::event::EventParams;
 use bt_hci::{AsHciBytes, FixedSizeValue, FromHciBytes, WriteHci};
 use embassy_nrf::{peripherals, Peripheral, PeripheralRef};
 use embassy_sync::blocking_mutex::raw::NoopRawMutex;
@@ -476,8 +477,10 @@ impl<'d> SoftdeviceController<'d> {
         // Check for a CommandComplete packet for an LeSetPeriodicAdvResponseData command
         if let bt_hci::PacketKind::Event = kind {
             if let Ok((header, data)) = bt_hci::event::EventPacketHeader::from_hci_bytes(buf) {
-                if header.code == 0x0e {
-                    if let Ok(event) = bt_hci::event::CommandComplete::from_hci_bytes_complete(data) {
+                if header.code == bt_hci::event::CommandComplete::EVENT_CODE {
+                    if let Ok(event) =
+                        bt_hci::event::CommandComplete::from_hci_bytes_complete(&data[..usize::from(header.params_len)])
+                    {
                         if event.cmd_opcode == LeSetPeriodicAdvResponseData::OPCODE {
                             if let Ok(return_params) = event.return_params::<LeSetPeriodicAdvResponseData>() {
                                 self.periodic_adv_response_data_complete
