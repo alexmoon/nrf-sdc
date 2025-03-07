@@ -1486,7 +1486,6 @@ pub mod vendor {
     sdc_cmd!(NordicSetPowerControlRequestParams => sdc_hci_cmd_vs_set_power_control_request_params(x));
     sdc_cmd!(NordicReadAverageRssi => sdc_hci_cmd_vs_read_average_rssi(x) -> y);
     sdc_cmd!(NordicCentralAclEventSpacingSet => sdc_hci_cmd_vs_central_acl_event_spacing_set(x));
-    sdc_cmd!(NordicSetConnEventTrigger => sdc_hci_cmd_vs_set_conn_event_trigger(x));
     sdc_cmd!(NordicGetNextConnEventCounter => sdc_hci_cmd_vs_get_next_conn_event_counter(x) -> y);
     sdc_cmd!(NordicAllowParallelConnectionEstablishments => sdc_hci_cmd_vs_allow_parallel_connection_establishments(x));
     sdc_cmd!(NordicMinValOfMaxAclTxPayloadSet => sdc_hci_cmd_vs_min_val_of_max_acl_tx_payload_set(x));
