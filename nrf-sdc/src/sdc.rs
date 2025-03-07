@@ -1352,20 +1352,6 @@ pub mod vendor {
     }
 
     cmd! {
-        NordicSetConnEventTrigger(VENDOR_SPECIFIC, 0x113) {
-            NordicSetConnEventTriggerParams {
-                conn_handle: ConnHandle,
-                role: u8,
-                ppi_ch_id: u8,
-                task_endpoint: u32,
-                conn_evt_counter_start: u16,
-                period_in_events: u16,
-            }
-            Return = ();
-        }
-    }
-
-    cmd! {
         NordicGetNextConnEventCounter(VENDOR_SPECIFIC, 0x114) {
             Params = ConnHandle;
             NordicGetNextConnEventCounterReturn {
@@ -1486,7 +1472,6 @@ pub mod vendor {
     sdc_cmd!(NordicSetPowerControlRequestParams => sdc_hci_cmd_vs_set_power_control_request_params(x));
     sdc_cmd!(NordicReadAverageRssi => sdc_hci_cmd_vs_read_average_rssi(x) -> y);
     sdc_cmd!(NordicCentralAclEventSpacingSet => sdc_hci_cmd_vs_central_acl_event_spacing_set(x));
-    sdc_cmd!(NordicSetConnEventTrigger => sdc_hci_cmd_vs_set_conn_event_trigger(x));
     sdc_cmd!(NordicGetNextConnEventCounter => sdc_hci_cmd_vs_get_next_conn_event_counter(x) -> y);
     sdc_cmd!(NordicAllowParallelConnectionEstablishments => sdc_hci_cmd_vs_allow_parallel_connection_establishments(x));
     sdc_cmd!(NordicMinValOfMaxAclTxPayloadSet => sdc_hci_cmd_vs_min_val_of_max_acl_tx_payload_set(x));
