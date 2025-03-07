@@ -1471,7 +1471,6 @@ pub mod vendor {
     sdc_cmd!(ZephyrReadChipTemp => sdc_hci_cmd_vs_zephyr_read_chip_temp() -> y);
     sdc_cmd!(ZephyrWriteTxPower => sdc_hci_cmd_vs_zephyr_write_tx_power(x) -> y);
     sdc_cmd!(ZephyrReadTxPower => sdc_hci_cmd_vs_zephyr_read_tx_power(x) -> y);
-    sdc_cmd!(NordicReadSupportedCommands => sdc_hci_cmd_vs_read_supported_vs_commands() -> y);
     sdc_cmd!(NordicLlpmModeSet => sdc_hci_cmd_vs_llpm_mode_set(x));
     sdc_cmd!(NordicConnUpdate => sdc_hci_cmd_vs_conn_update(x));
     sdc_cmd!(NordicConnEventExtend => sdc_hci_cmd_vs_conn_event_extend(x));

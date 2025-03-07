@@ -109,7 +109,7 @@ impl ParseCallbacks for Callback {
             let args = name[(i + 1)..(name.len() - 1)]
                 .split(',')
                 .map(|x| {
-                    if x.ends_with("_enabled") {
+                    if x.ends_with("_enabled") || x.ends_with("step_mode3_supported") {
                         format!("{x}: bool")
                     } else {
                         format!("{x}: u32")
