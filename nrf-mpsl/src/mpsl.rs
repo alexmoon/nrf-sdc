@@ -7,7 +7,7 @@ use core::task::Poll;
 use cortex_m::interrupt::InterruptNumber as _;
 use embassy_nrf::interrupt::typelevel::{Binding, Handler, Interrupt, CLOCK_POWER, RADIO, RTC0, TIMER0};
 use embassy_nrf::interrupt::Priority;
-use embassy_nrf::{interrupt, peripherals, Peripheral, PeripheralRef};
+use embassy_nrf::{interrupt, peripherals, Peri};
 use embassy_sync::waitqueue::AtomicWaker;
 
 use crate::error::{Error, RetVal};
@@ -32,32 +32,32 @@ static WAKER: AtomicWaker = AtomicWaker::new();
 /// - Do not use `RADIO` directly, except during timeslots you've allocated.
 /// - Do not use `CLOCK_POWER` directly, use the functions provided by this crate instead.
 pub struct Peripherals<'d> {
-    pub rtc0: PeripheralRef<'d, peripherals::RTC0>,
-    pub timer0: PeripheralRef<'d, peripherals::TIMER0>,
-    pub temp: PeripheralRef<'d, peripherals::TEMP>,
+    pub rtc0: Peri<'d, peripherals::RTC0>,
+    pub timer0: Peri<'d, peripherals::TIMER0>,
+    pub temp: Peri<'d, peripherals::TEMP>,
 
-    pub ppi_ch19: PeripheralRef<'d, peripherals::PPI_CH19>,
-    pub ppi_ch30: PeripheralRef<'d, peripherals::PPI_CH30>,
-    pub ppi_ch31: PeripheralRef<'d, peripherals::PPI_CH31>,
+    pub ppi_ch19: Peri<'d, peripherals::PPI_CH19>,
+    pub ppi_ch30: Peri<'d, peripherals::PPI_CH30>,
+    pub ppi_ch31: Peri<'d, peripherals::PPI_CH31>,
 }
 
 impl<'d> Peripherals<'d> {
     #[allow(clippy::too_many_arguments)]
     pub fn new(
-        rtc0: impl Peripheral<P = peripherals::RTC0> + 'd,
-        timer0: impl Peripheral<P = peripherals::TIMER0> + 'd,
-        temp: impl Peripheral<P = peripherals::TEMP> + 'd,
-        ppi_ch19: impl Peripheral<P = peripherals::PPI_CH19> + 'd,
-        ppi_ch30: impl Peripheral<P = peripherals::PPI_CH30> + 'd,
-        ppi_ch31: impl Peripheral<P = peripherals::PPI_CH31> + 'd,
+        rtc0: Peri<'d, peripherals::RTC0>,
+        timer0: Peri<'d, peripherals::TIMER0>,
+        temp: Peri<'d, peripherals::TEMP>,
+        ppi_ch19: Peri<'d, peripherals::PPI_CH19>,
+        ppi_ch30: Peri<'d, peripherals::PPI_CH30>,
+        ppi_ch31: Peri<'d, peripherals::PPI_CH31>,
     ) -> Self {
         Peripherals {
-            rtc0: rtc0.into_ref(),
-            timer0: timer0.into_ref(),
-            temp: temp.into_ref(),
-            ppi_ch19: ppi_ch19.into_ref(),
-            ppi_ch30: ppi_ch30.into_ref(),
-            ppi_ch31: ppi_ch31.into_ref(),
+            rtc0,
+            timer0,
+            temp,
+            ppi_ch19,
+            ppi_ch30,
+            ppi_ch31,
         }
     }
 }

@@ -12,7 +12,7 @@ use bt_hci::controller::blocking::TryError;
 use bt_hci::controller::{blocking, Controller};
 use bt_hci::event::EventParams;
 use bt_hci::{AsHciBytes, FixedSizeValue, FromHciBytes, WriteHci};
-use embassy_nrf::{peripherals, Peripheral, PeripheralRef};
+use embassy_nrf::{peripherals, Peri};
 use embassy_sync::blocking_mutex::raw::NoopRawMutex;
 use embassy_sync::signal::Signal;
 use embassy_sync::waitqueue::AtomicWaker;
@@ -39,49 +39,49 @@ static SDC_RNG: AtomicPtr<()> = AtomicPtr::new(core::ptr::null_mut());
 ///
 /// - Do not use the `ECB`, `CCM` or `AAR` peripherals directly.
 pub struct Peripherals<'d> {
-    pub ppi_ch17: PeripheralRef<'d, peripherals::PPI_CH17>,
-    pub ppi_ch18: PeripheralRef<'d, peripherals::PPI_CH18>,
-    pub ppi_ch20: PeripheralRef<'d, peripherals::PPI_CH20>,
-    pub ppi_ch21: PeripheralRef<'d, peripherals::PPI_CH21>,
-    pub ppi_ch22: PeripheralRef<'d, peripherals::PPI_CH22>,
-    pub ppi_ch23: PeripheralRef<'d, peripherals::PPI_CH23>,
-    pub ppi_ch24: PeripheralRef<'d, peripherals::PPI_CH24>,
-    pub ppi_ch25: PeripheralRef<'d, peripherals::PPI_CH25>,
-    pub ppi_ch26: PeripheralRef<'d, peripherals::PPI_CH26>,
-    pub ppi_ch27: PeripheralRef<'d, peripherals::PPI_CH27>,
-    pub ppi_ch28: PeripheralRef<'d, peripherals::PPI_CH28>,
-    pub ppi_ch29: PeripheralRef<'d, peripherals::PPI_CH29>,
+    pub ppi_ch17: Peri<'d, peripherals::PPI_CH17>,
+    pub ppi_ch18: Peri<'d, peripherals::PPI_CH18>,
+    pub ppi_ch20: Peri<'d, peripherals::PPI_CH20>,
+    pub ppi_ch21: Peri<'d, peripherals::PPI_CH21>,
+    pub ppi_ch22: Peri<'d, peripherals::PPI_CH22>,
+    pub ppi_ch23: Peri<'d, peripherals::PPI_CH23>,
+    pub ppi_ch24: Peri<'d, peripherals::PPI_CH24>,
+    pub ppi_ch25: Peri<'d, peripherals::PPI_CH25>,
+    pub ppi_ch26: Peri<'d, peripherals::PPI_CH26>,
+    pub ppi_ch27: Peri<'d, peripherals::PPI_CH27>,
+    pub ppi_ch28: Peri<'d, peripherals::PPI_CH28>,
+    pub ppi_ch29: Peri<'d, peripherals::PPI_CH29>,
 }
 
 impl<'d> Peripherals<'d> {
     #[allow(clippy::too_many_arguments)]
     pub fn new(
-        ppi_ch17: impl Peripheral<P = peripherals::PPI_CH17> + 'd,
-        ppi_ch18: impl Peripheral<P = peripherals::PPI_CH18> + 'd,
-        ppi_ch20: impl Peripheral<P = peripherals::PPI_CH20> + 'd,
-        ppi_ch21: impl Peripheral<P = peripherals::PPI_CH21> + 'd,
-        ppi_ch22: impl Peripheral<P = peripherals::PPI_CH22> + 'd,
-        ppi_ch23: impl Peripheral<P = peripherals::PPI_CH23> + 'd,
-        ppi_ch24: impl Peripheral<P = peripherals::PPI_CH24> + 'd,
-        ppi_ch25: impl Peripheral<P = peripherals::PPI_CH25> + 'd,
-        ppi_ch26: impl Peripheral<P = peripherals::PPI_CH26> + 'd,
-        ppi_ch27: impl Peripheral<P = peripherals::PPI_CH27> + 'd,
-        ppi_ch28: impl Peripheral<P = peripherals::PPI_CH28> + 'd,
-        ppi_ch29: impl Peripheral<P = peripherals::PPI_CH29> + 'd,
+        ppi_ch17: Peri<'d, peripherals::PPI_CH17>,
+        ppi_ch18: Peri<'d, peripherals::PPI_CH18>,
+        ppi_ch20: Peri<'d, peripherals::PPI_CH20>,
+        ppi_ch21: Peri<'d, peripherals::PPI_CH21>,
+        ppi_ch22: Peri<'d, peripherals::PPI_CH22>,
+        ppi_ch23: Peri<'d, peripherals::PPI_CH23>,
+        ppi_ch24: Peri<'d, peripherals::PPI_CH24>,
+        ppi_ch25: Peri<'d, peripherals::PPI_CH25>,
+        ppi_ch26: Peri<'d, peripherals::PPI_CH26>,
+        ppi_ch27: Peri<'d, peripherals::PPI_CH27>,
+        ppi_ch28: Peri<'d, peripherals::PPI_CH28>,
+        ppi_ch29: Peri<'d, peripherals::PPI_CH29>,
     ) -> Self {
         Peripherals {
-            ppi_ch17: ppi_ch17.into_ref(),
-            ppi_ch18: ppi_ch18.into_ref(),
-            ppi_ch20: ppi_ch20.into_ref(),
-            ppi_ch21: ppi_ch21.into_ref(),
-            ppi_ch22: ppi_ch22.into_ref(),
-            ppi_ch23: ppi_ch23.into_ref(),
-            ppi_ch24: ppi_ch24.into_ref(),
-            ppi_ch25: ppi_ch25.into_ref(),
-            ppi_ch26: ppi_ch26.into_ref(),
-            ppi_ch27: ppi_ch27.into_ref(),
-            ppi_ch28: ppi_ch28.into_ref(),
-            ppi_ch29: ppi_ch29.into_ref(),
+            ppi_ch17,
+            ppi_ch18,
+            ppi_ch20,
+            ppi_ch21,
+            ppi_ch22,
+            ppi_ch23,
+            ppi_ch24,
+            ppi_ch25,
+            ppi_ch26,
+            ppi_ch27,
+            ppi_ch28,
+            ppi_ch29,
         }
     }
 }
