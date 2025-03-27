@@ -11,7 +11,7 @@ use embassy_nrf::interrupt::Interrupt;
 use embassy_nrf::nvmc::{FLASH_SIZE, PAGE_SIZE};
 use embassy_nrf::pac::nvmc::vals::Wen;
 use embassy_nrf::peripherals::NVMC;
-use embassy_nrf::{into_ref, pac, Peripheral, PeripheralRef};
+use embassy_nrf::{pac, Peri};
 use embassy_sync::blocking_mutex::raw::RawMutex;
 use embassy_sync::blocking_mutex::Mutex;
 use embassy_sync::waitqueue::WakerRegistration;
@@ -53,7 +53,7 @@ pub enum FlashError {
 /// ensure it does not affect radio transmissions.
 pub struct Flash<'d> {
     _mpsl: &'d MultiprotocolServiceLayer<'d>,
-    _p: PeripheralRef<'d, NVMC>,
+    _p: Peri<'d, NVMC>,
 }
 
 /// Global state of the timeslot flash operation
@@ -134,15 +134,13 @@ impl<'d> Flash<'d> {
     /// # Panics
     ///
     /// Panics if called more than once.
-    pub fn take(_mpsl: &'d MultiprotocolServiceLayer<'d>, _p: impl Peripheral<P = NVMC> + 'd) -> Flash<'d> {
+    pub fn take(_mpsl: &'d MultiprotocolServiceLayer<'d>, _p: Peri<'d, NVMC>) -> Flash<'d> {
         STATE.with_inner(|state| {
             if state.taken {
                 panic!("nrf_mpsl::Flash::take() called multiple times.")
             }
             state.taken = true;
         });
-
-        into_ref!(_p);
 
         Self { _mpsl, _p }
     }
