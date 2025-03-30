@@ -51,6 +51,27 @@ pub enum FlashError {
 
 /// Represents a flash that can be used with the MPSL timeslot API to
 /// ensure it does not affect radio transmissions.
+///
+/// # Requirements
+///
+/// The MPSL must be initialized with timeslots support before creating a `Flash` instance.
+/// Use `MultiprotocolServiceLayer::with_timeslots()` to create an MPSL instance with timeslot
+/// support.
+///
+/// # Example
+///
+/// ```rust
+/// // Initialize MPSL with timeslots
+/// let mpsl = MultiprotocolServiceLayer::with_timeslots(
+///     mpsl_p,
+///     Irqs,
+///     lfclk_cfg,
+///     session_mem
+/// ).unwrap();
+///
+/// // Create a Flash instance
+/// let flash = Flash::take(&mpsl, p.NVMC);
+/// ```
 pub struct Flash<'d> {
     _mpsl: &'d MultiprotocolServiceLayer<'d>,
     _p: Peri<'d, NVMC>,
