@@ -847,6 +847,7 @@ mod le {
 
     // Extended advertising commands
     sdc_cmd!(LeSetExtAdvParams => raw_cmd_params_return(sdc_hci_cmd_le_set_ext_adv_params, LeSetExtAdvParams) true);
+    sdc_cmd!(LeSetExtAdvParamsV2 => raw_cmd_params_return(sdc_hci_cmd_le_set_ext_adv_params_v2, LeSetExtAdvParamsV2) true);
     sdc_cmd!(LeReadMaxAdvDataLength => raw_cmd_return(sdc_hci_cmd_le_read_max_adv_data_length) true);
     sdc_cmd!(LeReadNumberOfSupportedAdvSets => raw_cmd_return(sdc_hci_cmd_le_read_number_of_supported_adv_sets) true);
     sdc_cmd!(LeRemoveAdvSet => raw_cmd_params(sdc_hci_cmd_le_remove_adv_set, LeRemoveAdvSet) true);
