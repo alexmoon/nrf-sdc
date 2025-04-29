@@ -917,6 +917,8 @@ mod le {
     sdc_cmd!(LeSetPathLossReportingEnable => sdc_hci_cmd_le_set_path_loss_reporting_enable(x) -> y);
     sdc_cmd!(LeSetTransmitPowerReportingEnable => sdc_hci_cmd_le_set_transmit_power_reporting_enable(x) -> y);
     sdc_cmd!(LeSetDataRelatedAddrChanges => sdc_hci_cmd_le_set_data_related_address_changes(x));
+    sdc_cmd!(LeSetHostFeature => sdc_hci_cmd_le_set_host_feature(x));
+    sdc_cmd!(LeSetHostFeatureV2 => sdc_hci_cmd_le_set_host_feature_v2(x));
 
     impl<'a, 'd> ControllerCmdSync<LeSetExtAdvData<'a>> for super::SoftdeviceController<'d> {
         async fn exec(&self, cmd: &LeSetExtAdvData<'a>) -> Result<(), CmdError<nrf_mpsl::Error>> {
