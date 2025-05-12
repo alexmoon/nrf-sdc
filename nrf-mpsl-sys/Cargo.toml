@@ -18,8 +18,7 @@ include = [
     "third_party/nordic/nrfx/LICENSE",
     "third_party/nordic/nrfx/mdk/*.h",
     "third_party/nordic/nrfxlib/LICENSE",
-    "third_party/nordic/nrfxlib/mpsl/include/**",
-    "third_party/nordic/nrfxlib/mpsl/lib/**",
+    "third_party/nordic/nrfxlib/mpsl/**",
 ]
 
 [features]
@@ -27,6 +26,11 @@ fem = []
 "fem-simple-gpio" = ["fem"]
 "fem-nrf21540-gpio" = ["fem"]
 "fem-nrf21540-gpio-spi" = ["fem"]
+
+[package.metadata.docs.rs]
+features = ["fem"]
+default-target = ["thumbv7em-none-eabihf"]
+targets = ["thumbv7em-none-eabi", "thumbv7em-none-eabihf", "thumbv8m.main-none-eabi"]
 
 [dependencies]
 
