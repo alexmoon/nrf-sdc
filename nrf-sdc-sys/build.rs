@@ -25,11 +25,11 @@ mod parser {
     use winnow::stream::AsChar;
     use winnow::token::{one_of, take_while};
 
-    pub fn uint<'s>(i: &mut &'s str) -> PResult<&'s str> {
+    pub fn uint<'s>(i: &mut &'s str) -> ModalResult<&'s str> {
         digit1.parse_next(i)
     }
 
-    pub fn ident<'s>(i: &mut &'s str) -> PResult<&'s str> {
+    pub fn ident<'s>(i: &mut &'s str) -> ModalResult<&'s str> {
         (
             one_of(|c: char| c.is_alpha() || c == '_'),
             take_while(0.., |c: char| c.is_alphanum() || c == '_'),
@@ -38,14 +38,14 @@ mod parser {
             .parse_next(i)
     }
 
-    pub fn ternary(i: &mut &str) -> PResult<String> {
+    pub fn ternary(i: &mut &str) -> ModalResult<String> {
         separated_pair(expr, '?', cut_err(separated_pair(expr, ':', expr)))
             .context(winnow::error::StrContext::Label("ternary expression"))
             .map(|(condition, (if_true, if_false))| format!("if {condition} {{ {if_true} }} else {{ {if_false} }}"))
             .parse_next(i)
     }
 
-    pub fn func(i: &mut &str) -> PResult<String> {
+    pub fn func(i: &mut &str) -> ModalResult<String> {
         let func = ident.parse_next(i)?;
 
         let args = delimited(
@@ -59,7 +59,7 @@ mod parser {
         Ok(format!("{func}({args})"))
     }
 
-    pub fn expr(i: &mut &str) -> PResult<String> {
+    pub fn expr(i: &mut &str) -> ModalResult<String> {
         let init = term.parse_next(i)?;
 
         repeat(
@@ -78,13 +78,13 @@ mod parser {
         .parse_next(i)
     }
 
-    pub fn term(i: &mut &str) -> PResult<String> {
+    pub fn term(i: &mut &str) -> ModalResult<String> {
         alt((func, ident.map(str::to_owned), uint.map(str::to_owned), parens))
             .context(winnow::error::StrContext::Label("term"))
             .parse_next(i)
     }
 
-    pub fn parens(i: &mut &str) -> PResult<String> {
+    pub fn parens(i: &mut &str) -> ModalResult<String> {
         delimited('(', cut_err(alt((ternary, expr))), ')')
             .context(winnow::error::StrContext::Label("parenthesized expression"))
             .map(|x| format!("({x})"))
@@ -97,7 +97,7 @@ mod parser {
     /// This handles only the very small subset of C expressions used in those
     /// macros. The primary purpose of the translation is to turn C-style ternary
     /// expressions into Rust if/else expressions.
-    pub fn sdc_mem_macro(i: &mut &str) -> PResult<String> {
+    pub fn sdc_mem_macro(i: &mut &str) -> ModalResult<String> {
         parens.parse_next(i)
     }
 }

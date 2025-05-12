@@ -22,6 +22,11 @@ include = [
     "third_party/nordic/nrfxlib/softdevice_controller/lib/**",
 ]
 
+[package.metadata.docs.rs]
+features = ["central", "peripheral"]
+default-target = ["thumbv7em-none-eabihf"]
+targets = ["thumbv7em-none-eabi", "thumbv7em-none-eabihf", "thumbv8m.main-none-eabi"]
+
 [features]
 peripheral = []
 central = []
