@@ -12,11 +12,27 @@ include = [
     "./*.md",
     "build.rs",
     "src/**",
-    "include/**",
     "third_party/arm/CMSIS_5/LICENSE.txt",
-    "third_party/arm/CMSIS_5/CMSIS/Core/Include/**",
+    "third_party/arm/CMSIS_5/CMSIS/Core/Include/core_cm4.h",
+    "third_party/arm/CMSIS_5/CMSIS/Core/Include/cmsis_version.h",
+    "third_party/arm/CMSIS_5/CMSIS/Core/Include/cmsis_compiler.h",
+    "third_party/arm/CMSIS_5/CMSIS/Core/Include/cmsis_gcc.h",
+    "third_party/arm/CMSIS_5/CMSIS/Core/Include/mpu_armv7.h",
+    "third_party/arm/CMSIS_5/CMSIS/Core/Include/core_cm33.h",
+    "third_party/arm/CMSIS_5/CMSIS/Core/Include/mpu_armv8.h",
     "third_party/nordic/nrfx/LICENSE",
-    "third_party/nordic/nrfx/mdk/*.h",
+    "third_party/nordic/nrfx/mdk/nrf.h",
+    "third_party/nordic/nrfx/mdk/nrf52840.h",
+    "third_party/nordic/nrfx/mdk/system_nrf52840.h",
+    "third_party/nordic/nrfx/mdk/nrf52840_bitfields.h",
+    "third_party/nordic/nrfx/mdk/nrf51_to_nrf52840.h",
+    "third_party/nordic/nrfx/mdk/nrf52_to_nrf52840.h",
+    "third_party/nordic/nrfx/mdk/nrf52840_name_change.h",
+    "third_party/nordic/nrfx/mdk/compiler_abstraction.h",
+    "third_party/nordic/nrfx/mdk/nrf5340_network.h",
+    "third_party/nordic/nrfx/mdk/system_nrf5340_network.h",
+    "third_party/nordic/nrfx/mdk/nrf5340_network_bitfields.h",
+    "third_party/nordic/nrfx/mdk/nrf5340_network_name_change.h",
     "third_party/nordic/nrfxlib/LICENSE",
     "third_party/nordic/nrfxlib/softdevice_controller/include/**",
     "third_party/nordic/nrfxlib/softdevice_controller/lib/**",
@@ -32,7 +48,7 @@ peripheral = []
 central = []
 
 [dependencies]
-nrf-mpsl-sys = { version = "0.1.0", path = "../nrf-mpsl-sys" }
+nrf-mpsl-sys = { version = "0.1.1", path = "../nrf-mpsl-sys" }
 
 [build-dependencies]
 bindgen = "0.70.1"
