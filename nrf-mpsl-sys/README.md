@@ -1,5 +1,4 @@
 [![crates.io][crates-badge]][crates-url] [![docs.rs][docs-badge]][docs-url]
-[![Build Status][actions-badge]][actions-url]
 
 [crates-badge]: https://img.shields.io/crates/v/nrf-mpsl-sys
 [crates-url]: https://crates.io/crates/nrf-mpsl-sys
