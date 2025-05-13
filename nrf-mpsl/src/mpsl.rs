@@ -29,16 +29,29 @@ static WAKER: AtomicWaker = AtomicWaker::new();
 /// - Do not use `NVMC` directly as this causes the CPU to stall during flash operations.
 ///   Use the [`Flash`](crate::Flash) implementation from this crate instead, which
 ///   uses the timeslot system to schedule flash operations at times that don't disrupt radio.
+/// - Do not use 'ECB' directly.
 /// - Do not use `RADIO` directly, except during timeslots you've allocated.
 /// - Do not use `CLOCK_POWER` directly, use the functions provided by this crate instead.
 pub struct Peripherals<'d> {
     pub rtc0: Peri<'d, peripherals::RTC0>,
     pub timer0: Peri<'d, peripherals::TIMER0>,
+    #[cfg(feature = "nrf53")]
+    pub timer1: Peri<'d, peripherals::TIMER1>,
+    #[cfg(feature = "nrf52")]
     pub temp: Peri<'d, peripherals::TEMP>,
 
+    #[cfg(feature = "nrf52")]
     pub ppi_ch19: Peri<'d, peripherals::PPI_CH19>,
+    #[cfg(feature = "nrf52")]
     pub ppi_ch30: Peri<'d, peripherals::PPI_CH30>,
+    #[cfg(feature = "nrf52")]
     pub ppi_ch31: Peri<'d, peripherals::PPI_CH31>,
+    #[cfg(feature = "nrf53")]
+    pub ppi_ch0: Peri<'d, peripherals::PPI_CH0>,
+    #[cfg(feature = "nrf53")]
+    pub ppi_ch1: Peri<'d, peripherals::PPI_CH1>,
+    #[cfg(feature = "nrf53")]
+    pub ppi_ch2: Peri<'d, peripherals::PPI_CH2>,
 }
 
 impl<'d> Peripherals<'d> {
@@ -46,18 +59,34 @@ impl<'d> Peripherals<'d> {
     pub fn new(
         rtc0: Peri<'d, peripherals::RTC0>,
         timer0: Peri<'d, peripherals::TIMER0>,
-        temp: Peri<'d, peripherals::TEMP>,
-        ppi_ch19: Peri<'d, peripherals::PPI_CH19>,
-        ppi_ch30: Peri<'d, peripherals::PPI_CH30>,
-        ppi_ch31: Peri<'d, peripherals::PPI_CH31>,
+        #[cfg(feature = "nrf53")] timer1: Peri<'d, peripherals::TIMER1>,
+        #[cfg(feature = "nrf52")] temp: Peri<'d, peripherals::TEMP>,
+        #[cfg(feature = "nrf52")] ppi_ch19: Peri<'d, peripherals::PPI_CH19>,
+        #[cfg(feature = "nrf52")] ppi_ch30: Peri<'d, peripherals::PPI_CH30>,
+        #[cfg(feature = "nrf52")] ppi_ch31: Peri<'d, peripherals::PPI_CH31>,
+        #[cfg(feature = "nrf53")] ppi_ch0: Peri<'d, peripherals::PPI_CH0>,
+        #[cfg(feature = "nrf53")] ppi_ch1: Peri<'d, peripherals::PPI_CH1>,
+        #[cfg(feature = "nrf53")] ppi_ch2: Peri<'d, peripherals::PPI_CH2>,
     ) -> Self {
         Peripherals {
             rtc0,
             timer0,
+            #[cfg(feature = "nrf53")]
+            timer1,
+            #[cfg(feature = "nrf52")]
             temp,
+            #[cfg(feature = "nrf52")]
             ppi_ch19,
+            #[cfg(feature = "nrf52")]
             ppi_ch30,
+            #[cfg(feature = "nrf52")]
             ppi_ch31,
+            #[cfg(feature = "nrf53")]
+            ppi_ch0,
+            #[cfg(feature = "nrf53")]
+            ppi_ch1,
+            #[cfg(feature = "nrf53")]
+            ppi_ch2,
         }
     }
 }

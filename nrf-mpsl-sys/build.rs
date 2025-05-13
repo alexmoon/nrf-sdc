@@ -36,6 +36,32 @@ impl ParseCallbacks for Callback {
     }
 }
 
+enum Series {
+    Nrf52,
+    Nrf53,
+    Nrf54l,
+    Nrf54lNs,
+    Nrf54h,
+}
+
+impl Series {
+    fn get() -> Self {
+        let nrf52 = cfg!(feature = "nrf52");
+        let nrf53 = cfg!(feature = "nrf53");
+        let nrf54l_s = cfg!(feature = "nrf54l-s");
+        let nrf54l_ns = cfg!(feature = "nrf54l-ns");
+        let nrf54h = cfg!(feature = "nrf54h");
+        match (nrf52, nrf53, nrf54l_s, nrf54l_ns, nrf54h) {
+            (true, false, false, false, false) => Series::Nrf52,
+            (false, true, false, false, false) => Series::Nrf53,
+            (false, false, true, false, false) => Series::Nrf54l,
+            (false, false, false, true, false) => Series::Nrf54lNs,
+            (false, false, false, false, true) => Series::Nrf54h,
+            _ => panic!("Exactly one architecture feature must be enabled for nrf_mpsl_sys"),
+        }
+    }
+}
+
 #[derive(Debug)]
 struct Target {
     target: String,
@@ -43,14 +69,43 @@ struct Target {
     float_abi: &'static str,
     chip_family: &'static str,
     chip: &'static str,
+    core: Option<&'static str>,
 }
 
 impl Target {
-    fn new(target: String) -> Self {
-        let (cpu, float_abi, chip_family, chip) = match target.as_str() {
-            "thumbv7em-none-eabihf" => ("cortex-m4", "hard", "nrf52", "NRF52840_XXAA"),
-            "thumbv7em-none-eabi" => ("cortex-m4", "soft", "nrf52", "NRF52840_XXAA"),
-            "thumbv8m.main-none-eabi" => ("cortex-m33+nodsp", "soft", "nrf53", "NRF5340_XXAA_NETWORK"),
+    fn new(series: Series, target: String) -> Self {
+        let (cpu, float_abi, chip_family, chip, core) = match (series, target.as_str()) {
+            (Series::Nrf52, "thumbv7em-none-eabihf") => ("cortex-m4", "hard", "nrf52", "NRF52840_XXAA", None),
+            (Series::Nrf52, "thumbv7em-none-eabi") => ("cortex-m4", "soft", "nrf52", "NRF52840_XXAA", None),
+            (Series::Nrf53, "thumbv8m.main-none-eabi") => {
+                ("cortex-m33+nodsp", "soft", "nrf53", "NRF5340_XXAA", Some("NRF_NETWORK"))
+            }
+            (Series::Nrf54l, "thumbv8m.main-none-eabihf") => {
+                ("cortex-m33", "hard", "nrf54l", "NRF54L15_XXAA", Some("NRF_APPLICATION"))
+            }
+            (Series::Nrf54l, "thumbv8m.main-none-eabi") => {
+                ("cortex-m33", "soft", "nrf54l", "NRF54L15_XXAA", Some("NRF_APPLICATION"))
+            }
+            (Series::Nrf54lNs, "thumbv8m.main-none-eabihf") => (
+                "cortex-m33",
+                "hard",
+                "nrf54l_ns",
+                "NRF54L15_XXAA",
+                Some("NRF_APPLICATION"),
+            ),
+            (Series::Nrf54lNs, "thumbv8m.main-none-eabi") => (
+                "cortex-m33",
+                "soft",
+                "nrf54l_ns",
+                "NRF54L15_XXAA",
+                Some("NRF_APPLICATION"),
+            ),
+            (Series::Nrf54h, "thumbv8m.main-none-eabihf") => {
+                ("cortex-m33", "hard", "nrf54h", "NRF54H20_XXAA", Some("NRF_RADIOCORE"))
+            }
+            (Series::Nrf54h, "thumbv8m.main-none-eabi") => {
+                ("cortex-m33", "soft", "nrf54h", "NRF54H20_XXAA", Some("NRF_RADIOCORE"))
+            }
             _ => panic!("Unsupported target: {:?}", target),
         };
 
@@ -60,6 +115,7 @@ impl Target {
             float_abi,
             chip_family,
             chip,
+            core,
         }
     }
 }
@@ -78,6 +134,7 @@ fn bindgen(target: &Target) -> bindgen::Builder {
         .clang_arg("-I./third_party/nordic/nrfxlib/mpsl/include")
         .clang_arg("-I./third_party/nordic/nrfxlib/mpsl/fem/include")
         .clang_arg(format!("-D{}", target.chip))
+        .clang_args(target.core.map(|x| format!("-D{}", x)))
         .allowlist_function("mpsl_.*")
         .allowlist_function("MPSL_.*")
         .allowlist_type("mpsl_.*")
@@ -91,7 +148,7 @@ fn bindgen(target: &Target) -> bindgen::Builder {
 }
 
 fn main() {
-    let target = Target::new(env::var("TARGET").unwrap());
+    let target = Target::new(Series::get(), env::var("TARGET").unwrap());
 
     let mut builder = bindgen(&target)
         .header("./include/stdlib.h")
@@ -108,7 +165,7 @@ fn main() {
         .header("./third_party/nordic/nrfxlib/mpsl/include/protocol/mpsl_cx_protocol_api.h")
         .header("./third_party/nordic/nrfxlib/mpsl/include/protocol/mpsl_dppi_protocol_api.h");
 
-    if env::var_os("CARGO_FEATURE_FEM").is_some() {
+    if cfg!(feature = "fem") {
         builder = builder
             .header("./third_party/nordic/nrfxlib/mpsl/fem/include/mpsl_fem_config_common.h")
             .header("./third_party/nordic/nrfxlib/mpsl/fem/include/mpsl_fem_init.h")
@@ -117,19 +174,19 @@ fn main() {
     }
 
     let (fem_lib, fem_includes): (Option<&str>, Option<&[&str]>) = match (
-        env::var_os("CARGO_FEATURE_FEM_SIMPLE_GPIO"),
-        env::var_os("CARGO_FEATURE_FEM_NRF21540_GPIO"),
-        env::var_os("CARGO_FEATURE_FEM_NRF21540_GPIO_SPI"),
+        cfg!(feature = "fem-simple-gpio"),
+        cfg!(feature = "fem-nrf21540-gpio"),
+        cfg!(feature = "fem-nrf21540-gpio-spi"),
     ) {
-        (None, None, None) => (None, None),
-        (Some(_), None, None) => (
+        (false, false, false) => (None, None),
+        (true, false, false) => (
             Some("simple_gpio"),
             Some(&[
                 "./third_party/nordic/nrfxlib/mpsl/fem/include/protocol/mpsl_fem_protocol_api.h",
                 "./third_party/nordic/nrfxlib/mpsl/fem/simple_gpio/include/mpsl_fem_config_simple_gpio.h",
             ]),
         ),
-        (None, Some(_), None) => (
+        (false, true, false) => (
             Some("nrf21540_gpio"),
             Some(&[
                 "./third_party/nordic/nrfxlib/mpsl/fem/include/mpsl_fem_config_nrf21540_common.h",
@@ -137,7 +194,7 @@ fn main() {
                 "./third_party/nordic/nrfxlib/mpsl/fem/nrf21540_gpio/include/mpsl_fem_config_nrf21540_gpio.h",
             ]),
         ),
-        (None, None, Some(_)) => (Some("nrf21540_gpio_spi"),
+        (false, false, true) => (Some("nrf21540_gpio_spi"),
             Some(&[
                 "./third_party/nordic/nrfxlib/mpsl/fem/include/mpsl_fem_config_nrf21540_common.h",
                 "./third_party/nordic/nrfxlib/mpsl/fem/include/protocol/mpsl_fem_protocol_api.h",

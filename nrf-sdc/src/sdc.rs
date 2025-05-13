@@ -37,7 +37,8 @@ static SDC_RNG: AtomicPtr<()> = AtomicPtr::new(core::ptr::null_mut());
 /// However, there's extra restrictions that are not enforced at compile-time
 /// that you must ensure to fulfill manually:
 ///
-/// - Do not use the `ECB`, `CCM` or `AAR` peripherals directly.
+/// - Do not use the `CCM`, `AAR`, or `NVMC` peripherals directly.
+#[cfg(feature = "nrf52")]
 pub struct Peripherals<'d> {
     pub ppi_ch17: Peri<'d, peripherals::PPI_CH17>,
     pub ppi_ch18: Peri<'d, peripherals::PPI_CH18>,
@@ -52,9 +53,23 @@ pub struct Peripherals<'d> {
     pub ppi_ch28: Peri<'d, peripherals::PPI_CH28>,
     pub ppi_ch29: Peri<'d, peripherals::PPI_CH29>,
 }
+#[cfg(feature = "nrf53")]
+pub struct Peripherals<'d> {
+    pub ppi_ch3: Peri<'d, peripherals::PPI_CH3>,
+    pub ppi_ch4: Peri<'d, peripherals::PPI_CH4>,
+    pub ppi_ch5: Peri<'d, peripherals::PPI_CH5>,
+    pub ppi_ch6: Peri<'d, peripherals::PPI_CH6>,
+    pub ppi_ch7: Peri<'d, peripherals::PPI_CH7>,
+    pub ppi_ch8: Peri<'d, peripherals::PPI_CH8>,
+    pub ppi_ch9: Peri<'d, peripherals::PPI_CH9>,
+    pub ppi_ch10: Peri<'d, peripherals::PPI_CH10>,
+    pub ppi_ch11: Peri<'d, peripherals::PPI_CH11>,
+    pub ppi_ch12: Peri<'d, peripherals::PPI_CH12>,
+}
 
 impl<'d> Peripherals<'d> {
     #[allow(clippy::too_many_arguments)]
+    #[cfg(feature = "nrf52")]
     pub fn new(
         ppi_ch17: Peri<'d, peripherals::PPI_CH17>,
         ppi_ch18: Peri<'d, peripherals::PPI_CH18>,
@@ -82,6 +97,34 @@ impl<'d> Peripherals<'d> {
             ppi_ch27,
             ppi_ch28,
             ppi_ch29,
+        }
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    #[cfg(feature = "nrf53")]
+    pub fn new(
+        ppi_ch3: Peri<'d, peripherals::PPI_CH3>,
+        ppi_ch4: Peri<'d, peripherals::PPI_CH4>,
+        ppi_ch5: Peri<'d, peripherals::PPI_CH5>,
+        ppi_ch6: Peri<'d, peripherals::PPI_CH6>,
+        ppi_ch7: Peri<'d, peripherals::PPI_CH7>,
+        ppi_ch8: Peri<'d, peripherals::PPI_CH8>,
+        ppi_ch9: Peri<'d, peripherals::PPI_CH9>,
+        ppi_ch10: Peri<'d, peripherals::PPI_CH10>,
+        ppi_ch11: Peri<'d, peripherals::PPI_CH11>,
+        ppi_ch12: Peri<'d, peripherals::PPI_CH12>,
+    ) -> Self {
+        Peripherals {
+            ppi_ch3,
+            ppi_ch4,
+            ppi_ch5,
+            ppi_ch6,
+            ppi_ch7,
+            ppi_ch8,
+            ppi_ch9,
+            ppi_ch10,
+            ppi_ch11,
+            ppi_ch12,
         }
     }
 }

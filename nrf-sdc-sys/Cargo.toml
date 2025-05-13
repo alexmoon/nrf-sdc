@@ -44,6 +44,12 @@ default-target = ["thumbv7em-none-eabihf"]
 targets = ["thumbv7em-none-eabi", "thumbv7em-none-eabihf", "thumbv8m.main-none-eabi"]
 
 [features]
+nrf52 = ["nrf-mpsl-sys/nrf52"]
+nrf53 = ["nrf-mpsl-sys/nrf53"]
+nrf54l-ns = ["nrf-mpsl-sys/nrf54l-ns"]
+nrf54l-s = ["nrf-mpsl-sys/nrf54l-s"]
+nrf54h = ["nrf-mpsl-sys/nrf54h"]
+
 peripheral = []
 central = []
 

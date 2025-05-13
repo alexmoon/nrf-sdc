@@ -9,13 +9,18 @@ version = "0.1.0"
 rust-version = "1.77"
 
 [features]
-nrf52805 = ["embassy-nrf/nrf52805"]
-nrf52810 = ["embassy-nrf/nrf52810"]
-nrf52811 = ["embassy-nrf/nrf52811"]
-nrf52820 = ["embassy-nrf/nrf52820"]
-nrf52832 = ["embassy-nrf/nrf52832"]
-nrf52833 = ["embassy-nrf/nrf52833"]
-nrf52840 = ["embassy-nrf/nrf52840"]
+nrf52805 = ["embassy-nrf/nrf52805", "nrf52"]
+nrf52810 = ["embassy-nrf/nrf52810", "nrf52"]
+nrf52811 = ["embassy-nrf/nrf52811", "nrf52"]
+nrf52820 = ["embassy-nrf/nrf52820", "nrf52"]
+nrf52832 = ["embassy-nrf/nrf52832", "nrf52"]
+nrf52833 = ["embassy-nrf/nrf52833", "nrf52"]
+nrf52840 = ["embassy-nrf/nrf52840", "nrf52"]
+nrf5340-net = ["embassy-nrf/nrf5340-net", "nrf53"]
+
+nrf52 = ["nrf-mpsl-sys/nrf52"]
+nrf53 = ["nrf-mpsl-sys/nrf53"]
+
 critical-section-impl = ["critical-section/restore-state-bool"]
 fem = ["nrf-mpsl-sys/fem"]
 fem-simple-gpio = ["nrf-mpsl-sys/fem-simple-gpio"]

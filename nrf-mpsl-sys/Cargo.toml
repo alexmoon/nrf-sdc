@@ -22,6 +22,12 @@ include = [
 ]
 
 [features]
+nrf52 = []
+nrf53 = []
+nrf54l-ns = []
+nrf54l-s = []
+nrf54h = []
+
 fem = []
 "fem-simple-gpio" = ["fem"]
 "fem-nrf21540-gpio" = ["fem"]
