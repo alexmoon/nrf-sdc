@@ -144,20 +144,76 @@ impl ParseCallbacks for Callback {
     }
 }
 
+enum Series {
+    Nrf52,
+    Nrf53,
+    Nrf54l,
+    Nrf54lNs,
+    Nrf54h,
+}
+
+impl Series {
+    fn get() -> Self {
+        let nrf52 = cfg!(feature = "nrf52");
+        let nrf53 = cfg!(feature = "nrf53");
+        let nrf54l_s = cfg!(feature = "nrf54l-s");
+        let nrf54l_ns = cfg!(feature = "nrf54l-ns");
+        let nrf54h = cfg!(feature = "nrf54h");
+        match (nrf52, nrf53, nrf54l_s, nrf54l_ns, nrf54h) {
+            (true, false, false, false, false) => Series::Nrf52,
+            (false, true, false, false, false) => Series::Nrf53,
+            (false, false, true, false, false) => Series::Nrf54l,
+            (false, false, false, true, false) => Series::Nrf54lNs,
+            (false, false, false, false, true) => Series::Nrf54h,
+            _ => panic!("Exactly one architecture feature must be enabled for nrf_sdc_sys"),
+        }
+    }
+}
+
+#[derive(Debug)]
 struct Target {
     target: String,
     cpu: &'static str,
     float_abi: &'static str,
     chip_family: &'static str,
     chip: &'static str,
+    core: Option<&'static str>,
 }
 
 impl Target {
-    fn new(target: String) -> Self {
-        let (cpu, float_abi, chip_family, chip) = match target.as_str() {
-            "thumbv7em-none-eabihf" => ("cortex-m4", "hard", "nrf52", "NRF52840_XXAA"),
-            "thumbv7em-none-eabi" => ("cortex-m4", "soft", "nrf52", "NRF52840_XXAA"),
-            "thumbv8m.main-none-eabi" => ("cortex-m33+nodsp", "soft", "nrf53", "NRF5340_XXAA_NETWORK"),
+    fn new(series: Series, target: String) -> Self {
+        let (cpu, float_abi, chip_family, chip, core) = match (series, target.as_str()) {
+            (Series::Nrf52, "thumbv7em-none-eabihf") => ("cortex-m4", "hard", "nrf52", "NRF52840_XXAA", None),
+            (Series::Nrf52, "thumbv7em-none-eabi") => ("cortex-m4", "soft", "nrf52", "NRF52840_XXAA", None),
+            (Series::Nrf53, "thumbv8m.main-none-eabi") => {
+                ("cortex-m33+nodsp", "soft", "nrf53", "NRF5340_XXAA", Some("NRF_NETWORK"))
+            }
+            (Series::Nrf54l, "thumbv8m.main-none-eabihf") => {
+                ("cortex-m33", "hard", "nrf54l", "NRF54L15_XXAA", Some("NRF_APPLICATION"))
+            }
+            (Series::Nrf54l, "thumbv8m.main-none-eabi") => {
+                ("cortex-m33", "soft", "nrf54l", "NRF54L15_XXAA", Some("NRF_APPLICATION"))
+            }
+            (Series::Nrf54lNs, "thumbv8m.main-none-eabihf") => (
+                "cortex-m33",
+                "hard",
+                "nrf54l_ns",
+                "NRF54L15_XXAA",
+                Some("NRF_APPLICATION"),
+            ),
+            (Series::Nrf54lNs, "thumbv8m.main-none-eabi") => (
+                "cortex-m33",
+                "soft",
+                "nrf54l_ns",
+                "NRF54L15_XXAA",
+                Some("NRF_APPLICATION"),
+            ),
+            (Series::Nrf54h, "thumbv8m.main-none-eabihf") => {
+                ("cortex-m33", "hard", "nrf54h", "NRF54H20_XXAA", Some("NRF_RADIOCORE"))
+            }
+            (Series::Nrf54h, "thumbv8m.main-none-eabi") => {
+                ("cortex-m33", "soft", "nrf54h", "NRF54H20_XXAA", Some("NRF_RADIOCORE"))
+            }
             _ => panic!("Unsupported target: {:?}", target),
         };
 
@@ -167,6 +223,7 @@ impl Target {
             float_abi,
             chip_family,
             chip,
+            core,
         }
     }
 }
@@ -184,6 +241,7 @@ fn bindgen(target: &Target, mem_fns: Rc<RefCell<Vec<u8>>>) -> bindgen::Builder {
         .clang_arg("-I./third_party/nordic/nrfx/mdk")
         .clang_arg("-I./third_party/nordic/nrfxlib/softdevice_controller/include")
         .clang_arg(format!("-D{}", target.chip))
+        .clang_args(target.core.map(|x| format!("-D{}", x)))
         .allowlist_function("sdc_.*")
         .allowlist_function("SDC_.*")
         .allowlist_type("sdc_.*")
@@ -196,7 +254,7 @@ fn bindgen(target: &Target, mem_fns: Rc<RefCell<Vec<u8>>>) -> bindgen::Builder {
 }
 
 fn main() {
-    let target = Target::new(env::var("TARGET").unwrap());
+    let target = Target::new(Series::get(), env::var("TARGET").unwrap());
 
     let role = match (cfg!(feature = "peripheral"), cfg!(feature = "central")) {
         (true, true) => "multirole",

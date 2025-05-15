@@ -9,13 +9,17 @@ version = "0.1.0"
 rust-version="1.77"
 
 [features]
-nrf52805 = ["nrf-mpsl/nrf52805"]
-nrf52810 = ["nrf-mpsl/nrf52810"]
-nrf52811 = ["nrf-mpsl/nrf52811"]
-nrf52820 = ["nrf-mpsl/nrf52820"]
-nrf52832 = ["nrf-mpsl/nrf52832"]
-nrf52833 = ["nrf-mpsl/nrf52833"]
-nrf52840 = ["nrf-mpsl/nrf52840"]
+nrf52805 = ["nrf-mpsl/nrf52805", "nrf52"]
+nrf52810 = ["nrf-mpsl/nrf52810", "nrf52"]
+nrf52811 = ["nrf-mpsl/nrf52811", "nrf52"]
+nrf52820 = ["nrf-mpsl/nrf52820", "nrf52"]
+nrf52832 = ["nrf-mpsl/nrf52832", "nrf52"]
+nrf52833 = ["nrf-mpsl/nrf52833", "nrf52"]
+nrf52840 = ["nrf-mpsl/nrf52840", "nrf52"]
+nrf5340-net = ["nrf-mpsl/nrf5340-net", "nrf53"]
+
+nrf52 = ["nrf-sdc-sys/nrf52"]
+nrf53 = ["nrf-sdc-sys/nrf53"]
 
 peripheral = ["nrf-sdc-sys/peripheral"]
 central = ["nrf-sdc-sys/central"]
