@@ -28,7 +28,7 @@ defmt = ["dep:defmt", "nrf-mpsl/defmt", "bt-hci/defmt"]
 log = ["dep:log", "nrf-mpsl/log", "bt-hci/log"]
 
 [dependencies]
-defmt = { version = "0.3", optional = true }
+defmt = { version = "1", optional = true }
 log = { version = "0.4.11", optional = true }
 
 nrf-mpsl = { version = "0.1.0", path = "../nrf-mpsl" }
@@ -38,7 +38,7 @@ embassy-nrf = "0.3.1"
 embassy-sync = "0.6.1"
 embassy-hal-internal = "0.2.0"
 critical-section = "1.1.1"
-rand_core = "0.6.4"
+rand_core = "0.9"
 embedded-io = "0.6.0"
 embedded-io-async = "0.6.0"
 bt-hci = "0.3.1"

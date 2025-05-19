@@ -18,6 +18,8 @@ jobs:
           submodules: true
       - name: Install nightly
         run: rustup toolchain add --component=rustfmt nightly
+      - name: Install clippy
+        run: rustup component add clippy
       - name: Install targets
         run: rustup target add thumbv7em-none-eabi thumbv7em-none-eabihf thumbv8m.main-none-eabi thumbv8m.main-none-eabihf
       - name: Formatting
