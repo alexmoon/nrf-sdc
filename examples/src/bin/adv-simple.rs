@@ -9,6 +9,7 @@ use embassy_executor::Spawner;
 use embassy_nrf::gpio::{Level, Output, OutputDrive};
 use embassy_nrf::peripherals::RNG;
 use embassy_nrf::rng::Rng;
+use embassy_nrf::mode::Async;
 use embassy_nrf::{bind_interrupts, pac, rng};
 use embassy_time::{Duration, Timer};
 use nrf_sdc::{self as sdc, mpsl};
@@ -28,7 +29,7 @@ bind_interrupts!(struct Irqs {
 
 fn build_sdc<'d, const N: usize>(
     p: nrf_sdc::Peripherals<'d>,
-    rng: &'d mut Rng<RNG>,
+    rng: &'d mut Rng<RNG, Async>,
     mpsl: &'d MultiprotocolServiceLayer,
     mem: &'d mut sdc::Mem<N>,
 ) -> Result<nrf_sdc::SoftdeviceController<'d>, nrf_sdc::Error> {

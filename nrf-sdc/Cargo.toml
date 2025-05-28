@@ -35,10 +35,10 @@ nrf-mpsl = { version = "0.1.0", path = "../nrf-mpsl" }
 nrf-sdc-sys = { version = "0.1.0", path = "../nrf-sdc-sys" }
 
 embassy-nrf = "0.3.1"
-embassy-sync = "0.6.1"
+embassy-sync = "0.7"
 embassy-hal-internal = "0.2.0"
 critical-section = "1.1.1"
 rand_core = "0.9"
 embedded-io = "0.6.0"
 embedded-io-async = "0.6.0"
-bt-hci = "0.3.1"
+bt-hci = "0.3"
