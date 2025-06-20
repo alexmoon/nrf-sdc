@@ -37,7 +37,6 @@ pub struct Peripherals<'d> {
     pub timer0: Peri<'d, peripherals::TIMER0>,
     #[cfg(feature = "nrf53")]
     pub timer1: Peri<'d, peripherals::TIMER1>,
-    #[cfg(feature = "nrf52")]
     pub temp: Peri<'d, peripherals::TEMP>,
 
     #[cfg(feature = "nrf52")]
@@ -60,7 +59,7 @@ impl<'d> Peripherals<'d> {
         rtc0: Peri<'d, peripherals::RTC0>,
         timer0: Peri<'d, peripherals::TIMER0>,
         #[cfg(feature = "nrf53")] timer1: Peri<'d, peripherals::TIMER1>,
-        #[cfg(feature = "nrf52")] temp: Peri<'d, peripherals::TEMP>,
+        temp: Peri<'d, peripherals::TEMP>,
         #[cfg(feature = "nrf52")] ppi_ch19: Peri<'d, peripherals::PPI_CH19>,
         #[cfg(feature = "nrf52")] ppi_ch30: Peri<'d, peripherals::PPI_CH30>,
         #[cfg(feature = "nrf52")] ppi_ch31: Peri<'d, peripherals::PPI_CH31>,
@@ -73,7 +72,6 @@ impl<'d> Peripherals<'d> {
             timer0,
             #[cfg(feature = "nrf53")]
             timer1,
-            #[cfg(feature = "nrf52")]
             temp,
             #[cfg(feature = "nrf52")]
             ppi_ch19,
