@@ -29,45 +29,82 @@ use crate::{raw, Error, RetVal};
 static WAKER: AtomicWaker = AtomicWaker::new();
 static SDC_RNG: AtomicPtr<()> = AtomicPtr::new(core::ptr::null_mut());
 
-/// Struct containing all peripherals required for the SDC to operate.
+/// Peripherals required for the SoftDevice Controller.
 ///
-/// This is used to enforce at compile-time that your code doesn't use
-/// these peripherals.
+/// This is used to enforce at compile-time that the application does not use
+/// any peripherals that are required by the SDC.
 ///
-/// However, there's extra restrictions that are not enforced at compile-time
-/// that you must ensure to fulfill manually:
+/// In addition, the application must not use any of the following peripherals directly:
 ///
-/// - Do not use the `CCM`, `AAR`, or `NVMC` peripherals directly.
+/// - `CCM`
+/// - `AAR`
+/// - `NVMC`
+///
+/// `NVMC` may be used via the `Flash` implementation in the `nrf-mpsl` crate, which
+/// synchronizes access to the flash with the MPSL timeslot API.
 #[cfg(feature = "nrf52")]
 pub struct Peripherals<'d> {
+    /// PPI channel 17.
     pub ppi_ch17: Peri<'d, peripherals::PPI_CH17>,
+    /// PPI channel 18.
     pub ppi_ch18: Peri<'d, peripherals::PPI_CH18>,
+    /// PPI channel 20.
     pub ppi_ch20: Peri<'d, peripherals::PPI_CH20>,
+    /// PPI channel 21.
     pub ppi_ch21: Peri<'d, peripherals::PPI_CH21>,
+    /// PPI channel 22.
     pub ppi_ch22: Peri<'d, peripherals::PPI_CH22>,
+    /// PPI channel 23.
     pub ppi_ch23: Peri<'d, peripherals::PPI_CH23>,
+    /// PPI channel 24.
     pub ppi_ch24: Peri<'d, peripherals::PPI_CH24>,
+    /// PPI channel 25.
     pub ppi_ch25: Peri<'d, peripherals::PPI_CH25>,
+    /// PPI channel 26.
     pub ppi_ch26: Peri<'d, peripherals::PPI_CH26>,
+    /// PPI channel 27.
     pub ppi_ch27: Peri<'d, peripherals::PPI_CH27>,
+    /// PPI channel 28.
     pub ppi_ch28: Peri<'d, peripherals::PPI_CH28>,
+    /// PPI channel 29.
     pub ppi_ch29: Peri<'d, peripherals::PPI_CH29>,
 }
 #[cfg(feature = "nrf53")]
+/// Peripherals required for the SoftDevice Controller.
+///
+/// This is used to enforce at compile-time that the application does not use
+/// any peripherals that are required by the SDC.
+///
+/// # Panics
+///
+/// The following hardware restrictions must be followed. Panics may occur if they are not.
+///
+/// - Do not use the `CCM`, `AAR`, or `NVMC` peripherals directly.
 pub struct Peripherals<'d> {
+    /// PPI channel 3.
     pub ppi_ch3: Peri<'d, peripherals::PPI_CH3>,
+    /// PPI channel 4.
     pub ppi_ch4: Peri<'d, peripherals::PPI_CH4>,
+    /// PPI channel 5.
     pub ppi_ch5: Peri<'d, peripherals::PPI_CH5>,
+    /// PPI channel 6.
     pub ppi_ch6: Peri<'d, peripherals::PPI_CH6>,
+    /// PPI channel 7.
     pub ppi_ch7: Peri<'d, peripherals::PPI_CH7>,
+    /// PPI channel 8.
     pub ppi_ch8: Peri<'d, peripherals::PPI_CH8>,
+    /// PPI channel 9.
     pub ppi_ch9: Peri<'d, peripherals::PPI_CH9>,
+    /// PPI channel 10.
     pub ppi_ch10: Peri<'d, peripherals::PPI_CH10>,
+    /// PPI channel 11.
     pub ppi_ch11: Peri<'d, peripherals::PPI_CH11>,
+    /// PPI channel 12.
     pub ppi_ch12: Peri<'d, peripherals::PPI_CH12>,
 }
 
 impl<'d> Peripherals<'d> {
+    /// Creates a new `Peripherals` instance for nRF52 series devices.
     #[allow(clippy::too_many_arguments)]
     #[cfg(feature = "nrf52")]
     pub fn new(
@@ -100,6 +137,7 @@ impl<'d> Peripherals<'d> {
         }
     }
 
+    /// Creates a new `Peripherals` instance for nRF53 series devices.
     #[allow(clippy::too_many_arguments)]
     #[cfg(feature = "nrf53")]
     pub fn new(
@@ -157,10 +195,14 @@ unsafe extern "C" fn rand_blocking<R: CryptoRng + Send>(p_buff: *mut u8, length:
     (*rng).fill_bytes(buf);
 }
 
+/// The memory required by the SoftDevice Controller.
+///
+/// The required size of this buffer is determined by the configuration of the SoftDevice Controller.
 #[repr(align(8))]
 pub struct Mem<const N: usize>(MaybeUninit<[u8; N]>);
 
 impl<const N: usize> Mem<N> {
+    /// Creates a new `Mem` instance.
     pub fn new() -> Self {
         Self(MaybeUninit::uninit())
     }
@@ -172,17 +214,20 @@ impl<const N: usize> Default for Mem<N> {
     }
 }
 
+/// A builder for the SoftDevice Controller.
 pub struct Builder {
     // Prevent Send, Sync
     _private: PhantomData<*mut ()>,
 }
 
 impl Builder {
+    /// Creates a new `Builder` instance.
     pub fn new() -> Result<Self, Error> {
         let ret = unsafe { raw::sdc_init(Some(fault_handler)) };
         RetVal::from(ret).to_result().and(Ok(Builder { _private: PhantomData }))
     }
 
+    /// Sets the number of central links.
     pub fn central_count(self, count: u8) -> Result<Self, Error> {
         self.cfg_set(
             raw::SDC_CFG_TYPE_CENTRAL_COUNT,
@@ -192,6 +237,7 @@ impl Builder {
         )
     }
 
+    /// Sets the number of peripheral links.
     pub fn peripheral_count(self, count: u8) -> Result<Self, Error> {
         self.cfg_set(
             raw::SDC_CFG_TYPE_PERIPHERAL_COUNT,
@@ -201,6 +247,7 @@ impl Builder {
         )
     }
 
+    /// Sets the buffer configuration.
     pub fn buffer_cfg(
         self,
         tx_packet_size: u16,
@@ -221,6 +268,7 @@ impl Builder {
         )
     }
 
+    /// Sets the number of advertising sets.
     pub fn adv_count(self, count: u8) -> Result<Self, Error> {
         self.cfg_set(
             raw::SDC_CFG_TYPE_ADV_COUNT,
@@ -230,6 +278,7 @@ impl Builder {
         )
     }
 
+    /// Sets the scan buffer configuration.
     pub fn scan_buffer_cfg(self, count: u8) -> Result<Self, Error> {
         self.cfg_set(
             raw::SDC_CFG_TYPE_SCAN_BUFFER_CFG,
@@ -239,6 +288,7 @@ impl Builder {
         )
     }
 
+    /// Sets the advertising buffer configuration.
     pub fn adv_buffer_cfg(self, max_adv_data: u16) -> Result<Self, Error> {
         self.cfg_set(
             raw::SDC_CFG_TYPE_ADV_BUFFER_CFG,
@@ -248,6 +298,7 @@ impl Builder {
         )
     }
 
+    /// Sets the number of periodic advertising sets.
     pub fn periodic_adv_count(self, count: u8) -> Result<Self, Error> {
         self.cfg_set(
             raw::SDC_CFG_TYPE_PERIODIC_ADV_COUNT,
@@ -257,6 +308,7 @@ impl Builder {
         )
     }
 
+    /// Sets the number of periodic syncs.
     pub fn periodic_sync_count(self, count: u8) -> Result<Self, Error> {
         self.cfg_set(
             raw::SDC_CFG_TYPE_PERIODIC_SYNC_COUNT,
@@ -266,6 +318,7 @@ impl Builder {
         )
     }
 
+    /// Sets the periodic sync buffer configuration.
     pub fn periodic_sync_buffer_cfg(self, count: u8) -> Result<Self, Error> {
         self.cfg_set(
             raw::SDC_CFG_TYPE_PERIODIC_SYNC_BUFFER_CFG,
@@ -275,6 +328,7 @@ impl Builder {
         )
     }
 
+    /// Sets the periodic advertising list length.
     pub fn periodic_adv_list_len(self, len: u8) -> Result<Self, Error> {
         self.cfg_set(
             raw::SDC_CFG_TYPE_PERIODIC_ADV_LIST_SIZE,
@@ -284,116 +338,144 @@ impl Builder {
         )
     }
 
+    /// Enables support for advertising.
     pub fn support_adv(self) -> Result<Self, Error> {
         self.support(raw::sdc_support_adv)
     }
 
+    /// Enables support for extended advertising.
     pub fn support_ext_adv(self) -> Result<Self, Error> {
         self.support(raw::sdc_support_ext_adv)
     }
 
+    /// Enables support for peripheral role.
     pub fn support_peripheral(self) -> Result<Self, Error> {
         self.support(raw::sdc_support_peripheral)
     }
 
+    /// Enables support for scanning.
     pub fn support_scan(self) -> Result<Self, Error> {
         self.support(raw::sdc_support_scan)
     }
 
+    /// Enables support for extended scanning.
     pub fn support_ext_scan(self) -> Result<Self, Error> {
         self.support(raw::sdc_support_ext_scan)
     }
 
+    /// Enables support for central role.
     pub fn support_central(self) -> Result<Self, Error> {
         self.support(raw::sdc_support_central)
     }
 
+    /// Enables support for extended central role.
     pub fn support_ext_central(self) -> Result<Self, Error> {
         self.support(raw::sdc_support_ext_central)
     }
 
+    /// Enables support for Data Length Extension (DLE) in central role.
     pub fn support_dle_central(self) -> Result<Self, Error> {
         self.support(raw::sdc_support_dle_central)
     }
 
+    /// Enables support for Data Length Extension (DLE) in peripheral role.
     pub fn support_dle_peripheral(self) -> Result<Self, Error> {
         self.support(raw::sdc_support_dle_peripheral)
     }
 
+    /// Enables support for 2M PHY.
     pub fn support_le_2m_phy(self) -> Result<Self, Error> {
         self.support(raw::sdc_support_le_2m_phy)
     }
 
+    /// Enables support for coded PHY.
     pub fn support_le_coded_phy(self) -> Result<Self, Error> {
         self.support(raw::sdc_support_le_coded_phy)
     }
 
+    /// Enables support for PHY update in central role.
     pub fn support_phy_update_central(self) -> Result<Self, Error> {
         self.support(raw::sdc_support_phy_update_central)
     }
 
+    /// Enables support for PHY update in peripheral role.
     pub fn support_phy_update_peripheral(self) -> Result<Self, Error> {
         self.support(raw::sdc_support_phy_update_peripheral)
     }
 
+    /// Enables support for periodic advertising.
     pub fn support_le_periodic_adv(self) -> Result<Self, Error> {
         self.support(raw::sdc_support_le_periodic_adv)
     }
 
+    /// Enables support for periodic sync.
     pub fn support_le_periodic_sync(self) -> Result<Self, Error> {
         self.support(raw::sdc_support_le_periodic_sync)
     }
 
+    /// Enables support for LE power control in central role.
     pub fn support_le_power_control_central(self) -> Result<Self, Error> {
         self.support(raw::sdc_support_le_power_control_central)
     }
 
+    /// Enables support for LE power control in peripheral role.
     pub fn support_le_power_control_peripheral(self) -> Result<Self, Error> {
         self.support(raw::sdc_support_le_power_control_peripheral)
     }
 
+    /// Enables support for sleep clock accuracy (SCA) updates in central role.
     pub fn support_sca_central(self) -> Result<Self, Error> {
         self.support(raw::sdc_support_sca_central)
     }
 
+    /// Enables support for sleep clock accuracy (SCA) updates in peripheral role.
     pub fn support_sca_peripheral(self) -> Result<Self, Error> {
         self.support(raw::sdc_support_sca_peripheral)
     }
 
+    /// Enables support for LE connection CTE response in central role.
     pub fn support_le_conn_cte_rsp_central(self) -> Result<Self, Error> {
         self.support(raw::sdc_support_le_conn_cte_rsp_central)
     }
 
+    /// Enables support for LE connection CTE response in peripheral role.
     pub fn support_le_conn_cte_rsp_peripheral(self) -> Result<Self, Error> {
         self.support(raw::sdc_support_le_conn_cte_rsp_peripheral)
     }
 
+    /// Enables support for periodic advertising sync transfer sender in central role.
     pub fn support_periodic_adv_sync_transfer_sender_central(self) -> Result<Self, Error> {
         self.support(raw::sdc_support_periodic_adv_sync_transfer_sender_central)
     }
 
+    /// Enables support for periodic advertising sync transfer sender in peripheral role.
     pub fn support_periodic_adv_sync_transfer_sender_peripheral(self) -> Result<Self, Error> {
         self.support(raw::sdc_support_periodic_adv_sync_transfer_sender_peripheral)
     }
 
+    /// Enables support for periodic advertising sync transfer receiver in central role.
     pub fn support_periodic_adv_sync_transfer_receiver_central(self) -> Result<Self, Error> {
         self.support(raw::sdc_support_periodic_adv_sync_transfer_receiver_central)
     }
 
+    /// Enables support for periodic advertising sync transfer receiver in peripheral role.
     pub fn support_periodic_adv_sync_transfer_receiver_peripheral(self) -> Result<Self, Error> {
         self.support(raw::sdc_support_periodic_adv_sync_transfer_receiver_peripheral)
     }
 
+    /// Enables support for QoS channel survey.
     pub fn support_qos_channel_survey(self) -> Result<Self, Error> {
         self.support(raw::sdc_support_qos_channel_survey)
     }
 
+    /// Sets the default TX power.
     pub fn default_tx_power(self, dbm: i8) -> Result<Self, Error> {
         RetVal::from(unsafe { raw::sdc_default_tx_power_set(dbm) })
             .to_result()
             .and(Ok(self))
     }
 
+    /// Calculates the required memory for the current configuration.
     pub fn required_memory(&self) -> Result<usize, Error> {
         let ret = unsafe {
             raw::sdc_cfg_set(
@@ -405,7 +487,11 @@ impl Builder {
         RetVal::from(ret).to_result().map(|x| x as usize)
     }
 
-    /// SAFETY: `SoftdeviceController` must not have its lifetime end without running its destructor, e.g. using `mem::forget`.
+    /// Builds the SoftDevice Controller.
+    ///
+    /// # Safety
+    ///
+    /// The returned `SoftdeviceController` must not have its lifetime end without running its destructor, e.g. using `mem::forget`.
     pub fn build<'d, R: CryptoRng + Send, const N: usize>(
         self,
         p: Peripherals<'d>,
@@ -463,6 +549,9 @@ impl Builder {
     }
 }
 
+/// The SoftDevice Controller.
+///
+/// This is the main interface to the SoftDevice Controller. It is responsible for enabling and running the SDC.
 pub struct SoftdeviceController<'d> {
     using_ext_adv_cmds: RefCell<Option<bool>>,
     periodic_adv_response_data_in_progress: AtomicBool,
@@ -485,12 +574,14 @@ unsafe fn bytes_of<T: Copy>(t: &T) -> &[u8] {
 }
 
 impl<'d> SoftdeviceController<'d> {
+    /// Returns the build revision of the SoftDevice Controller.
     pub fn build_revision() -> Result<[u8; raw::SDC_BUILD_REVISION_SIZE as usize], Error> {
         let mut rev = [0; raw::SDC_BUILD_REVISION_SIZE as usize];
         let ret = unsafe { raw::sdc_build_revision_get(rev.as_mut_ptr()) };
         RetVal::from(ret).to_result().and(Ok(rev))
     }
 
+    /// Submits an HCI data packet to the controller.
     pub fn hci_data_put(&self, buf: &[u8]) -> Result<(), Error> {
         assert!(buf.len() >= 4 && buf.len() >= 4 + usize::from(u16::from_le_bytes([buf[2], buf[3]])));
         RetVal::from(unsafe { raw::sdc_hci_data_put(buf.as_ptr()) })
@@ -498,6 +589,7 @@ impl<'d> SoftdeviceController<'d> {
             .and(Ok(()))
     }
 
+    /// Submits an HCI ISO data packet to the controller.
     pub fn hci_iso_data_put(&self, buf: &[u8]) -> Result<(), Error> {
         assert!(buf.len() >= 4 && buf.len() >= 4 + usize::from(u16::from_le_bytes([buf[2], buf[3]])));
         RetVal::from(unsafe { raw::sdc_hci_iso_data_put(buf.as_ptr()) })
@@ -505,6 +597,7 @@ impl<'d> SoftdeviceController<'d> {
             .and(Ok(()))
     }
 
+    /// Tries to get an HCI packet from the controller.
     pub fn try_hci_get(&self, buf: &mut [u8]) -> Result<bt_hci::PacketKind, Error> {
         assert!(buf.len() >= raw::HCI_MSG_BUFFER_MAX_SIZE as usize);
         let mut msg_type: raw::sdc_hci_msg_type_t = 0;
@@ -539,6 +632,7 @@ impl<'d> SoftdeviceController<'d> {
         Ok(kind)
     }
 
+    /// Gets an HCI packet from the controller, waiting if necessary.
     pub async fn hci_get(&self, buf: &mut [u8]) -> Result<bt_hci::PacketKind, Error> {
         poll_fn(|ctx| match self.try_hci_get(buf) {
             Err(Error::EAGAIN) => {
@@ -550,6 +644,7 @@ impl<'d> SoftdeviceController<'d> {
         .await
     }
 
+    /// Registers a waker to be woken when the controller has a new event.
     pub fn register_waker(&self, waker: &Waker) {
         WAKER.register(waker);
     }
@@ -1129,7 +1224,7 @@ mod le {
     }
 }
 
-/// Bluetooth HCI vendor specific commands
+/// Bluetooth HCI vendor specific commands.
 pub mod vendor {
     use bt_hci::cmd::Error as CmdError;
     use bt_hci::controller::ControllerCmdSync;
