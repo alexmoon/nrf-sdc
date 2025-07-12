@@ -1,3 +1,4 @@
+//! Formatting macros and utilities.
 #![macro_use]
 #![allow(unused_macros)]
 
@@ -195,13 +196,18 @@ macro_rules! unwrap {
     }
 }
 
+/// The error type for operations that can fail, but only with one kind of error.
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub struct NoneError;
 
+/// A trait for types that can be converted into a `Result`.
 #[allow(unused)]
 pub trait Try {
+    /// The success value of the `Result`.
     type Ok;
+    /// The error value of the `Result`.
     type Error;
+    /// Converts `self` into a `Result`.
     fn into_result(self) -> Result<Self::Ok, Self::Error>;
 }
 

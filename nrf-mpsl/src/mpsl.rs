@@ -1,3 +1,4 @@
+//! Main implementation of the multiprotocol service layer.
 use core::ffi::CStr;
 use core::future::poll_fn;
 use core::marker::PhantomData;
@@ -15,13 +16,14 @@ use crate::{hfclk, raw, temp};
 
 static WAKER: AtomicWaker = AtomicWaker::new();
 
-/// Struct containing all peripherals required for the MPSL to operate.
+/// Peripherals required for the multiprotocol service layer.
 ///
-/// This is used to enforce at compile-time that your code doesn't use
-/// these peripherals.
+/// This is used to enforce at compile-time that the application does not use
+/// any peripherals that are required by the MPSL.
 ///
-/// However, there's extra restrictions that are not enforced at compile-time
-/// that you must ensure to fulfill manually:
+/// # Panics
+///
+/// The following hardware restrictions must be followed. Panics may occur if they are not.
 ///
 /// - Do not use `cpsid/cpsie` directly for globally disabling/enabling interrupts,
 ///   as this can disrupt timing. Do not use the `critical-section` implementation of
@@ -33,27 +35,38 @@ static WAKER: AtomicWaker = AtomicWaker::new();
 /// - Do not use `RADIO` directly, except during timeslots you've allocated.
 /// - Do not use `CLOCK_POWER` directly, use the functions provided by this crate instead.
 pub struct Peripherals<'d> {
+    /// Real-time counter 0.
     pub rtc0: Peri<'d, peripherals::RTC0>,
+    /// Timer 0.
     pub timer0: Peri<'d, peripherals::TIMER0>,
+    /// Timer 1.
     #[cfg(feature = "nrf53")]
     pub timer1: Peri<'d, peripherals::TIMER1>,
+    /// Temperature sensor.
     pub temp: Peri<'d, peripherals::TEMP>,
 
+    /// PPI channel 19.
     #[cfg(feature = "nrf52")]
     pub ppi_ch19: Peri<'d, peripherals::PPI_CH19>,
+    /// PPI channel 30.
     #[cfg(feature = "nrf52")]
     pub ppi_ch30: Peri<'d, peripherals::PPI_CH30>,
+    /// PPI channel 31.
     #[cfg(feature = "nrf52")]
     pub ppi_ch31: Peri<'d, peripherals::PPI_CH31>,
+    /// PPI channel 0.
     #[cfg(feature = "nrf53")]
     pub ppi_ch0: Peri<'d, peripherals::PPI_CH0>,
+    /// PPI channel 1.
     #[cfg(feature = "nrf53")]
     pub ppi_ch1: Peri<'d, peripherals::PPI_CH1>,
+    /// PPI channel 2.
     #[cfg(feature = "nrf53")]
     pub ppi_ch2: Peri<'d, peripherals::PPI_CH2>,
 }
 
 impl<'d> Peripherals<'d> {
+    /// Creates a new `Peripherals` instance.
     #[allow(clippy::too_many_arguments)]
     pub fn new(
         rtc0: Peri<'d, peripherals::RTC0>,
@@ -89,6 +102,9 @@ impl<'d> Peripherals<'d> {
     }
 }
 
+/// The multiprotocol service layer.
+///
+/// This is the main interface to the MPSL. It is responsible for initializing and running the MPSL.
 pub struct MultiprotocolServiceLayer<'d> {
     // Prevent Sync
     _private: PhantomData<core::cell::UnsafeCell<&'d ()>>,
@@ -109,12 +125,10 @@ impl Drop for MultiprotocolServiceLayer<'_> {
     }
 }
 
-pub struct Builder<'d> {
-    // Prevent Send, Sync
-    _private: PhantomData<&'d ()>,
-}
-
 impl<'d> MultiprotocolServiceLayer<'d> {
+    /// Initializes the multiprotocol service layer.
+    ///
+    /// This function should only be called once.
     pub fn new<T, I>(p: Peripherals<'d>, _irq: I, clock_cfg: raw::mpsl_clock_lfclk_cfg_t) -> Result<Self, Error>
     where
         T: Interrupt,
@@ -141,6 +155,9 @@ impl<'d> MultiprotocolServiceLayer<'d> {
         Ok(Self { _private: PhantomData })
     }
 
+    /// Initializes the multiprotocol service layer with timeslot support.
+    ///
+    /// This function should only be called once.
     pub fn with_timeslots<T, I, const SLOTS: usize>(
         p: Peripherals<'d>,
         _irq: I,
@@ -161,12 +178,16 @@ impl<'d> MultiprotocolServiceLayer<'d> {
         Ok(me)
     }
 
+    /// Returns the build revision of the MPSL.
     pub fn build_revision() -> Result<[u8; raw::MPSL_BUILD_REVISION_SIZE as usize], Error> {
         let mut rev = [0; raw::MPSL_BUILD_REVISION_SIZE as usize];
         let ret = unsafe { raw::mpsl_build_revision_get(rev.as_mut_ptr()) };
         RetVal::from(ret).to_result().and(Ok(rev))
     }
 
+    /// Runs the multiprotocol service layer.
+    ///
+    /// This function never returns.
     pub async fn run(&self) -> ! {
         poll_fn(|ctx| {
             WAKER.register(ctx.waker());
@@ -176,14 +197,20 @@ impl<'d> MultiprotocolServiceLayer<'d> {
         .await
     }
 
+    /// Returns the temperature of the chip.
     pub fn get_temperature(&self) -> temp::Temperature {
         temp::Temperature(unsafe { raw::mpsl_temperature_get() })
     }
 
+    /// Requests the high-frequency clock.
+    ///
+    /// This function returns a guard that will release the clock when dropped. An error will be returned if
+    /// an `Hfclk` guard already exists.
     pub async fn request_hfclk(&self) -> Result<hfclk::Hfclk, Error> {
         hfclk::Hfclk::new()
     }
 
+    /// Encrypts a block of data using the ECB peripheral.
     pub fn ecb_block_encrypt(&self, key: &[u8; 16], cleartext: &[u8], ciphertext: &mut [u8]) -> Result<(), Error> {
         assert_eq!(cleartext.len(), 16);
         assert_eq!(ciphertext.len(), 16);
@@ -200,10 +227,14 @@ impl<'d> MultiprotocolServiceLayer<'d> {
     }
 }
 
+/// Memory required for timeslot sessions.
+///
+/// This buffer must be provided to [`MultiprotocolServiceLayer::with_timeslots`] to enable timeslot support.
 #[repr(align(4))]
 pub struct SessionMem<const N: usize>(MaybeUninit<[[u8; raw::MPSL_TIMESLOT_CONTEXT_SIZE as usize]; N]>);
 
 impl<const N: usize> SessionMem<N> {
+    /// Creates a new `SessionMem` instance.
     pub fn new() -> Self {
         Self(MaybeUninit::uninit())
     }
@@ -216,6 +247,7 @@ impl<const N: usize> Default for SessionMem<N> {
 }
 
 // Low priority interrupts
+/// The low-priority interrupt handler.
 pub struct LowPrioInterruptHandler;
 impl<T: Interrupt> Handler<T> for LowPrioInterruptHandler {
     unsafe fn on_interrupt() {
@@ -223,6 +255,7 @@ impl<T: Interrupt> Handler<T> for LowPrioInterruptHandler {
     }
 }
 
+/// The clock interrupt handler.
 pub struct ClockInterruptHandler;
 impl Handler<interrupt::typelevel::CLOCK_POWER> for ClockInterruptHandler {
     unsafe fn on_interrupt() {
@@ -231,6 +264,7 @@ impl Handler<interrupt::typelevel::CLOCK_POWER> for ClockInterruptHandler {
 }
 
 // High priority interrupts
+/// The high-priority interrupt handler.
 pub struct HighPrioInterruptHandler;
 impl Handler<interrupt::typelevel::RADIO> for HighPrioInterruptHandler {
     unsafe fn on_interrupt() {
