@@ -1,3 +1,4 @@
+//! High-frequency clock management.
 use core::future::poll_fn;
 use core::marker::PhantomData;
 use core::sync::atomic::{AtomicBool, Ordering};
@@ -11,6 +12,11 @@ use crate::raw;
 static ENABLED: AtomicBool = AtomicBool::new(false);
 static WAKER: AtomicWaker = AtomicWaker::new();
 
+/// A guard that keeps the high-frequency clock running.
+///
+/// When this guard is dropped, the high-frequency clock may be stopped at any time when it is not needed by the MPSL.
+///
+/// At most one `Hfclk` guard may exist at any time.
 pub struct Hfclk {
     // Prevent Send, Sync
     _private: PhantomData<*mut ()>,
@@ -41,6 +47,7 @@ impl Hfclk {
         RetVal::from(ret).to_result().and(Ok(Hfclk { _private: PhantomData }))
     }
 
+    /// Waits for the high-frequency clock to start.
     pub async fn wait() -> Result<(), Error> {
         poll_fn(|cx| {
             WAKER.register(cx.waker());

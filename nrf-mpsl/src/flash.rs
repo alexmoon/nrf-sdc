@@ -1,3 +1,4 @@
+//! Flash operations using the timeslot API.
 use core::cell::RefCell;
 use core::future::poll_fn;
 use core::mem::MaybeUninit;
@@ -37,15 +38,15 @@ unsafe impl RawMutex for Timer0RawMutex {
     }
 }
 
-/// Error type for Flash operations.
+/// Error type for flash operations.
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum FlashError {
-    /// Error from the MPSL api
+    /// An error from the MPSL API.
     Mpsl(crate::Error),
-    /// Operation using a location not in flash.
+    /// The operation tried to access an address outside of the flash memory.
     OutOfBounds,
-    /// Unaligned operation or using unaligned buffers.
+    /// The address or buffer is not aligned to a word boundary.
     Unaligned,
 }
 
@@ -60,7 +61,7 @@ pub enum FlashError {
 ///
 /// # Example
 ///
-/// ```rust
+/// ```rust,no_run
 /// // Initialize MPSL with timeslots
 /// let mpsl = MultiprotocolServiceLayer::with_timeslots(
 ///     mpsl_p,
@@ -150,11 +151,13 @@ const TIMESLOT_LENGTH_WRITE_US: u32 = 7500;
 static STATE: State = State::new();
 
 impl<'d> Flash<'d> {
-    /// Constructs a flash instance.
+    /// Creates a new `Flash` instance, taking ownership of the NVMC peripheral.
+    ///
+    /// This method should only be called once.
     ///
     /// # Panics
     ///
-    /// Panics if called more than once.
+    /// This method will panic if it is called more than once.
     pub fn take(_mpsl: &'d MultiprotocolServiceLayer<'d>, _p: Peri<'d, NVMC>) -> Flash<'d> {
         STATE.with_inner(|state| {
             if state.taken {
@@ -166,6 +169,9 @@ impl<'d> Flash<'d> {
         Self { _mpsl, _p }
     }
 
+    /// Reads data from flash.
+    ///
+    /// This operation does not require a timeslot.
     pub fn read(&mut self, offset: u32, bytes: &mut [u8]) -> Result<(), FlashError> {
         if offset as usize >= FLASH_SIZE || offset as usize + bytes.len() > FLASH_SIZE {
             return Err(FlashError::OutOfBounds);
@@ -248,6 +254,10 @@ impl<'d> Flash<'d> {
         Ok(())
     }
 
+    /// Erases a region of flash.
+    ///
+    /// This operation is aligned to page boundaries. The `from` and `to` addresses must
+    /// be page-aligned.
     pub async fn erase(&mut self, from: u32, to: u32) -> Result<(), FlashError> {
         if to < from || to as usize > FLASH_SIZE {
             return Err(FlashError::OutOfBounds);
@@ -268,6 +278,10 @@ impl<'d> Flash<'d> {
         Ok(())
     }
 
+    /// Writes data to flash.
+    ///
+    /// This operation is aligned to word boundaries. The `offset` and `data.len()` must
+    /// be word-aligned.
     pub async fn write(&mut self, offset: u32, data: &[u8]) -> Result<(), FlashError> {
         if offset as usize + data.len() > FLASH_SIZE {
             return Err(FlashError::OutOfBounds);
@@ -545,19 +559,21 @@ impl From<crate::Error> for FlashError {
     }
 }
 
-/// A type to delay the drop handler invocation.
+/// A guard that runs a closure when it is dropped.
 #[must_use = "to delay the drop handler invocation to the end of the scope"]
-pub struct OnDrop<F: FnOnce()> {
+pub(crate) struct OnDrop<F: FnOnce()> {
     f: MaybeUninit<F>,
 }
 
 impl<F: FnOnce()> OnDrop<F> {
-    /// Create a new instance.
+    /// Creates a new `OnDrop` guard.
+    ///
+    /// The closure `f` will be called when the guard is dropped.
     pub fn new(f: F) -> Self {
         Self { f: MaybeUninit::new(f) }
     }
 
-    /// Prevent drop handler from running.
+    /// Prevents the closure from being called when the guard is dropped.
     pub fn defuse(self) {
         core::mem::forget(self)
     }
