@@ -5,7 +5,7 @@ edition = "2021"
 license-file = "third_party/nordic/nrfxlib/LICENSE"
 name = "nrf-sdc-sys"
 repository = "https://github.com/alexmoon/nrf-sdc"
-version = "0.1.0"
+version = "0.2.0"
 rust-version = "1.77"
 
 include = [
@@ -54,7 +54,7 @@ peripheral = []
 central = []
 
 [dependencies]
-nrf-mpsl-sys = { version = "0.1.1", path = "../nrf-mpsl-sys" }
+nrf-mpsl-sys = { version = "0.2.0", path = "../nrf-mpsl-sys" }
 
 [build-dependencies]
 bindgen = "0.70.1"
