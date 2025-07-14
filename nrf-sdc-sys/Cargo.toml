@@ -39,9 +39,9 @@ include = [
 ]
 
 [package.metadata.docs.rs]
-features = ["central", "peripheral"]
+features = ["nrf52", "central", "peripheral"]
 default-target = ["thumbv7em-none-eabihf"]
-targets = ["thumbv7em-none-eabi", "thumbv7em-none-eabihf", "thumbv8m.main-none-eabi"]
+targets = ["thumbv7em-none-eabihf"]
 
 [features]
 nrf52 = ["nrf-mpsl-sys/nrf52"]

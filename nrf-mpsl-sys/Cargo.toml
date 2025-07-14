@@ -34,9 +34,9 @@ fem = []
 "fem-nrf21540-gpio-spi" = ["fem"]
 
 [package.metadata.docs.rs]
-features = ["fem"]
+features = ["nrf52", "fem"]
 default-target = ["thumbv7em-none-eabihf"]
-targets = ["thumbv7em-none-eabi", "thumbv7em-none-eabihf", "thumbv8m.main-none-eabi"]
+targets = ["thumbv7em-none-eabihf"]
 
 [dependencies]
 
