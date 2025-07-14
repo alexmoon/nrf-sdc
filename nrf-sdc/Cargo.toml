@@ -34,7 +34,7 @@ log = { version = "0.4.11", optional = true }
 nrf-mpsl = { version = "0.1.0", path = "../nrf-mpsl" }
 nrf-sdc-sys = { version = "0.1.0", path = "../nrf-sdc-sys" }
 
-embassy-nrf = "0.3.1"
+embassy-nrf = "0.4.1"
 embassy-sync = "0.7"
 embassy-hal-internal = "0.2.0"
 critical-section = "1.1.1"
