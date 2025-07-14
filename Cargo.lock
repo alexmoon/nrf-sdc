@@ -728,7 +728,7 @@ dependencies = [
 
 [[package]]
 name = "nrf-mpsl"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "cortex-m",
  "critical-section",
@@ -744,7 +744,7 @@ dependencies = [
 
 [[package]]
 name = "nrf-mpsl-sys"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "bindgen",
  "doxygen-rs",
@@ -762,7 +762,7 @@ dependencies = [
 
 [[package]]
 name = "nrf-sdc"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "bt-hci",
  "critical-section",
@@ -800,7 +800,7 @@ dependencies = [
 
 [[package]]
 name = "nrf-sdc-sys"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "bindgen",
  "doxygen-rs",
