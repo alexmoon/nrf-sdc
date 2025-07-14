@@ -5,12 +5,12 @@ edition = "2021"
 license = "MIT OR Apache-2.0"
 name = "nrf-sdc"
 repository = "https://github.com/alexmoon/nrf-sdc"
-version = "0.1.0"
+version = "0.1.1"
 rust-version="1.77"
 
 [package.metadata.docs.rs]
 features = ["nrf52840", "peripheral", "central", "defmt"]
-default-target = ["thumbv7em-none-eabihf"]
+default-target = "thumbv7em-none-eabihf"
 targets = ["thumbv7em-none-eabihf"]
 
 [features]
