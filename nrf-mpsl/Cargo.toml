@@ -34,13 +34,13 @@ fem-nrf21540-gpio-spi = ["nrf-mpsl-sys/fem-nrf21540-gpio-spi"]
 
 [dependencies]
 defmt = { version = "1", optional = true }
-log = { version = "0.4.11", optional = true }
-critical-section = { version = "1.1", optional = true }
+log = { version = "0.4.27", optional = true }
+critical-section = { version = "1.2", optional = true }
 embedded-io = "0.6.1"
 embedded-storage = "0.3.1"
 embedded-storage-async = "0.4.1"
 
-cortex-m = "0.7.2"
+cortex-m = "0.7.7"
 
 nrf-mpsl-sys = { version = "0.2.0", path = "../nrf-mpsl-sys" }
 

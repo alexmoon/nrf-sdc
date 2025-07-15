@@ -24,8 +24,8 @@ defmt-rtt = "1"
 
 futures = { version = "0.3", default-features = false }
 
-cortex-m = { version = "0.7.6" }
-cortex-m-rt = "0.7.0"
+cortex-m = { version = "0.7.7" }
+cortex-m-rt = "0.7.5"
 panic-probe = { version = "1", features = ["print-defmt"] }
 static_cell = "2"
 
