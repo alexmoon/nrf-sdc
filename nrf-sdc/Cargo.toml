@@ -34,16 +34,16 @@ log = ["dep:log", "nrf-mpsl/log", "bt-hci/log"]
 
 [dependencies]
 defmt = { version = "1", optional = true }
-log = { version = "0.4.11", optional = true }
+log = { version = "0.4.27", optional = true }
 
 nrf-mpsl = { version = "0.1.0", path = "../nrf-mpsl" }
 nrf-sdc-sys = { version = "0.2.0", path = "../nrf-sdc-sys" }
 
 embassy-nrf = "0.4.1"
 embassy-sync = "0.7"
-embassy-hal-internal = "0.2.0"
-critical-section = "1.1.1"
+embassy-hal-internal = "0.3.0"
+critical-section = "1.2.0"
 rand_core = "0.9"
-embedded-io = "0.6.0"
-embedded-io-async = "0.6.0"
+embedded-io = "0.6.1"
+embedded-io-async = "0.6.1"
 bt-hci = "0.3"

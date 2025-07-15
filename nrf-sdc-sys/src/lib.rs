@@ -13,6 +13,7 @@ mod bindings {
         clippy::redundant_static_lifetimes,
         clippy::too_many_arguments,
         clippy::useless_transmute,
+        clippy::ptr_offset_with_cast,
         unused_parens
     )]
 
