@@ -8,6 +8,9 @@ repository = "https://github.com/alexmoon/nrf-sdc"
 version = "0.2.1"
 rust-version = "1.77"
 
+# Linked name in build.rs
+links = "nrf-mpsl-sys"
+
 include = [
     "./*.md",
     "build.rs",
@@ -19,6 +22,8 @@ include = [
     "third_party/nordic/nrfx/mdk/*.h",
     "third_party/nordic/nrfxlib/LICENSE",
     "third_party/nordic/nrfxlib/mpsl/**",
+    "third_party/nordic/nrfxlib/softdevice_controller/include/**",
+    "third_party/nordic/nrfxlib/softdevice_controller/lib/**"
 ]
 
 [features]

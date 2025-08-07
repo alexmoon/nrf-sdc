@@ -7,7 +7,7 @@ use std::cell::RefCell;
 use std::env;
 use std::fs::OpenOptions;
 use std::io::Write;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::rc::Rc;
 
 use bindgen::callbacks::ParseCallbacks;
@@ -228,7 +228,7 @@ impl Target {
     }
 }
 
-fn bindgen(target: &Target, mem_fns: Rc<RefCell<Vec<u8>>>) -> bindgen::Builder {
+fn bindgen(target: &Target, third_party_path: &Path, mem_fns: Rc<RefCell<Vec<u8>>>) -> bindgen::Builder {
     bindgen::Builder::default()
         .use_core()
         .size_t_is_usize(true)
@@ -236,10 +236,18 @@ fn bindgen(target: &Target, mem_fns: Rc<RefCell<Vec<u8>>>) -> bindgen::Builder {
         .clang_arg(format!("-mcpu={}", target.cpu))
         .clang_arg(format!("-mfloat-abi={}", target.float_abi))
         .clang_arg("-mthumb")
-        .clang_arg("-I./third_party/arm/CMSIS_5/CMSIS/Core/Include")
-        .clang_arg("-I./third_party/nordic/nrfx")
-        .clang_arg("-I./third_party/nordic/nrfx/mdk")
-        .clang_arg("-I./third_party/nordic/nrfxlib/softdevice_controller/include")
+        .clang_arg(format!(
+            "-I{}",
+            third_party_path.join("arm/CMSIS_5/CMSIS/Core/Include").display()
+        ))
+        .clang_arg(format!("-I{}", third_party_path.join("nordic/nrfx").display()))
+        .clang_arg(format!("-I{}", third_party_path.join("nordic/nrfx/mdk").display()))
+        .clang_arg(format!(
+            "-I{}",
+            third_party_path
+                .join("nordic/nrfxlib/softdevice_controller/include")
+                .display()
+        ))
         .clang_arg(format!("-D{}", target.chip))
         .clang_args(target.core.map(|x| format!("-D{}", x)))
         .allowlist_function("sdc_.*")
@@ -254,6 +262,9 @@ fn bindgen(target: &Target, mem_fns: Rc<RefCell<Vec<u8>>>) -> bindgen::Builder {
 }
 
 fn main() {
+    // Get the path of third party code from nrf-mpsl-sys
+    let third_party_path = PathBuf::from(env::var("DEP_NRF_MPSL_SYS_THIRD_PARTY_REPO_PATH").unwrap());
+
     let target = Target::new(Series::get(), env::var("TARGET").unwrap());
 
     // Only nrf52 series have different binaries depending on the role.
@@ -269,16 +280,61 @@ fn main() {
     };
 
     let mem_fns = Rc::new(RefCell::new(Vec::new()));
-    let bindings = bindgen(&target, mem_fns.clone())
-        .header("./third_party/nordic/nrfxlib/softdevice_controller/include/sdc.h")
-        .header("./third_party/nordic/nrfxlib/softdevice_controller/include/sdc_hci.h")
-        .header("./third_party/nordic/nrfxlib/softdevice_controller/include/sdc_hci_cmd_controller_baseband.h")
-        .header("./third_party/nordic/nrfxlib/softdevice_controller/include/sdc_hci_cmd_info_params.h")
-        .header("./third_party/nordic/nrfxlib/softdevice_controller/include/sdc_hci_cmd_le.h")
-        .header("./third_party/nordic/nrfxlib/softdevice_controller/include/sdc_hci_cmd_link_control.h")
-        .header("./third_party/nordic/nrfxlib/softdevice_controller/include/sdc_hci_cmd_status_params.h")
-        .header("./third_party/nordic/nrfxlib/softdevice_controller/include/sdc_hci_vs.h")
-        .header("./third_party/nordic/nrfxlib/softdevice_controller/include/sdc_soc.h")
+    let bindings = bindgen(&target, &third_party_path, mem_fns.clone())
+        .header(
+            third_party_path
+                .join("nordic/nrfxlib/softdevice_controller/include/sdc.h")
+                .to_str()
+                .unwrap(),
+        )
+        .header(
+            third_party_path
+                .join("nordic/nrfxlib/softdevice_controller/include/sdc_hci.h")
+                .to_str()
+                .unwrap(),
+        )
+        .header(
+            third_party_path
+                .join("nordic/nrfxlib/softdevice_controller/include/sdc_hci_cmd_controller_baseband.h")
+                .to_str()
+                .unwrap(),
+        )
+        .header(
+            third_party_path
+                .join("nordic/nrfxlib/softdevice_controller/include/sdc_hci_cmd_info_params.h")
+                .to_str()
+                .unwrap(),
+        )
+        .header(
+            third_party_path
+                .join("nordic/nrfxlib/softdevice_controller/include/sdc_hci_cmd_le.h")
+                .to_str()
+                .unwrap(),
+        )
+        .header(
+            third_party_path
+                .join("nordic/nrfxlib/softdevice_controller/include/sdc_hci_cmd_link_control.h")
+                .to_str()
+                .unwrap(),
+        )
+        .header(
+            third_party_path
+                .join("nordic/nrfxlib/softdevice_controller/include/sdc_hci_cmd_status_params.h")
+                .to_str()
+                .unwrap(),
+        )
+        .header(
+            third_party_path
+                .join("nordic/nrfxlib/softdevice_controller/include/sdc_hci_vs.h")
+                .to_str()
+                .unwrap(),
+        )
+        .header(
+            third_party_path
+                .join("nordic/nrfxlib/softdevice_controller/include/sdc_soc.h")
+                .to_str()
+                .unwrap(),
+        )
         .generate()
         .expect("Unable to generate bindings");
 
@@ -292,8 +348,8 @@ fn main() {
     file.write_all(&mem_fns.borrow())
         .expect("Couldn't write SDC_MEM_* functions");
 
-    let mut lib_path = PathBuf::from(env::var_os("CARGO_MANIFEST_DIR").unwrap());
-    lib_path.push("third_party/nordic/nrfxlib/softdevice_controller/lib");
+    let mut lib_path = third_party_path;
+    lib_path.push("nordic/nrfxlib/softdevice_controller/lib");
     lib_path.push(target.chip_family);
     lib_path.push(format!("{}-float", target.float_abi));
 
