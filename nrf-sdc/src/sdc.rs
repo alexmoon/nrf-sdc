@@ -924,7 +924,7 @@ mod controller_baseband {
         async fn exec(
             &self,
             cmd: &HostNumberOfCompletedPackets<'a>,
-        ) -> Result<<HostNumberOfCompletedPackets as bt_hci::cmd::SyncCmd>::Return, CmdError<Self::Error>> {
+        ) -> Result<<HostNumberOfCompletedPackets<'a> as bt_hci::cmd::SyncCmd>::Return, CmdError<Self::Error>> {
             const MAX_CONN_HANDLES: usize = 63;
             const N: usize = 1 + MAX_CONN_HANDLES + core::mem::size_of::<ConnHandleCompletedPackets>();
             let mut buf = [0; N];
@@ -1226,6 +1226,7 @@ mod le {
 
 /// Bluetooth HCI vendor specific commands.
 pub mod vendor {
+    #![allow(missing_docs)]
     use bt_hci::cmd::Error as CmdError;
     use bt_hci::controller::ControllerCmdSync;
     use bt_hci::param::{BdAddr, ChannelMap, ConnHandle, Duration};
