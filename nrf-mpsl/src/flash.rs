@@ -529,7 +529,7 @@ impl embedded_storage::nor_flash::ReadNorFlash for Flash<'_> {
     }
 }
 
-impl<'d> embedded_storage_async::nor_flash::ReadNorFlash for Flash<'d> {
+impl embedded_storage_async::nor_flash::ReadNorFlash for Flash<'_> {
     const READ_SIZE: usize = 1;
     async fn read(&mut self, offset: u32, bytes: &mut [u8]) -> Result<(), Self::Error> {
         Self::read(self, offset, bytes)
@@ -540,7 +540,7 @@ impl<'d> embedded_storage_async::nor_flash::ReadNorFlash for Flash<'d> {
     }
 }
 
-impl<'d> embedded_storage_async::nor_flash::NorFlash for Flash<'d> {
+impl embedded_storage_async::nor_flash::NorFlash for Flash<'_> {
     const WRITE_SIZE: usize = 4;
     const ERASE_SIZE: usize = PAGE_SIZE;
 
