@@ -7,4 +7,3 @@
 [submodule "nrf-mpsl-sys/third_party/nordic/nrfxlib"]
 	path = nrf-mpsl-sys/third_party/nordic/nrfxlib
 	url = https://github.com/nrfconnect/sdk-nrfxlib.git
-	branch = "v2.7-branch"
