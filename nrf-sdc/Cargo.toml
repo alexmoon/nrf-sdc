@@ -5,7 +5,7 @@ edition = "2021"
 license = "MIT OR Apache-2.0"
 name = "nrf-sdc"
 repository = "https://github.com/alexmoon/nrf-sdc"
-version = "0.2.0"
+version = "0.3.0"
 rust-version="1.77"
 
 [package.metadata.docs.rs]
@@ -36,12 +36,12 @@ log = ["dep:log", "nrf-mpsl/log", "bt-hci/log"]
 defmt = { version = "1", optional = true }
 log = { version = "0.4.27", optional = true }
 
-nrf-mpsl = { version = "0.2.0", path = "../nrf-mpsl" }
+nrf-mpsl = { version = "0.3.0", path = "../nrf-mpsl" }
 nrf-sdc-sys = { version = "0.2.0", path = "../nrf-sdc-sys" }
 
-embassy-nrf = "0.6.0"
+embassy-nrf = "0.7"
 embassy-sync = "0.7"
-embassy-hal-internal = "0.3.0"
+embassy-hal-internal = "0.3"
 critical-section = "1.2.0"
 rand_core = "0.9"
 embedded-io = "0.6.1"
