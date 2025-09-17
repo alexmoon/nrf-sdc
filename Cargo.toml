@@ -20,7 +20,7 @@ lto = 'fat'
 opt-level = 'z'
 overflow-checks = false
 
-#[patch.crates-io]
+[patch.crates-io]
 #embassy-executor = { path = "../embassy/embassy-executor" }
 #embassy-nrf = {path = "../embassy/embassy-nrf"}
 #embassy-sync = {path = "../embassy/embassy-sync"}
