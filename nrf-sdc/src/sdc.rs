@@ -614,8 +614,11 @@ impl<'d> SoftdeviceController<'d> {
         if let bt_hci::PacketKind::Event = kind {
             if let Ok((header, data)) = bt_hci::event::EventPacketHeader::from_hci_bytes(buf) {
                 if header.code == bt_hci::event::CommandComplete::EVENT_CODE {
-                    if let Ok(event) =
-                        bt_hci::event::CommandComplete::from_hci_bytes_complete(&data[..usize::from(header.params_len)])
+                    if let Ok(Ok(event)) =
+                        bt_hci::event::CommandComplete::from_hci_bytes_complete(&data[..usize::from(header.params_len)]).map(|e| {
+                            let e: Result<bt_hci::event::CommandCompleteWithStatus, _> = e.try_into();
+                            e
+                        })
                     {
                         if event.cmd_opcode == LeSetPeriodicAdvResponseData::OPCODE {
                             if let Ok(return_params) = event.return_params::<LeSetPeriodicAdvResponseData>() {
