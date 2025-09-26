@@ -1,6 +1,6 @@
 [package]
 authors = ["Alex Moon <alex@moonspot.org>"]
-description = "Rust bindings to the Nordic Multiprotocol Service Layer"
+description = "Low level rust bindings to the Nordic Multiprotocol Service Layer"
 edition = "2021"
 license-file = "third_party/nordic/nrfxlib/LICENSE"
 name = "nrf-mpsl-sys"
@@ -41,5 +41,5 @@ targets = ["thumbv7em-none-eabihf"]
 [dependencies]
 
 [build-dependencies]
-bindgen = "0.72.0"
+bindgen = "0.72.1"
 doxygen-rs = "0.4.2"

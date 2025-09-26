@@ -103,6 +103,61 @@ pub struct Peripherals<'d> {
     pub ppi_ch12: Peri<'d, peripherals::PPI_CH12>,
 }
 
+#[cfg(feature = "nrf54l")]
+/// Peripherals required for the SoftDevice Controller.
+///
+/// This is used to enforce at compile-time that the application does not use
+/// any peripherals that are required by the SDC.
+///
+/// # Panics
+///
+/// The following hardware restrictions must be followed. Panics may occur if they are not.
+///
+/// - Do not use the `CCM`, `AAR`, or `NVMC` peripherals directly.
+pub struct Peripherals<'d> {
+    /// PPI00 channel 1.
+    pub ppi00_ch1: Peri<'d, peripherals::PPI00_CH1>,
+    /// PPI00 channel 3.
+    pub ppi00_ch3: Peri<'d, peripherals::PPI00_CH3>,
+
+    /// PPI10 channel 1.
+    pub ppi10_ch1: Peri<'d, peripherals::PPI10_CH1>,
+    /// PPI10 channel 2.
+    pub ppi10_ch2: Peri<'d, peripherals::PPI10_CH2>,
+    /// PPI10 channel 3.
+    pub ppi10_ch3: Peri<'d, peripherals::PPI10_CH3>,
+    /// PPI10 channel 4.
+    pub ppi10_ch4: Peri<'d, peripherals::PPI10_CH4>,
+    /// PPI10 channel 5.
+    pub ppi10_ch5: Peri<'d, peripherals::PPI10_CH5>,
+    /// PPI10 channel 6.
+    pub ppi10_ch6: Peri<'d, peripherals::PPI10_CH6>,
+    /// PPI10 channel 7.
+    pub ppi10_ch7: Peri<'d, peripherals::PPI10_CH7>,
+    /// PPI10 channel 8.
+    pub ppi10_ch8: Peri<'d, peripherals::PPI10_CH8>,
+    /// PPI10 channel 9.
+    pub ppi10_ch9: Peri<'d, peripherals::PPI10_CH9>,
+    /// PPI10 channel 10.
+    pub ppi10_ch10: Peri<'d, peripherals::PPI10_CH10>,
+    /// PPI10 channel 11.
+    pub ppi10_ch11: Peri<'d, peripherals::PPI10_CH11>,
+
+    /// PPIB00 channel 1.
+    pub ppib00_ch1: Peri<'d, peripherals::PPIB00_CH1>,
+    /// PPIB00 channel 2.
+    pub ppib00_ch2: Peri<'d, peripherals::PPIB00_CH2>,
+    /// PPIB00 channel 3.
+    pub ppib00_ch3: Peri<'d, peripherals::PPIB00_CH3>,
+
+    /// PPIB10 channel 1.
+    pub ppib10_ch1: Peri<'d, peripherals::PPIB10_CH1>,
+    /// PPIB10 channel 2.
+    pub ppib10_ch2: Peri<'d, peripherals::PPIB10_CH2>,
+    /// PPIB10 channel 3.
+    pub ppib10_ch3: Peri<'d, peripherals::PPIB10_CH3>,
+}
+
 impl<'d> Peripherals<'d> {
     /// Creates a new `Peripherals` instance for nRF52 series devices.
     #[allow(clippy::too_many_arguments)]
@@ -163,6 +218,53 @@ impl<'d> Peripherals<'d> {
             ppi_ch10,
             ppi_ch11,
             ppi_ch12,
+        }
+    }
+
+    /// Creates a new `Peripherals` instance for nRF52 series devices.
+    #[allow(clippy::too_many_arguments)]
+    #[cfg(feature = "nrf54l")]
+    pub fn new(
+        ppi00_ch1: Peri<'d, peripherals::PPI00_CH1>,
+        ppi00_ch3: Peri<'d, peripherals::PPI00_CH3>,
+        ppi10_ch1: Peri<'d, peripherals::PPI10_CH1>,
+        ppi10_ch2: Peri<'d, peripherals::PPI10_CH2>,
+        ppi10_ch3: Peri<'d, peripherals::PPI10_CH3>,
+        ppi10_ch4: Peri<'d, peripherals::PPI10_CH4>,
+        ppi10_ch5: Peri<'d, peripherals::PPI10_CH5>,
+        ppi10_ch6: Peri<'d, peripherals::PPI10_CH6>,
+        ppi10_ch7: Peri<'d, peripherals::PPI10_CH7>,
+        ppi10_ch8: Peri<'d, peripherals::PPI10_CH8>,
+        ppi10_ch9: Peri<'d, peripherals::PPI10_CH9>,
+        ppi10_ch10: Peri<'d, peripherals::PPI10_CH10>,
+        ppi10_ch11: Peri<'d, peripherals::PPI10_CH11>,
+        ppib00_ch1: Peri<'d, peripherals::PPIB00_CH1>,
+        ppib00_ch2: Peri<'d, peripherals::PPIB00_CH2>,
+        ppib00_ch3: Peri<'d, peripherals::PPIB00_CH3>,
+        ppib10_ch1: Peri<'d, peripherals::PPIB10_CH1>,
+        ppib10_ch2: Peri<'d, peripherals::PPIB10_CH2>,
+        ppib10_ch3: Peri<'d, peripherals::PPIB10_CH3>,
+    ) -> Self {
+        Peripherals {
+            ppi00_ch1,
+            ppi00_ch3,
+            ppi10_ch1,
+            ppi10_ch2,
+            ppi10_ch3,
+            ppi10_ch4,
+            ppi10_ch5,
+            ppi10_ch6,
+            ppi10_ch7,
+            ppi10_ch8,
+            ppi10_ch9,
+            ppi10_ch10,
+            ppi10_ch11,
+            ppib00_ch1,
+            ppib00_ch2,
+            ppib00_ch3,
+            ppib10_ch1,
+            ppib10_ch2,
+            ppib10_ch3,
         }
     }
 }
@@ -468,6 +570,11 @@ impl Builder {
         self.support(raw::sdc_support_qos_channel_survey)
     }
 
+    /// Support power class 1.
+    pub fn support_le_power_class_1(self) -> Result<Self, Error> {
+        self.support(raw::sdc_support_le_power_class_1)
+    }
+
     /// Sets the default TX power.
     pub fn default_tx_power(self, dbm: i8) -> Result<Self, Error> {
         RetVal::from(unsafe { raw::sdc_default_tx_power_set(dbm) })
@@ -614,8 +721,12 @@ impl<'d> SoftdeviceController<'d> {
         if let bt_hci::PacketKind::Event = kind {
             if let Ok((header, data)) = bt_hci::event::EventPacketHeader::from_hci_bytes(buf) {
                 if header.code == bt_hci::event::CommandComplete::EVENT_CODE {
-                    if let Ok(event) =
+                    if let Ok(Ok(event)) =
                         bt_hci::event::CommandComplete::from_hci_bytes_complete(&data[..usize::from(header.params_len)])
+                            .map(|e| {
+                                let e: Result<bt_hci::event::CommandCompleteWithStatus, _> = e.try_into();
+                                e
+                            })
                     {
                         if event.cmd_opcode == LeSetPeriodicAdvResponseData::OPCODE {
                             if let Ok(return_params) = event.return_params::<LeSetPeriodicAdvResponseData>() {
@@ -1023,7 +1134,6 @@ mod le {
     sdc_cmd!(LeLongTermKeyRequestReply => sdc_hci_cmd_le_long_term_key_request_reply(x) -> y);
     sdc_cmd!(LeLongTermKeyRequestNegativeReply => sdc_hci_cmd_le_long_term_key_request_negative_reply(x) -> y);
     sdc_cmd!(LeReadSupportedStates => sdc_hci_cmd_le_read_supported_states() -> y);
-    sdc_cmd!(LeTestEnd => sdc_hci_cmd_le_test_end() -> y);
     sdc_cmd!(LeSetDataLength => sdc_hci_cmd_le_set_data_length(x) -> y);
     sdc_cmd!(LeReadSuggestedDefaultDataLength => sdc_hci_cmd_le_read_suggested_default_data_length() -> y);
     sdc_cmd!(LeWriteSuggestedDefaultDataLength => sdc_hci_cmd_le_write_suggested_default_data_length(x));

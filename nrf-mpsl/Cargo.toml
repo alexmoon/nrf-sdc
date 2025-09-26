@@ -1,6 +1,6 @@
 [package]
 authors = ["Alex Moon <alex@moonspot.org>"]
-description = "Crate name reserved for the nrf-sdc project"
+description = "High level rust bindings to the Nordic Multiprotocol Service Layer"
 edition = "2021"
 license = "MIT OR Apache-2.0"
 name = "nrf-mpsl"
@@ -22,9 +22,19 @@ nrf52832 = ["embassy-nrf/nrf52832", "nrf52"]
 nrf52833 = ["embassy-nrf/nrf52833", "nrf52"]
 nrf52840 = ["embassy-nrf/nrf52840", "nrf52"]
 nrf5340-net = ["embassy-nrf/nrf5340-net", "nrf53"]
+nrf54l05-app-ns = ["embassy-nrf/nrf54l05-app-ns", "nrf-mpsl-sys/nrf54l-ns", "nrf54l-ns"]
+nrf54l05-app-s = ["embassy-nrf/nrf54l05-app-s", "nrf-mpsl-sys/nrf54l-s", "nrf54l-s"]
+nrf54l10-app-ns = ["embassy-nrf/nrf54l10-app-ns", "nrf-mpsl-sys/nrf54l-ns", "nrf54l-ns"]
+nrf54l10-app-s = ["embassy-nrf/nrf54l10-app-s", "nrf-mpsl-sys/nrf54l-s", "nrf54l-s"]
+nrf54l15-app-ns = ["embassy-nrf/nrf54l15-app-ns", "nrf-mpsl-sys/nrf54l-ns", "nrf54l-ns"]
+nrf54l15-app-s = ["embassy-nrf/nrf54l15-app-s", "nrf-mpsl-sys/nrf54l-s", "nrf54l-s"]
+
 
 nrf52 = ["nrf-mpsl-sys/nrf52"]
 nrf53 = ["nrf-mpsl-sys/nrf53"]
+nrf54l-ns = ["_nrf54l"]
+nrf54l-s = ["_nrf54l"]
+_nrf54l = []
 
 critical-section-impl = ["critical-section/restore-state-bool"]
 fem = ["nrf-mpsl-sys/fem"]
@@ -39,10 +49,11 @@ critical-section = { version = "1.2", optional = true }
 embedded-io = "0.6.1"
 embedded-storage = "0.3.1"
 embedded-storage-async = "0.4.1"
+cfg-if = "1.0"
 
 cortex-m = "0.7.7"
 
-nrf-mpsl-sys = { version = "0.2.0", path = "../nrf-mpsl-sys" }
+nrf-mpsl-sys = { version = "0.2", path = "../nrf-mpsl-sys" }
 
-embassy-nrf = { version = "0.7", features = ["unstable-pac"]}
+embassy-nrf = { version = "0.8", features = ["unstable-pac"]}
 embassy-sync = { version = "0.7" }

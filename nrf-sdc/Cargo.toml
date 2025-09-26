@@ -1,6 +1,6 @@
 [package]
 authors = ["Alex Moon <alex@moonspot.org>"]
-description = "Crate name reserved for the nrf-sdc project"
+description = "High level rust bindings to the Nordic Softdevice Controller"
 edition = "2021"
 license = "MIT OR Apache-2.0"
 name = "nrf-sdc"
@@ -22,9 +22,16 @@ nrf52832 = ["nrf-mpsl/nrf52832", "nrf52"]
 nrf52833 = ["nrf-mpsl/nrf52833", "nrf52"]
 nrf52840 = ["nrf-mpsl/nrf52840", "nrf52"]
 nrf5340-net = ["nrf-mpsl/nrf5340-net", "nrf53"]
+nrf54l05-app-ns = ["nrf-mpsl/nrf54l05-app-ns", "nrf-sdc-sys/nrf54l-ns", "nrf54l"]
+nrf54l05-app-s = ["nrf-mpsl/nrf54l05-app-s", "nrf-sdc-sys/nrf54l-s", "nrf54l"]
+nrf54l10-app-ns = ["nrf-mpsl/nrf54l10-app-ns", "nrf-sdc-sys/nrf54l-ns", "nrf54l"]
+nrf54l10-app-s = ["nrf-mpsl/nrf54l10-app-s", "nrf-sdc-sys/nrf54l-s", "nrf54l"]
+nrf54l15-app-ns = ["nrf-mpsl/nrf54l15-app-ns", "nrf-sdc-sys/nrf54l-ns", "nrf54l"]
+nrf54l15-app-s = ["nrf-mpsl/nrf54l15-app-s", "nrf-sdc-sys/nrf54l-s", "nrf54l"]
 
 nrf52 = ["nrf-sdc-sys/nrf52"]
 nrf53 = ["nrf-sdc-sys/nrf53"]
+nrf54l = []
 
 peripheral = ["nrf-sdc-sys/peripheral"]
 central = ["nrf-sdc-sys/central"]
@@ -39,11 +46,11 @@ log = { version = "0.4.27", optional = true }
 nrf-mpsl = { version = "0.3.0", path = "../nrf-mpsl" }
 nrf-sdc-sys = { version = "0.2.0", path = "../nrf-sdc-sys" }
 
-embassy-nrf = "0.7"
+embassy-nrf = "0.8"
 embassy-sync = "0.7"
 embassy-hal-internal = "0.3"
 critical-section = "1.2.0"
 rand_core = "0.9"
 embedded-io = "0.6.1"
 embedded-io-async = "0.6.1"
-bt-hci = "0.5"
+bt-hci = "0.6"

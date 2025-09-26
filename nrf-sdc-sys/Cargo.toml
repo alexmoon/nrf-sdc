@@ -1,6 +1,6 @@
 [package]
 authors = ["Alex Moon <alex@moonspot.org>"]
-description = "Rust bindings to the Nordic Softdevice Controller"
+description = "Low level rust bindings to the Nordic Softdevice Controller"
 edition = "2021"
 license-file = "third_party/nordic/nrfxlib/LICENSE"
 name = "nrf-sdc-sys"
