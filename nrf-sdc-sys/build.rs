@@ -1,4 +1,4 @@
-//! Build Script for nrf-mpsl-sys
+//! Build Script for nrf-sdc-sys
 //!
 //! Calls out to bindgen to generate a Rust crate from the Nordic header
 //! files.

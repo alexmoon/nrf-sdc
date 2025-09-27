@@ -71,3 +71,9 @@ cargo clippy -p nrf-sdc --features nrf52840,peripheral
 cargo clippy -p nrf-sdc --features nrf52840,central
 cargo clippy -p nrf-sdc --features nrf52840,peripheral,central,defmt
 cargo clippy -p nrf-sdc --features nrf52840,peripheral,central,log
+
+cargo clippy -p nrf-802154-sys --features nrf52
+cargo clippy -p nrf-802154-sys --features nrf53 --target thumbv8m.main-none-eabi
+cargo clippy -p nrf-802154-sys --features nrf54l-ns --target thumbv8m.main-none-eabihf
+cargo clippy -p nrf-802154-sys --features nrf54l-s --target thumbv8m.main-none-eabihf
+cargo clippy -p nrf-802154-sys --features nrf54h --target thumbv8m.main-none-eabihf

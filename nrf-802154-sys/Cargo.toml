@@ -1,0 +1,60 @@
+[package]
+authors = ["Alex Moon <alex@moonspot.org>"]
+description = "Rust bindings to the Nordic 802.15.4 Radio Driver"
+edition = "2021"
+license-file = "third_party/nordic/nrfxlib/LICENSE"
+name = "nrf-802154-sys"
+repository = "https://github.com/alexmoon/nrf-sdc"
+version = "0.1.0"
+rust-version = "1.77"
+
+include = [
+    "./*.md",
+    "build.rs",
+    "src/**",
+    "third_party/arm/CMSIS_5/LICENSE.txt",
+    "third_party/arm/CMSIS_5/CMSIS/Core/Include/core_cm4.h",
+    "third_party/arm/CMSIS_5/CMSIS/Core/Include/cmsis_version.h",
+    "third_party/arm/CMSIS_5/CMSIS/Core/Include/cmsis_compiler.h",
+    "third_party/arm/CMSIS_5/CMSIS/Core/Include/cmsis_gcc.h",
+    "third_party/arm/CMSIS_5/CMSIS/Core/Include/mpu_armv7.h",
+    "third_party/arm/CMSIS_5/CMSIS/Core/Include/core_cm33.h",
+    "third_party/arm/CMSIS_5/CMSIS/Core/Include/mpu_armv8.h",
+    "third_party/nordic/nrfx/LICENSE",
+    "third_party/nordic/nrfx/mdk/nrf.h",
+    "third_party/nordic/nrfx/mdk/nrf52840.h",
+    "third_party/nordic/nrfx/mdk/system_nrf52840.h",
+    "third_party/nordic/nrfx/mdk/nrf52840_bitfields.h",
+    "third_party/nordic/nrfx/mdk/nrf51_to_nrf52840.h",
+    "third_party/nordic/nrfx/mdk/nrf52_to_nrf52840.h",
+    "third_party/nordic/nrfx/mdk/nrf52840_name_change.h",
+    "third_party/nordic/nrfx/mdk/compiler_abstraction.h",
+    "third_party/nordic/nrfx/mdk/nrf5340_network.h",
+    "third_party/nordic/nrfx/mdk/system_nrf5340_network.h",
+    "third_party/nordic/nrfx/mdk/nrf5340_network_bitfields.h",
+    "third_party/nordic/nrfx/mdk/nrf5340_network_name_change.h",
+    "third_party/nordic/nrfxlib/LICENSE",
+    "third_party/nordic/nrfxlib/softdevice_controller/include/**",
+    "third_party/nordic/nrfxlib/softdevice_controller/lib/**",
+]
+
+[package.metadata.docs.rs]
+features = ["nrf52"]
+default-target = "thumbv7em-none-eabihf"
+targets = ["thumbv7em-none-eabihf"]
+
+[features]
+nrf52 = ["nrf-mpsl-sys/nrf52"]
+nrf53 = ["nrf-mpsl-sys/nrf53"]
+nrf54l-ns = ["nrf-mpsl-sys/nrf54l-ns"]
+nrf54l-s = ["nrf-mpsl-sys/nrf54l-s"]
+nrf54h = ["nrf-mpsl-sys/nrf54h"]
+
+[dependencies]
+nrf-mpsl-sys = { version = "0.2.0", path = "../nrf-mpsl-sys" }
+
+[build-dependencies]
+bindgen = "0.72.0"
+doxygen-rs = "0.4.2"
+winnow = "0.7.12"
+cmake = "0.1.54"

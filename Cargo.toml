@@ -6,6 +6,7 @@ members = [
     "nrf-mpsl-sys",
     "nrf-sdc",
     "nrf-sdc-sys",
+    "nrf-802154-sys",
 ]
 
 [profile.dev]
