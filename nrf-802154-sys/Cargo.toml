@@ -8,6 +8,7 @@ repository = "https://github.com/alexmoon/nrf-sdc"
 version = "0.1.0"
 rust-version = "1.77"
 
+# TODO: Double-check that the below is good-enough for the 802.15.4 driver build (both bindgen and cmake)
 include = [
     "./*.md",
     "build.rs",
@@ -34,8 +35,7 @@ include = [
     "third_party/nordic/nrfx/mdk/nrf5340_network_bitfields.h",
     "third_party/nordic/nrfx/mdk/nrf5340_network_name_change.h",
     "third_party/nordic/nrfxlib/LICENSE",
-    "third_party/nordic/nrfxlib/softdevice_controller/include/**",
-    "third_party/nordic/nrfxlib/softdevice_controller/lib/**",
+    "third_party/nordic/nrfxlib/nrf-802154/**",
 ]
 
 [package.metadata.docs.rs]

@@ -748,6 +748,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "nrf-802154"
+version = "0.1.0"
+dependencies = [
+ "critical-section",
+ "defmt 1.0.1",
+ "embassy-nrf",
+ "log",
+ "nrf-802154-sys",
+ "nrf-mpsl",
+]
+
+[[package]]
 name = "nrf-802154-sys"
 version = "0.1.0"
 dependencies = [

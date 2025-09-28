@@ -1,0 +1,45 @@
+[package]
+authors = ["Alex Moon <alex@moonspot.org>"]
+description = "802.15.4 Radio Driver for NRF"
+edition = "2021"
+license = "MIT OR Apache-2.0"
+name = "nrf-802154"
+repository = "https://github.com/alexmoon/nrf-sdc"
+version = "0.1.0"
+rust-version="1.77"
+
+[package.metadata.docs.rs]
+features = ["nrf52840"]
+default-target = "thumbv7em-none-eabihf"
+targets = ["thumbv7em-none-eabihf"]
+
+[features]
+nrf52805 = ["nrf-mpsl/nrf52805", "nrf52"]
+nrf52810 = ["nrf-mpsl/nrf52810", "nrf52"]
+nrf52811 = ["nrf-mpsl/nrf52811", "nrf52"]
+nrf52820 = ["nrf-mpsl/nrf52820", "nrf52"]
+nrf52832 = ["nrf-mpsl/nrf52832", "nrf52"]
+nrf52833 = ["nrf-mpsl/nrf52833", "nrf52"]
+nrf52840 = ["nrf-mpsl/nrf52840", "nrf52"]
+nrf5340-net = ["nrf-mpsl/nrf5340-net", "nrf53"]
+
+nrf52 = ["nrf-802154-sys/nrf52"]
+nrf53 = ["nrf-802154-sys/nrf53"]
+
+defmt = ["dep:defmt", "nrf-mpsl/defmt"]
+log = ["dep:log", "nrf-mpsl/log"]
+
+[dependencies]
+defmt = { version = "1", optional = true }
+log = { version = "0.4.27", optional = true }
+
+nrf-mpsl = { version = "0.3.0", path = "../nrf-mpsl" }
+nrf-802154-sys = { version = "0.1.0", path = "../nrf-802154-sys" }
+
+embassy-nrf = "0.7"
+#embassy-sync = "0.7"
+#embassy-hal-internal = "0.3"
+critical-section = "1.2.0"
+#rand_core = "0.9"
+#embedded-io = "0.6.1"
+#embedded-io-async = "0.6.1"

@@ -7,6 +7,7 @@ members = [
     "nrf-sdc",
     "nrf-sdc-sys",
     "nrf-802154-sys",
+    "nrf-802154",
 ]
 
 [profile.dev]
