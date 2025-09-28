@@ -163,6 +163,19 @@ fn build(target: &Target) {
         .collect::<Vec<_>>()
         .join(" ");
 
+    // NOTE:
+    // This is a terrible hack for (seemingly)
+    // `nrf_802154_swi.c` NOT including `nrf_802154_peripherals.h` directly or indirectly
+    // while it should, as it references `NRF_802154_EGU_INSTANCE` which is defined by that header.
+    let nrf_802154_egu_instance_workaround = format!(
+        "-DNRF_802154_EGU_INSTANCE={}",
+        match Series::get() {
+            Series::Nrf52 | Series::Nrf53 => "NRF_EGU0",
+            Series::Nrf54l | Series::Nrf54lNs => "NRF_EGU10",
+            Series::Nrf54h => "NRF_EGU020",
+        }
+    );
+
     let nrf_target_args = target
         .core
         .map(|x| format!("-D{}", x))
@@ -180,8 +193,8 @@ fn build(target: &Target) {
         .define(
             "CMAKE_C_FLAGS",
             format!(
-                "-Werror=implicit-function-declaration -fshort-enums -DNRF_802154_INTERNAL_SWI_IRQ_HANDLING=0 {} {}",
-                nrf_target_args, include_paths_args
+                "-Werror=implicit-function-declaration -fshort-enums -DNRF_802154_INTERNAL_SWI_IRQ_HANDLING=0 {} {} {}",
+                nrf_802154_egu_instance_workaround, nrf_target_args, include_paths_args
             ),
         )
         .define("CMAKE_C_FLAGS_RELEASE", "-O3 -DNDEBUG")
