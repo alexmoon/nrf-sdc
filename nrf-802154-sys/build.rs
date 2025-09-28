@@ -190,6 +190,8 @@ fn build(target: &Target) {
         .define("CMAKE_TRY_COMPILE_TARGET_TYPE", "STATIC_LIBRARY")
         .define("CMAKE_C_COMPILER", "clang")
         .define("CMAKE_C_COMPILER_TARGET", &target.target)
+        .define("CMAKE_CXX_COMPILER", "clang")
+        .define("CMAKE_CXX_COMPILER_TARGET", &target.target)
         .define("BUILD_SHARED_LIBS", "OFF")
         .define("BUILD_TESTING", "OFF")
         .build_target("nrf-802154-driver")
