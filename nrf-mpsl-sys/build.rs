@@ -131,6 +131,8 @@ fn bindgen(target: &Target) -> bindgen::Builder {
         .clang_arg("-I./include")
         .clang_arg("-I./third_party/arm/CMSIS_5/CMSIS/Core/Include")
         .clang_arg("-I./third_party/nordic/nrfx/mdk")
+        .clang_arg("-I./third_party/nordic/nrfx/templates")
+        .clang_arg("-I./third_party/nordic/nrfx")
         .clang_arg("-I./third_party/nordic/nrfxlib/mpsl/include")
         .clang_arg("-I./third_party/nordic/nrfxlib/mpsl/fem/include")
         .clang_arg(format!("-D{}", target.chip))

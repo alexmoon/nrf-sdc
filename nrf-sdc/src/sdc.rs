@@ -1027,7 +1027,6 @@ mod le {
     sdc_cmd!(LeLongTermKeyRequestReply => sdc_hci_cmd_le_long_term_key_request_reply(x) -> y);
     sdc_cmd!(LeLongTermKeyRequestNegativeReply => sdc_hci_cmd_le_long_term_key_request_negative_reply(x) -> y);
     sdc_cmd!(LeReadSupportedStates => sdc_hci_cmd_le_read_supported_states() -> y);
-    sdc_cmd!(LeTestEnd => sdc_hci_cmd_le_test_end() -> y);
     sdc_cmd!(LeSetDataLength => sdc_hci_cmd_le_set_data_length(x) -> y);
     sdc_cmd!(LeReadSuggestedDefaultDataLength => sdc_hci_cmd_le_read_suggested_default_data_length() -> y);
     sdc_cmd!(LeWriteSuggestedDefaultDataLength => sdc_hci_cmd_le_write_suggested_default_data_length(x));
