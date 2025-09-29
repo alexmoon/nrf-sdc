@@ -29,7 +29,7 @@ bind_interrupts!(struct Irqs {
 
 fn build_sdc<'d, const N: usize>(
     p: nrf_sdc::Peripherals<'d>,
-    rng: &'d mut Rng<RNG, Async>,
+    rng: &'d mut Rng<Async>,
     mpsl: &'d MultiprotocolServiceLayer,
     mem: &'d mut sdc::Mem<N>,
 ) -> Result<nrf_sdc::SoftdeviceController<'d>, nrf_sdc::Error> {
