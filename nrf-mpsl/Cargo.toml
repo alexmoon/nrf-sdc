@@ -1,6 +1,6 @@
 [package]
 authors = ["Alex Moon <alex@moonspot.org>"]
-description = "Crate name reserved for the nrf-sdc project"
+description = "High level rust bindings to the Nordic Multiprotocol Service Layer"
 edition = "2021"
 license = "MIT OR Apache-2.0"
 name = "nrf-mpsl"
