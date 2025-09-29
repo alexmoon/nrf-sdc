@@ -186,7 +186,7 @@ impl Target {
             (Series::Nrf52, "thumbv7em-none-eabihf") => ("cortex-m4", "hard", "nrf52", "NRF52840_XXAA", None),
             (Series::Nrf52, "thumbv7em-none-eabi") => ("cortex-m4", "soft", "nrf52", "NRF52840_XXAA", None),
             (Series::Nrf53, "thumbv8m.main-none-eabi") => {
-                ("cortex-m33+nodsp", "soft", "nrf53", "NRF5340_XXAA", Some("NRF_NETWORK"))
+                ("cortex-m33+nodsp", "soft", "nrf53", "NRF5340_XXAA_NETWORK", None)
             }
             (Series::Nrf54l, "thumbv8m.main-none-eabihf") => {
                 ("cortex-m33", "hard", "nrf54l", "NRF54L15_XXAA", Some("NRF_APPLICATION"))
