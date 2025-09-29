@@ -37,9 +37,5 @@ nrf-mpsl = { version = "0.3.0", path = "../nrf-mpsl" }
 nrf-802154-sys = { version = "0.1.0", path = "../nrf-802154-sys" }
 
 embassy-nrf = "0.7"
-#embassy-sync = "0.7"
-#embassy-hal-internal = "0.3"
+embassy-sync = "0.7"
 critical-section = "1.2.0"
-#rand_core = "0.9"
-#embedded-io = "0.6.1"
-#embedded-io-async = "0.6.1"

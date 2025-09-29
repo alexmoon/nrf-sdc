@@ -754,6 +754,7 @@ dependencies = [
  "critical-section",
  "defmt 1.0.1",
  "embassy-nrf",
+ "embassy-sync",
  "log",
  "nrf-802154-sys",
  "nrf-mpsl",
