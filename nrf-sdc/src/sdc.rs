@@ -259,8 +259,8 @@ impl Builder {
             raw::SDC_CFG_TYPE_BUFFER_CFG,
             sdc_cfg_t {
                 buffer_cfg: sdc_cfg_buffer_cfg_t {
-                    tx_packet_size,
-                    rx_packet_size,
+                    tx_packet_size: tx_packet_size as u8,
+                    rx_packet_size: rx_packet_size as u8,
                     tx_packet_count,
                     rx_packet_count,
                 },
@@ -989,7 +989,6 @@ mod le {
 
     // Extended advertising commands
     sdc_cmd!(LeSetExtAdvParams => raw_cmd_params_return(sdc_hci_cmd_le_set_ext_adv_params, LeSetExtAdvParams) true);
-    sdc_cmd!(LeSetExtAdvParamsV2 => raw_cmd_params_return(sdc_hci_cmd_le_set_ext_adv_params_v2, LeSetExtAdvParamsV2) true);
     sdc_cmd!(LeReadMaxAdvDataLength => raw_cmd_return(sdc_hci_cmd_le_read_max_adv_data_length) true);
     sdc_cmd!(LeReadNumberOfSupportedAdvSets => raw_cmd_return(sdc_hci_cmd_le_read_number_of_supported_adv_sets) true);
     sdc_cmd!(LeRemoveAdvSet => raw_cmd_params(sdc_hci_cmd_le_remove_adv_set, LeRemoveAdvSet) true);
@@ -1059,7 +1058,6 @@ mod le {
     sdc_cmd!(LeSetTransmitPowerReportingEnable => sdc_hci_cmd_le_set_transmit_power_reporting_enable(x) -> y);
     sdc_cmd!(LeSetDataRelatedAddrChanges => sdc_hci_cmd_le_set_data_related_address_changes(x));
     sdc_cmd!(LeSetHostFeature => sdc_hci_cmd_le_set_host_feature(x));
-    sdc_cmd!(LeSetHostFeatureV2 => sdc_hci_cmd_le_set_host_feature_v2(x));
 
     impl<'a, 'd> ControllerCmdSync<LeSetExtAdvData<'a>> for super::SoftdeviceController<'d> {
         async fn exec(&self, cmd: &LeSetExtAdvData<'a>) -> Result<(), CmdError<nrf_mpsl::Error>> {
