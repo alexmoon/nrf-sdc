@@ -468,6 +468,11 @@ impl Builder {
         self.support(raw::sdc_support_qos_channel_survey)
     }
 
+    /// Support power class 1.
+    pub fn support_le_power_class_1(self) -> Result<Self, Error> {
+        self.support(raw::sdc_support_le_power_class_1)
+    }
+
     /// Sets the default TX power.
     pub fn default_tx_power(self, dbm: i8) -> Result<Self, Error> {
         RetVal::from(unsafe { raw::sdc_default_tx_power_set(dbm) })
