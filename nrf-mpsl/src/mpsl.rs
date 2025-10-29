@@ -160,6 +160,11 @@ cfg_if! {
         use embassy_nrf::interrupt::typelevel::TIMER20;
         use embassy_nrf::interrupt::typelevel::GRTC_3;
         use embassy_nrf::interrupt::typelevel::RADIO_0;
+
+        type RadioIrq = RADIO_0;
+        type RtcIrq = GRTC_3;
+        type TimerIrq = TIMER10;
+
         /// Foo
         pub struct Peripherals<'d> {
             /// Real-time counter 0.
