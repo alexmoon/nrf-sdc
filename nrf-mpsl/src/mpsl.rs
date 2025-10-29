@@ -23,6 +23,11 @@ cfg_if! {
         use embassy_nrf::interrupt::typelevel::TIMER0;
         use embassy_nrf::interrupt::typelevel::RTC0;
         use embassy_nrf::interrupt::typelevel::RADIO;
+
+        type RadioIrq = RADIO;
+        type RtcIrq = RTC0;
+        type TimerIrq = TIMER0;
+
         /// Peripherals required for the multiprotocol service layer.
         ///
         /// This is used to enforce at compile-time that the application does not use
@@ -104,6 +109,10 @@ cfg_if! {
         use embassy_nrf::interrupt::typelevel::TIMER0;
         use embassy_nrf::interrupt::typelevel::RADIO;
         use embassy_nrf::interrupt::typelevel::RTC0;
+
+        type RadioIrq = RADIO;
+        type RtcIrq = RTC0;
+        type TimerIrq = TIMER0;
         /// Foo
         pub struct Peripherals<'d> {
             /// Real-time counter 0.
@@ -230,16 +239,13 @@ impl<'d> MultiprotocolServiceLayer<'d> {
     /// Initializes the multiprotocol service layer.
     ///
     /// This function should only be called once.
-    pub fn new<T, I, RADIO, TIMER, RTC>(p: Peripherals<'d>, _irq: I, clock_cfg: raw::mpsl_clock_lfclk_cfg_t) -> Result<Self, Error>
+    pub fn new<T, I>(p: Peripherals<'d>, _irq: I, clock_cfg: raw::mpsl_clock_lfclk_cfg_t) -> Result<Self, Error>
     where
         T: Interrupt,
-        RADIO: Interrupt,
-        TIMER: Interrupt,
-        RTC: Interrupt,
         I: Binding<T, LowPrioInterruptHandler>
-        + Binding<RADIO, HighPrioInterruptHandler>
-        + Binding<TIMER, HighPrioInterruptHandler>
-        + Binding<RTC, HighPrioInterruptHandler>
+        + Binding<RadioIrq, HighPrioInterruptHandler>
+        + Binding<TimerIrq, HighPrioInterruptHandler>
+        + Binding<RtcIrq, HighPrioInterruptHandler>
         + Binding<interrupt::typelevel::CLOCK_POWER, ClockInterruptHandler>,
     {
         // Peripherals are used by the MPSL library, so we merely take ownership and ignore them
@@ -251,9 +257,9 @@ impl<'d> MultiprotocolServiceLayer<'d> {
         let ret = unsafe { raw::mpsl_init(&clock_cfg, raw::IRQn_Type::from(T::IRQ.number()), Some(assert_handler)) };
         RetVal::from(ret).to_result()?;
 
-        RADIO::set_priority(Priority::P0);
-        RTC::set_priority(Priority::P0);
-        TIMER::set_priority(Priority::P0);
+        RadioIrq::set_priority(Priority::P0);
+        RtcIrq::set_priority(Priority::P0);
+        TimerIrq::set_priority(Priority::P0);
         CLOCK_POWER::set_priority(Priority::P4);
 
 
@@ -263,7 +269,7 @@ impl<'d> MultiprotocolServiceLayer<'d> {
     /// Initializes the multiprotocol service layer with timeslot support.
     ///
     /// This function should only be called once.
-    pub fn with_timeslots<T, I, RADIO, TIMER, RTC, const SLOTS: usize>(
+    pub fn with_timeslots<T, I, const SLOTS: usize>(
         p: Peripherals<'d>,
         _irq: I,
         clock_cfg: raw::mpsl_clock_lfclk_cfg_t,
@@ -271,13 +277,10 @@ impl<'d> MultiprotocolServiceLayer<'d> {
     ) -> Result<Self, Error>
     where
         T: Interrupt,
-        RADIO: Interrupt,
-        TIMER: Interrupt,
-        RTC: Interrupt,
         I: Binding<T, LowPrioInterruptHandler>
-        + Binding<RADIO, HighPrioInterruptHandler>
-        + Binding<TIMER, HighPrioInterruptHandler>
-        + Binding<RTC, HighPrioInterruptHandler>
+        + Binding<RadioIrq, HighPrioInterruptHandler>
+        + Binding<TimerIrq, HighPrioInterruptHandler>
+        + Binding<RtcIrq, HighPrioInterruptHandler>
         + Binding<interrupt::typelevel::CLOCK_POWER, ClockInterruptHandler>,
 
     {
