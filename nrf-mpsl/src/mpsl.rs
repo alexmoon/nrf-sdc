@@ -4,9 +4,10 @@ use core::future::poll_fn;
 use core::marker::PhantomData;
 use core::mem::MaybeUninit;
 use core::task::Poll;
+use cfg_if::cfg_if;
 
 use cortex_m::interrupt::InterruptNumber as _;
-use embassy_nrf::interrupt::typelevel::{Binding, Handler, Interrupt, CLOCK_POWER, RADIO, RTC0, TIMER0};
+use embassy_nrf::interrupt::typelevel::{Binding, Handler, Interrupt, CLOCK_POWER};
 use embassy_nrf::interrupt::Priority;
 use embassy_nrf::{interrupt, peripherals, Peri};
 use embassy_sync::waitqueue::AtomicWaker;
@@ -16,91 +17,191 @@ use crate::{hfclk, raw, temp};
 
 static WAKER: AtomicWaker = AtomicWaker::new();
 
-/// Peripherals required for the multiprotocol service layer.
-///
-/// This is used to enforce at compile-time that the application does not use
-/// any peripherals that are required by the MPSL.
-///
-/// # Panics
-///
-/// The following hardware restrictions must be followed. Panics may occur if they are not.
-///
-/// - Do not use `cpsid/cpsie` directly for globally disabling/enabling interrupts,
-///   as this can disrupt timing. Do not use the `critical-section` implementation of
-///   `cortex-m`, use the one from this crate instead.
-/// - Do not use `NVMC` directly as this causes the CPU to stall during flash operations.
-///   Use the [`Flash`](crate::Flash) implementation from this crate instead, which
-///   uses the timeslot system to schedule flash operations at times that don't disrupt radio.
-/// - Do not use 'ECB' directly.
-/// - Do not use `RADIO` directly, except during timeslots you've allocated.
-/// - Do not use `CLOCK_POWER` directly, use the functions provided by this crate instead.
-pub struct Peripherals<'d> {
-    /// Real-time counter 0.
-    pub rtc0: Peri<'d, peripherals::RTC0>,
-    /// Timer 0.
-    pub timer0: Peri<'d, peripherals::TIMER0>,
-    /// Timer 1.
-    #[cfg(feature = "nrf53")]
-    pub timer1: Peri<'d, peripherals::TIMER1>,
-    /// Temperature sensor.
-    pub temp: Peri<'d, peripherals::TEMP>,
 
-    /// PPI channel 19.
-    #[cfg(feature = "nrf52")]
-    pub ppi_ch19: Peri<'d, peripherals::PPI_CH19>,
-    /// PPI channel 30.
-    #[cfg(feature = "nrf52")]
-    pub ppi_ch30: Peri<'d, peripherals::PPI_CH30>,
-    /// PPI channel 31.
-    #[cfg(feature = "nrf52")]
-    pub ppi_ch31: Peri<'d, peripherals::PPI_CH31>,
-    /// PPI channel 0.
-    #[cfg(feature = "nrf53")]
-    pub ppi_ch0: Peri<'d, peripherals::PPI_CH0>,
-    /// PPI channel 1.
-    #[cfg(feature = "nrf53")]
-    pub ppi_ch1: Peri<'d, peripherals::PPI_CH1>,
-    /// PPI channel 2.
-    #[cfg(feature = "nrf53")]
-    pub ppi_ch2: Peri<'d, peripherals::PPI_CH2>,
-}
+cfg_if! {
+    if #[cfg(feature = "nrf52")] {
+        use embassy_nrf::interrupt::typelevel::TIMER0;
+        use embassy_nrf::interrupt::typelevel::RTC0;
+        use embassy_nrf::interrupt::typelevel::RADIO;
+        /// Peripherals required for the multiprotocol service layer.
+        ///
+        /// This is used to enforce at compile-time that the application does not use
+        /// any peripherals that are required by the MPSL.
+        ///
+        /// # Panics
+        ///
+        /// The following hardware restrictions must be followed. Panics may occur if they are not.
+        ///
+        /// - Do not use `cpsid/cpsie` directly for globally disabling/enabling interrupts,
+        ///   as this can disrupt timing. Do not use the `critical-section` implementation of
+        ///   `cortex-m`, use the one from this crate instead.
+        /// - Do not use `NVMC` directly as this causes the CPU to stall during flash operations.
+        ///   Use the [`Flash`](crate::Flash) implementation from this crate instead, which
+        ///   uses the timeslot system to schedule flash operations at times that don't disrupt radio.
+        /// - Do not use 'ECB' directly.
+        /// - Do not use `RADIO` directly, except during timeslots you've allocated.
+        /// - Do not use `CLOCK_POWER` directly, use the functions provided by this crate instead.
+        pub struct Peripherals<'d> {
+            /// Real-time counter 0.
+            pub rtc0: Peri<'d, peripherals::RTC0>,
+            /// Timer 0.
+            pub timer0: Peri<'d, peripherals::TIMER0>,
+            /// Timer 1.
+            /// Temperature sensor.
+            pub temp: Peri<'d, peripherals::TEMP>,
 
-impl<'d> Peripherals<'d> {
-    /// Creates a new `Peripherals` instance.
-    #[allow(clippy::too_many_arguments)]
-    pub fn new(
-        rtc0: Peri<'d, peripherals::RTC0>,
-        timer0: Peri<'d, peripherals::TIMER0>,
-        #[cfg(feature = "nrf53")] timer1: Peri<'d, peripherals::TIMER1>,
-        temp: Peri<'d, peripherals::TEMP>,
-        #[cfg(feature = "nrf52")] ppi_ch19: Peri<'d, peripherals::PPI_CH19>,
-        #[cfg(feature = "nrf52")] ppi_ch30: Peri<'d, peripherals::PPI_CH30>,
-        #[cfg(feature = "nrf52")] ppi_ch31: Peri<'d, peripherals::PPI_CH31>,
-        #[cfg(feature = "nrf53")] ppi_ch0: Peri<'d, peripherals::PPI_CH0>,
-        #[cfg(feature = "nrf53")] ppi_ch1: Peri<'d, peripherals::PPI_CH1>,
-        #[cfg(feature = "nrf53")] ppi_ch2: Peri<'d, peripherals::PPI_CH2>,
-    ) -> Self {
-        Peripherals {
-            rtc0,
-            timer0,
-            #[cfg(feature = "nrf53")]
-            timer1,
-            temp,
-            #[cfg(feature = "nrf52")]
-            ppi_ch19,
-            #[cfg(feature = "nrf52")]
-            ppi_ch30,
-            #[cfg(feature = "nrf52")]
-            ppi_ch31,
-            #[cfg(feature = "nrf53")]
-            ppi_ch0,
-            #[cfg(feature = "nrf53")]
-            ppi_ch1,
-            #[cfg(feature = "nrf53")]
-            ppi_ch2,
+            /// PPI channel 19.
+            pub ppi_ch19: Peri<'d, peripherals::PPI_CH19>,
+            /// PPI channel 30.
+            pub ppi_ch30: Peri<'d, peripherals::PPI_CH30>,
+            /// PPI channel 31.
+            pub ppi_ch31: Peri<'d, peripherals::PPI_CH31>,
+        }
+
+        impl<'d> Peripherals<'d> {
+            /// Creates a new `Peripherals` instance.
+            #[allow(clippy::too_many_arguments)]
+            pub fn new(
+                rtc0: Peri<'d, peripherals::RTC0>,
+                timer0: Peri<'d, peripherals::TIMER0>,
+                temp: Peri<'d, peripherals::TEMP>,
+                ppi_ch19: Peri<'d, peripherals::PPI_CH19>,
+                ppi_ch30: Peri<'d, peripherals::PPI_CH30>,
+                ppi_ch31: Peri<'d, peripherals::PPI_CH31>,
+            ) -> Self {
+                Peripherals {
+                    rtc0,
+                    timer0,
+                    temp,
+                    ppi_ch19,
+                    ppi_ch30,
+                    ppi_ch31,
+                }
+            }
+        }
+
+        /// High priority interrupt handler.
+        pub struct HighPrioInterruptHandler;
+
+        impl Handler<TIMER0> for HighPrioInterruptHandler {
+            unsafe fn on_interrupt() {
+                raw::MPSL_IRQ_TIMER0_Handler();
+            }
+        }
+
+        impl Handler<RADIO> for HighPrioInterruptHandler {
+            unsafe fn on_interrupt() {
+                raw::MPSL_IRQ_RADIO_Handler();
+            }
+        }
+
+        impl Handler<RTC0> for HighPrioInterruptHandler {
+            unsafe fn on_interrupt() {
+                raw::MPSL_IRQ_RTC0_Handler();
+            }
+        }
+    } else if #[cfg(feature = "nrf53")] {
+        use embassy_nrf::interrupt::typelevel::TIMER0;
+        use embassy_nrf::interrupt::typelevel::RADIO;
+        use embassy_nrf::interrupt::typelevel::RTC0;
+        /// Foo
+        pub struct Peripherals<'d> {
+            /// Real-time counter 0.
+            pub rtc0: Peri<'d, peripherals::RTC0>,
+            /// Timer 0.
+            pub timer0: Peri<'d, peripherals::TIMER0>,
+            /// Timer 1.
+            pub timer1: Peri<'d, peripherals::TIMER1>,
+            /// Temperature sensor.
+            pub temp: Peri<'d, peripherals::TEMP>,
+
+            /// PPI channel 0.
+            pub ppi_ch0: Peri<'d, peripherals::PPI_CH0>,
+            /// PPI channel 1.
+            pub ppi_ch1: Peri<'d, peripherals::PPI_CH1>,
+            /// PPI channel 2.
+            pub ppi_ch2: Peri<'d, peripherals::PPI_CH2>,
+        }
+
+        impl<'d> Peripherals<'d> {
+            /// Creates a new `Peripherals` instance.
+            #[allow(clippy::too_many_arguments)]
+            pub fn new(
+                rtc0: Peri<'d, peripherals::RTC0>,
+                timer0: Peri<'d, peripherals::TIMER0>,
+                timer1: Peri<'d, peripherals::TIMER1>,
+                temp: Peri<'d, peripherals::TEMP>,
+                ppi_ch0: Peri<'d, peripherals::PPI_CH0>,
+                ppi_ch1: Peri<'d, peripherals::PPI_CH1>,
+                ppi_ch2: Peri<'d, peripherals::PPI_CH2>,
+            ) -> Self {
+                Peripherals {
+                    rtc0,
+                    timer0,
+                    timer1,
+                    temp,
+                    ppi_ch0,
+                    ppi_ch1,
+                    ppi_ch2,
+                }
+            }
+        }
+    } else if #[cfg(feature = "nrf54l")] {
+        use embassy_nrf::interrupt::typelevel::TIMER10;
+        use embassy_nrf::interrupt::typelevel::TIMER20;
+        use embassy_nrf::interrupt::typelevel::GRTC_3;
+        use embassy_nrf::interrupt::typelevel::RADIO_0;
+        /// Foo
+        pub struct Peripherals<'d> {
+            /// Real-time counter 0.
+            pub grtc: Peri<'d, peripherals::GRTC>,
+            /// Timer 0.
+            pub timer10: Peri<'d, peripherals::TIMER10>,
+            /// Timer 1.
+            pub timer20: Peri<'d, peripherals::TIMER20>,
+            /// Temperature sensor
+            pub temp: Peri<'d, peripherals::TEMP>,
+
+            /// PPIC10 channel 0.
+            pub ppi10_ch0: Peri<'d, peripherals::PPI10_CH0>,
+            /// PPIC20 channel 1.
+            pub ppi20_ch1: Peri<'d, peripherals::PPI20_CH1>,
+            /// PPIB11 channel 0
+            pub ppib11_ch0: Peri<'d, peripherals::PPIB11>,
+            /// PPIB21 channel 0
+            pub ppib21_ch0: Peri<'d, peripherals::PPIB21>,
+        }
+
+        impl<'d> Peripherals<'d> {
+            /// Creates a new `Peripherals` instance.
+            #[allow(clippy::too_many_arguments)]
+            pub fn new(
+                grtc: Peri<'d, peripherals::GRTC>,
+                timer10: Peri<'d, peripherals::TIMER10>,
+                timer20: Peri<'d, peripherals::TIMER20>,
+                temp: Peri<'d, peripherals::TEMP>,
+                ppi10_ch0: Peri<'d, peripherals::PPI10_CH0>,
+                ppi20_ch1: Peri<'d, peripherals::PPI20_CH1>,
+                ppib11_ch0: Peri<'d, peripherals::PPIB11>,
+                ppib21_ch0: Peri<'d, peripherals::PPIB21>,
+            ) -> Self {
+                Peripherals {
+                    grtc,
+                    timer10,
+                    timer20,
+                    temp,
+                    ppi10_ch0,
+                    ppi20_ch1,
+                    ppib11_ch0,
+                    ppib21_ch0,
+                }
+            }
         }
     }
 }
+
+
+
 
 /// The multiprotocol service layer.
 ///
@@ -129,14 +230,17 @@ impl<'d> MultiprotocolServiceLayer<'d> {
     /// Initializes the multiprotocol service layer.
     ///
     /// This function should only be called once.
-    pub fn new<T, I>(p: Peripherals<'d>, _irq: I, clock_cfg: raw::mpsl_clock_lfclk_cfg_t) -> Result<Self, Error>
+    pub fn new<T, I, RADIO, TIMER, RTC>(p: Peripherals<'d>, _irq: I, clock_cfg: raw::mpsl_clock_lfclk_cfg_t) -> Result<Self, Error>
     where
         T: Interrupt,
+        RADIO: Interrupt,
+        TIMER: Interrupt,
+        RTC: Interrupt,
         I: Binding<T, LowPrioInterruptHandler>
-            + Binding<interrupt::typelevel::RADIO, HighPrioInterruptHandler>
-            + Binding<interrupt::typelevel::TIMER0, HighPrioInterruptHandler>
-            + Binding<interrupt::typelevel::RTC0, HighPrioInterruptHandler>
-            + Binding<interrupt::typelevel::CLOCK_POWER, ClockInterruptHandler>,
+        + Binding<RADIO, HighPrioInterruptHandler>
+        + Binding<TIMER, HighPrioInterruptHandler>
+        + Binding<RTC, HighPrioInterruptHandler>
+        + Binding<interrupt::typelevel::CLOCK_POWER, ClockInterruptHandler>,
     {
         // Peripherals are used by the MPSL library, so we merely take ownership and ignore them
         let _ = p;
@@ -148,9 +252,10 @@ impl<'d> MultiprotocolServiceLayer<'d> {
         RetVal::from(ret).to_result()?;
 
         RADIO::set_priority(Priority::P0);
-        RTC0::set_priority(Priority::P0);
-        TIMER0::set_priority(Priority::P0);
+        RTC::set_priority(Priority::P0);
+        TIMER::set_priority(Priority::P0);
         CLOCK_POWER::set_priority(Priority::P4);
+
 
         Ok(Self { _private: PhantomData })
     }
@@ -158,7 +263,7 @@ impl<'d> MultiprotocolServiceLayer<'d> {
     /// Initializes the multiprotocol service layer with timeslot support.
     ///
     /// This function should only be called once.
-    pub fn with_timeslots<T, I, const SLOTS: usize>(
+    pub fn with_timeslots<T, I, RADIO, TIMER, RTC, const SLOTS: usize>(
         p: Peripherals<'d>,
         _irq: I,
         clock_cfg: raw::mpsl_clock_lfclk_cfg_t,
@@ -166,11 +271,15 @@ impl<'d> MultiprotocolServiceLayer<'d> {
     ) -> Result<Self, Error>
     where
         T: Interrupt,
+        RADIO: Interrupt,
+        TIMER: Interrupt,
+        RTC: Interrupt,
         I: Binding<T, LowPrioInterruptHandler>
-            + Binding<interrupt::typelevel::RADIO, HighPrioInterruptHandler>
-            + Binding<interrupt::typelevel::TIMER0, HighPrioInterruptHandler>
-            + Binding<interrupt::typelevel::RTC0, HighPrioInterruptHandler>
-            + Binding<interrupt::typelevel::CLOCK_POWER, ClockInterruptHandler>,
+        + Binding<RADIO, HighPrioInterruptHandler>
+        + Binding<TIMER, HighPrioInterruptHandler>
+        + Binding<RTC, HighPrioInterruptHandler>
+        + Binding<interrupt::typelevel::CLOCK_POWER, ClockInterruptHandler>,
+
     {
         let me = Self::new(p, _irq, clock_cfg)?;
         let ret = unsafe { raw::mpsl_timeslot_session_count_set(mem.0.as_mut_ptr() as *mut _, SLOTS as u8) };
@@ -260,26 +369,5 @@ pub struct ClockInterruptHandler;
 impl Handler<interrupt::typelevel::CLOCK_POWER> for ClockInterruptHandler {
     unsafe fn on_interrupt() {
         raw::MPSL_IRQ_CLOCK_Handler();
-    }
-}
-
-// High priority interrupts
-/// The high-priority interrupt handler.
-pub struct HighPrioInterruptHandler;
-impl Handler<interrupt::typelevel::RADIO> for HighPrioInterruptHandler {
-    unsafe fn on_interrupt() {
-        raw::MPSL_IRQ_RADIO_Handler();
-    }
-}
-
-impl Handler<interrupt::typelevel::TIMER0> for HighPrioInterruptHandler {
-    unsafe fn on_interrupt() {
-        raw::MPSL_IRQ_TIMER0_Handler();
-    }
-}
-
-impl Handler<interrupt::typelevel::RTC0> for HighPrioInterruptHandler {
-    unsafe fn on_interrupt() {
-        raw::MPSL_IRQ_RTC0_Handler();
     }
 }

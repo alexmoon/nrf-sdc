@@ -22,6 +22,8 @@ nrf52832 = ["nrf-mpsl/nrf52832", "nrf52"]
 nrf52833 = ["nrf-mpsl/nrf52833", "nrf52"]
 nrf52840 = ["nrf-mpsl/nrf52840", "nrf52"]
 nrf5340-net = ["nrf-mpsl/nrf5340-net", "nrf53"]
+nrf54l15-app-ns = ["nrf-mpsl/nrf54l15-app-ns", "nrf-sdc-sys/nrf54l-ns"]
+nrf54l15-app-s = ["nrf-mpsl/nrf54l15-app-s", "nrf-sdc-sys/nrf54l-s"]
 
 nrf52 = ["nrf-sdc-sys/nrf52"]
 nrf53 = ["nrf-sdc-sys/nrf53"]
