@@ -211,6 +211,27 @@ cfg_if! {
                 }
             }
         }
+
+        /// High priority interrupt handler.
+        pub struct HighPrioInterruptHandler;
+
+        impl Handler<TIMER10> for HighPrioInterruptHandler {
+            unsafe fn on_interrupt() {
+                raw::MPSL_IRQ_TIMER0_Handler();
+            }
+        }
+
+        impl Handler<RADIO_0> for HighPrioInterruptHandler {
+            unsafe fn on_interrupt() {
+                raw::MPSL_IRQ_RADIO_Handler();
+            }
+        }
+
+        impl Handler<GRTC_3> for HighPrioInterruptHandler {
+            unsafe fn on_interrupt() {
+                raw::MPSL_IRQ_RTC0_Handler();
+            }
+        }
     }
 }
 
