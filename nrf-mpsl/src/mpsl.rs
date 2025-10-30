@@ -181,9 +181,9 @@ cfg_if! {
             /// PPIC20 channel 1.
             pub ppi20_ch1: Peri<'d, peripherals::PPI20_CH1>,
             /// PPIB11 channel 0
-            pub ppib11_ch0: Peri<'d, peripherals::PPIB11>,
+            pub ppib11_ch0: Peri<'d, peripherals::PPIB11_CH0>,
             /// PPIB21 channel 0
-            pub ppib21_ch0: Peri<'d, peripherals::PPIB21>,
+            pub ppib21_ch0: Peri<'d, peripherals::PPIB21_CH0>,
         }
 
         impl<'d> Peripherals<'d> {
@@ -196,8 +196,8 @@ cfg_if! {
                 temp: Peri<'d, peripherals::TEMP>,
                 ppi10_ch0: Peri<'d, peripherals::PPI10_CH0>,
                 ppi20_ch1: Peri<'d, peripherals::PPI20_CH1>,
-                ppib11_ch0: Peri<'d, peripherals::PPIB11>,
-                ppib21_ch0: Peri<'d, peripherals::PPIB21>,
+                ppib11_ch0: Peri<'d, peripherals::PPIB11_CH0>,
+                ppib21_ch0: Peri<'d, peripherals::PPIB21_CH0>,
             ) -> Self {
                 Peripherals {
                     grtc,

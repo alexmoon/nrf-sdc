@@ -39,3 +39,7 @@ nrf52840 = [
   "nrf-sdc/nrf52840",
   "embassy-nrf/nrf52840",
 ]
+nrf54l15 = [
+  "nrf-sdc/nrf54l15-app-s",
+  "embassy-nrf/nrf54l15-app-s"
+]

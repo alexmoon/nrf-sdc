@@ -103,6 +103,54 @@ pub struct Peripherals<'d> {
     pub ppi_ch12: Peri<'d, peripherals::PPI_CH12>,
 }
 
+#[cfg(feature = "nrf54")]
+/// Peripherals required for the SoftDevice Controller.
+///
+/// This is used to enforce at compile-time that the application does not use
+/// any peripherals that are required by the SDC.
+///
+/// # Panics
+///
+/// The following hardware restrictions must be followed. Panics may occur if they are not.
+///
+/// - Do not use the `CCM`, `AAR`, or `NVMC` peripherals directly.
+pub struct Peripherals<'d> {
+    /// PPI20 channel 1.
+    pub ppi20_ch1: Peri<'d, peripherals::PPI20_CH1>,
+    /// PPI20 channel 2.
+    pub ppi20_ch2: Peri<'d, peripherals::PPI20_CH2>,
+    /// PPI20 channel 3.
+    pub ppi20_ch3: Peri<'d, peripherals::PPI20_CH3>,
+    /// PPI20 channel 4.
+    pub ppi20_ch4: Peri<'d, peripherals::PPI20_CH4>,
+    /// PPI20 channel 5.
+    pub ppi20_ch5: Peri<'d, peripherals::PPI20_CH5>,
+    /// PPI20 channel 6.
+    pub ppi20_ch6: Peri<'d, peripherals::PPI20_CH6>,
+    /// PPI20 channel 7.
+    pub ppi20_ch7: Peri<'d, peripherals::PPI20_CH7>,
+    /// PPI20 channel 8.
+    pub ppi20_ch8: Peri<'d, peripherals::PPI20_CH8>,
+    /// PPI20 channel 9.
+    pub ppi20_ch9: Peri<'d, peripherals::PPI20_CH9>,
+    /// PPI20 channel 10.
+    pub ppi20_ch10: Peri<'d, peripherals::PPI20_CH10>,
+    /// PPI20 channel 11.
+    pub ppi20_ch11: Peri<'d, peripherals::PPI20_CH11>,
+
+    /// PPI30 channel 1.
+    pub ppi30_ch1: Peri<'d, peripherals::PPI30_CH1>,
+    /// PPI30 channel 3.
+    pub ppi30_ch3: Peri<'d, peripherals::PPI30_CH3>,
+
+    /// PPIB30 channel 1.
+    pub ppib30_ch1: Peri<'d, peripherals::PPIB30_CH1>,
+    /// PPIB30 channel 2.
+    pub ppib30_ch2: Peri<'d, peripherals::PPIB30_CH2>,
+    /// PPIB30 channel 3.
+    pub ppib30_ch3: Peri<'d, peripherals::PPIB30_CH3>,
+}
+
 impl<'d> Peripherals<'d> {
     /// Creates a new `Peripherals` instance for nRF52 series devices.
     #[allow(clippy::too_many_arguments)]
@@ -163,6 +211,52 @@ impl<'d> Peripherals<'d> {
             ppi_ch10,
             ppi_ch11,
             ppi_ch12,
+        }
+    }
+
+    /// Creates a new `Peripherals` instance for nRF52 series devices.
+    #[allow(clippy::too_many_arguments)]
+    #[cfg(feature = "nrf54")]
+    pub fn new(
+        ppi20_ch1: Peri<'d, peripherals::PPI20_CH1>,
+        ppi20_ch2: Peri<'d, peripherals::PPI20_CH2>,
+        ppi20_ch3: Peri<'d, peripherals::PPI20_CH3>,
+        ppi20_ch4: Peri<'d, peripherals::PPI20_CH4>,
+        ppi20_ch5: Peri<'d, peripherals::PPI20_CH5>,
+        ppi20_ch6: Peri<'d, peripherals::PPI20_CH6>,
+        ppi20_ch7: Peri<'d, peripherals::PPI20_CH7>,
+        ppi20_ch8: Peri<'d, peripherals::PPI20_CH8>,
+        ppi20_ch9: Peri<'d, peripherals::PPI20_CH9>,
+        ppi20_ch10: Peri<'d, peripherals::PPI20_CH10>,
+        ppi20_ch11: Peri<'d, peripherals::PPI20_CH11>,
+
+        ppi30_ch1: Peri<'d, peripherals::PPI30_CH1>,
+        ppi30_ch3: Peri<'d, peripherals::PPI30_CH3>,
+
+        ppib30_ch1: Peri<'d, peripherals::PPIB30_CH1>,
+        ppib30_ch2: Peri<'d, peripherals::PPIB30_CH2>,
+        ppib30_ch3: Peri<'d, peripherals::PPIB30_CH3>,
+    ) -> Self {
+        Peripherals {
+            ppi20_ch1,
+            ppi20_ch2,
+            ppi20_ch3,
+            ppi20_ch4,
+            ppi20_ch5,
+            ppi20_ch6,
+            ppi20_ch7,
+            ppi20_ch8,
+            ppi20_ch9,
+            ppi20_ch10,
+            ppi20_ch11,
+
+            ppi30_ch1,
+            ppi30_ch3,
+
+            ppib30_ch1,
+            ppib30_ch2,
+            ppib30_ch3
+
         }
     }
 }
