@@ -255,6 +255,21 @@ unsafe extern "C" fn assert_handler(file: *const core::ffi::c_char, line: u32) {
     )
 }
 
+#[cfg(feature = "nrf54l")]
+#[no_mangle]
+unsafe extern "C" fn mpsl_constlat_request_callback() {
+    let p = embassy_nrf::pac::POWER;
+    p.tasks_constlat().write_value(1);
+}
+
+
+#[cfg(feature = "nrf54l")]
+#[no_mangle]
+unsafe extern "C" fn mpsl_lowpower_request_callback() {
+    let p = embassy_nrf::pac::POWER;
+    p.tasks_lowpwr().write_value(1);
+}
+
 impl Drop for MultiprotocolServiceLayer<'_> {
     fn drop(&mut self) {
         unsafe { raw::mpsl_uninit() };
