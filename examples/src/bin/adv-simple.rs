@@ -9,13 +9,17 @@ use embassy_executor::Spawner;
 use embassy_nrf::gpio::{Level, Output, OutputDrive};
 use embassy_nrf::mode::Blocking;
 use embassy_nrf::peripherals::CRACEN;
-use embassy_nrf::{bind_interrupts, pac, cracen};
+use embassy_nrf::{bind_interrupts, pac, cracen, config};
 use embassy_time::{Duration, Timer};
 use nrf_sdc::{self as sdc, mpsl};
 use sdc::mpsl::MultiprotocolServiceLayer;
 use sdc::vendor::ZephyrWriteBdAddr;
 use static_cell::StaticCell;
+use rand_core::SeedableRng;
+
 use {defmt_rtt as _, panic_probe as _};
+
+type Rng = ChaCha12Rng;
 
 bind_interrupts!(struct Irqs {
     SWI00 => mpsl::LowPrioInterruptHandler;
@@ -27,7 +31,7 @@ bind_interrupts!(struct Irqs {
 
 fn build_sdc<'d, const N: usize>(
     p: nrf_sdc::Peripherals<'d>,
-    rng: &'d mut cracen::Cracen<Blocking>,
+    rng: &'d mut Rng,
     mpsl: &'d MultiprotocolServiceLayer,
     mem: &'d mut sdc::Mem<N>,
 ) -> Result<nrf_sdc::SoftdeviceController<'d>, nrf_sdc::Error> {
@@ -49,7 +53,9 @@ async fn mpsl_task(mpsl: &'static MultiprotocolServiceLayer<'static>) -> ! {
 
 #[embassy_executor::main]
 async fn main(spawner: Spawner) {
-    let p = embassy_nrf::init(Default::default());
+    let mut config: config::Config = Default::default();
+    config.clock_speed = config::ClockSpeed::CK128;
+    let p = embassy_nrf::init(config);
 
     defmt::info!("Starting");
     let mpsl_p = mpsl::Peripherals::new(
@@ -71,10 +77,28 @@ async fn main(spawner: Spawner) {
     };
     static MPSL: StaticCell<MultiprotocolServiceLayer> = StaticCell::new();
 
+    let r = embassy_nrf::pac::GRTC_S;
+    r.syscounter(0).active().write(|w| {
+        w.set_active(true);
+    });
+    r.mode().write(|w| {
+        use embassy_nrf::pac::grtc::vals::Autoen;
+        w.set_syscounteren(true);
+        w.set_autoen(Autoen::CPU_ACTIVE);
+    });
+
+    r.tasks_clear().write_value(1);
+    r.tasks_start().write_value(1);
+
+
+    Timer::after(Duration::from_millis(3000)).await;
+    defmt::info!("Clock: {:?}", defmt::Debug2Format(&embassy_nrf::pac::OSCILLATORS_S.pll().currentfreq().read().currentfreq()));
+
     defmt::info!("MPSL init");
     let mpsl = MPSL.init(unwrap!(mpsl::MultiprotocolServiceLayer::new(mpsl_p, Irqs, lfclk_cfg)));
-    //spawner.spawn(unwrap!(mpsl_task(&*mpsl)));
+    spawner.spawn(unwrap!(mpsl_task(&*mpsl)));
 
+    /*
     defmt::info!("SDC create");
     let sdc_p = sdc::Peripherals::new(
         p.PPI00_CH1,
@@ -99,7 +123,8 @@ async fn main(spawner: Spawner) {
     );
 
     defmt::info!("CRACEN start");
-    let mut rng = cracen::Cracen::new_blocking(p.CRACEN);
+//    let mut rng = Rng::from_seed([0; 32]);
+    //let mut rng = cracen::Cracen::new_blocking(p.CRACEN);
 
     defmt::info!("SDC mem ..");
     let mut sdc_mem = sdc::Mem::<4096>::new();
@@ -131,7 +156,9 @@ async fn main(spawner: Spawner) {
     unwrap!(LeSetAdvData::new(adv_data.len() as u8, data).exec(&sdc).await);
 
     unwrap!(LeSetAdvEnable::new(true).exec(&sdc).await);
+    */
 
+    defmt::info!("Led prepare");
     let mut led = Output::new(p.P1_10, Level::Low, OutputDrive::Standard);
 
     loop {
@@ -140,5 +167,76 @@ async fn main(spawner: Spawner) {
         Timer::after(Duration::from_millis(300)).await;
         led.set_low();
         Timer::after(Duration::from_millis(300)).await;
+    }
+}
+use chacha20::ChaChaCore;
+use chacha20::cipher::consts::U6;
+use chacha20::cipher::{KeyIvInit, StreamCipherCore};
+use rand_core::block::{BlockRng, BlockRngCore, CryptoBlockRng};
+use rand_core::{CryptoRng, RngCore};
+
+const BUFFER_SIZE: usize = 16;
+
+pub struct ChaCha12Rng {
+    pub core: BlockRng<ChaCha12Core>,
+}
+pub struct ChaCha12Core(ChaChaCore<U6>);
+
+impl SeedableRng for ChaCha12Rng {
+    type Seed = [u8; 32];
+
+    #[inline]
+    fn from_seed(seed: Self::Seed) -> Self {
+        Self {
+            core: BlockRng::new(ChaCha12Core::from_seed(seed.into())),
+        }
+    }
+}
+impl BlockRngCore for ChaCha12Core {
+    type Item = u32;
+    type Results = [u32; BUFFER_SIZE];
+
+    #[inline]
+    fn generate(&mut self, r: &mut Self::Results) {
+        fn u32_to_u8<const A: usize, const B: usize>(a: &mut [u32; A]) -> &mut [u8; B] {
+            const { core::assert!(A * 4 == B) };
+            unsafe { &mut *a.as_mut_ptr().cast() }
+        }
+        self.0.write_keystream_block(u32_to_u8::<16, 64>(r).into());
+    }
+}
+
+impl CryptoBlockRng for ChaCha12Core {}
+impl CryptoRng for ChaCha12Rng {}
+
+impl SeedableRng for ChaCha12Core {
+    type Seed = [u8; 32];
+
+    #[inline]
+    fn from_seed(seed: Self::Seed) -> Self {
+        Self(ChaChaCore::<U6>::new((&seed).into(), (&[0u8; 12]).into()))
+    }
+}
+
+impl RngCore for ChaCha12Rng {
+    #[inline]
+    fn next_u32(&mut self) -> u32 {
+        self.core.next_u32()
+    }
+    #[inline]
+    fn next_u64(&mut self) -> u64 {
+        self.core.next_u64()
+    }
+    #[inline]
+    fn fill_bytes(&mut self, dest: &mut [u8]) {
+        self.core.fill_bytes(dest)
+    }
+}
+
+impl From<ChaCha12Core> for ChaCha12Rng {
+    fn from(core: ChaCha12Core) -> Self {
+        ChaCha12Rng {
+            core: BlockRng::new(core),
+        }
     }
 }

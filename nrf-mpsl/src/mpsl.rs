@@ -217,18 +217,21 @@ cfg_if! {
 
         impl Handler<TIMER10> for HighPrioInterruptHandler {
             unsafe fn on_interrupt() {
+                defmt::info!("IRQ TIMER0");
                 raw::MPSL_IRQ_TIMER0_Handler();
             }
         }
 
         impl Handler<RADIO_0> for HighPrioInterruptHandler {
             unsafe fn on_interrupt() {
+                defmt::info!("IRQ RADIO");
                 raw::MPSL_IRQ_RADIO_Handler();
             }
         }
 
         impl Handler<GRTC_3> for HighPrioInterruptHandler {
             unsafe fn on_interrupt() {
+                defmt::info!("IRQ RTC");
                 raw::MPSL_IRQ_RTC0_Handler();
             }
         }
@@ -247,6 +250,7 @@ pub struct MultiprotocolServiceLayer<'d> {
 }
 
 unsafe extern "C" fn assert_handler(file: *const core::ffi::c_char, line: u32) {
+    defmt::info!("BUHUHUH");
     panic!(
         "MultiprotocolServiceLayer: {}:{}",
         // SAFETY: the SDC should always give us valid utf8 strings.
@@ -258,6 +262,7 @@ unsafe extern "C" fn assert_handler(file: *const core::ffi::c_char, line: u32) {
 #[cfg(feature = "nrf54l")]
 #[no_mangle]
 unsafe extern "C" fn mpsl_constlat_request_callback() {
+    panic!("REQUEST CONSTLAT");
     let p = embassy_nrf::pac::POWER;
     p.tasks_constlat().write_value(1);
 }
@@ -266,6 +271,7 @@ unsafe extern "C" fn mpsl_constlat_request_callback() {
 #[cfg(feature = "nrf54l")]
 #[no_mangle]
 unsafe extern "C" fn mpsl_lowpower_request_callback() {
+    panic!("REQUEST LOWPOWER");
     let p = embassy_nrf::pac::POWER;
     p.tasks_lowpwr().write_value(1);
 }

@@ -11,7 +11,7 @@ name = "adv-simple"
 
 [dependencies]
 nrf-sdc = { version = "0.4.0", path = "../nrf-sdc", features = ["defmt", "peripheral"] }
-nrf-mpsl = { version = "0.3.0", path = "../nrf-mpsl", features = ["defmt", "critical-section-impl"] }
+nrf-mpsl = { version = "0.3.0", path = "../nrf-mpsl", features = ["defmt"] } #, "critical-section-impl"] }
 bt-hci = { version = "0.6", default-features = false }
 
 embassy-executor = { version = "0.9", features = ["arch-cortex-m", "executor-thread", "defmt", "executor-interrupt"] }
@@ -19,12 +19,15 @@ embassy-time = { version = "0.5", features = ["defmt", "defmt-timestamp-uptime"]
 embassy-nrf = { version = "0.8", features = ["defmt", "time-driver-rtc1", "gpiote", "unstable-pac"] }
 embassy-sync = { version = "0.7", features = ["defmt"] }
 
+chacha20 = { version = "0.9.1", default-features = false }
+rand_core = "0.9.3"
+
 defmt = "1"
 defmt-rtt = "1"
 
 futures = { version = "0.3", default-features = false }
 
-cortex-m = { version = "0.7.7" }
+cortex-m = { version = "0.7.7", features = ["critical-section-single-core"] }
 cortex-m-rt = "0.7.5"
 panic-probe = { version = "1", features = ["print-defmt"] }
 static_cell = "2"
