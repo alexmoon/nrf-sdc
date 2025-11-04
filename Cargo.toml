@@ -28,4 +28,12 @@ overflow-checks = false
 #embassy-time = {path = "../embassy/embassy-time"}
 #embassy-time-driver = {path = "../embassy/embassy-time-driver"}
 #embassy-embedded-hal = {path = "../embassy/embassy-embedded-hal"}
+
+embassy-executor = {git = "https://github.com/embassy-rs/embassy.git", rev="dda429ce6642deaa490f8737e1373e2e2ba79655"}
+embassy-nrf = {git = "https://github.com/embassy-rs/embassy.git", rev="dda429ce6642deaa490f8737e1373e2e2ba79655"}
+embassy-sync = {git = "https://github.com/embassy-rs/embassy.git", rev="dda429ce6642deaa490f8737e1373e2e2ba79655"}
+embassy-futures = {git = "https://github.com/embassy-rs/embassy.git", rev="dda429ce6642deaa490f8737e1373e2e2ba79655"}
+embassy-time = {git = "https://github.com/embassy-rs/embassy.git", rev="dda429ce6642deaa490f8737e1373e2e2ba79655"}
+embassy-time-driver = {git = "https://github.com/embassy-rs/embassy.git", rev="dda429ce6642deaa490f8737e1373e2e2ba79655"}
+embassy-embedded-hal = {git = "https://github.com/embassy-rs/embassy.git", rev="dda429ce6642deaa490f8737e1373e2e2ba79655"}
 #bt-hci = { path = "../bt-hci" }

@@ -54,7 +54,7 @@ async fn main(spawner: Spawner) {
         lfclk_cfg,
         SESSION_MEM.init(mpsl::SessionMem::new())
     )));
-    spawner.must_spawn(mpsl_task(&*mpsl));
+    spawner.spawn(unwrap!(mpsl_task(&*mpsl)));
 
     let f = Flash::take(mpsl, p.NVMC);
     pin_mut!(f);
