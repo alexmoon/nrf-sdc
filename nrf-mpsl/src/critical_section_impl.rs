@@ -1,14 +1,32 @@
+#![allow(clippy::needless_range_loop, clippy::useless_attribute)]
 use core::arch::asm;
 use core::sync::atomic::{compiler_fence, AtomicBool, Ordering};
 
 use cortex_m::peripheral::NVIC;
 use embassy_nrf::interrupt::Interrupt;
 
-const RESERVED_IRQS: u32 =
-    (1 << (Interrupt::RADIO as u8)) | (1 << (Interrupt::RTC0 as u8)) | (1 << (Interrupt::TIMER0 as u8));
+cfg_if::cfg_if! {
+    if #[cfg(any(feature = "nrf54l-s", feature = "nrf54l-ns"))] {
+        const CS_LEN: usize = 8;
+        const RESERVED_IRQS: [u32; CS_LEN] = {
+            let mut irqs = [0; CS_LEN];
+            irqs[Interrupt::RADIO_0 as usize / 32] = 1  << (Interrupt::RADIO_0 as usize % 32);
+            irqs[Interrupt::GRTC_3 as usize / 32] = 1  << (Interrupt::GRTC_3 as usize % 32);
+            irqs[Interrupt::TIMER10 as usize / 32] = 1  << (Interrupt::TIMER10 as usize % 32);
+            irqs
+        };
+    } else {
+        const CS_LEN: usize = 2;
+        const RESERVED_IRQS: [u32; 2] =
+            [
+                (1 << (Interrupt::RADIO as u8)) | (1 << (Interrupt::RTC0 as u8)) | (1 << (Interrupt::TIMER0 as u8)),
+                0,
+            ];
+    }
+}
 
+static mut CS_MASK: [u32; CS_LEN] = [0; CS_LEN];
 static CS_FLAG: AtomicBool = AtomicBool::new(false);
-static mut CS_MASK: [u32; 2] = [0; 2];
 
 #[inline]
 unsafe fn raw_critical_section<R>(f: impl FnOnce() -> R) -> R {
@@ -47,12 +65,14 @@ unsafe impl critical_section::Impl for CriticalSection {
                 CS_FLAG.store(true, Ordering::Relaxed);
 
                 // Store the state of irqs.
-                CS_MASK[0] = nvic.icer[0].read();
-                CS_MASK[1] = nvic.icer[1].read();
+                for i in 0..CS_LEN {
+                    CS_MASK[i] = nvic.icer[i].read();
+                }
 
                 // Disable only not-reserved irqs.
-                nvic.icer[0].write(!RESERVED_IRQS);
-                nvic.icer[1].write(0xFFFF_FFFF);
+                for i in 0..RESERVED_IRQS.len() {
+                    nvic.icer[i].write(!RESERVED_IRQS[i]);
+                }
             });
         }
 
@@ -69,8 +89,9 @@ unsafe impl critical_section::Impl for CriticalSection {
             raw_critical_section(|| {
                 CS_FLAG.store(false, Ordering::Relaxed);
                 // restore only non-reserved irqs.
-                nvic.iser[0].write(CS_MASK[0] & !RESERVED_IRQS);
-                nvic.iser[1].write(CS_MASK[1]);
+                for i in 0..CS_LEN {
+                    nvic.iser[i].write(CS_MASK[i] & !RESERVED_IRQS[i]);
+                }
             });
         }
     }
