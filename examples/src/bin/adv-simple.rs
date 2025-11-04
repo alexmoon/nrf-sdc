@@ -6,19 +6,18 @@ use bt_hci::cmd::SyncCmd;
 use bt_hci::param::BdAddr;
 use defmt::unwrap;
 use embassy_executor::Spawner;
-use embassy_nrf::gpio::{Level, Output, OutputDrive};
-use embassy_nrf::mode::Blocking;
-#[cfg(feature = "nrf52")]
-use embassy_nrf::{peripherals::RNG, rng};
 #[cfg(feature = "nrf54l")]
 use embassy_nrf::cracen;
-use embassy_nrf::{bind_interrupts, pac, config};
+use embassy_nrf::gpio::{Level, Output, OutputDrive};
+use embassy_nrf::mode::Blocking;
+use embassy_nrf::{bind_interrupts, config, pac};
+#[cfg(feature = "nrf52")]
+use embassy_nrf::{peripherals::RNG, rng};
 use embassy_time::{Duration, Timer};
 use nrf_sdc::{self as sdc, mpsl};
 use sdc::mpsl::MultiprotocolServiceLayer;
 use sdc::vendor::ZephyrWriteBdAddr;
 use static_cell::StaticCell;
-
 use {defmt_rtt as _, panic_probe as _};
 
 #[cfg(feature = "nrf54l")]
@@ -28,14 +27,14 @@ type Rng = cracen::Cracen<'static, Blocking>;
 type Rng = rng::Rng<'static, Blocking>;
 
 #[cfg(feature = "nrf52")]
- bind_interrupts!(struct Irqs {
-    RNG => rng::InterruptHandler<RNG>;
-    EGU0_SWI0 => mpsl::LowPrioInterruptHandler;
-    CLOCK_POWER => mpsl::ClockInterruptHandler;
-    RADIO => mpsl::HighPrioInterruptHandler;
-    TIMER0 => mpsl::HighPrioInterruptHandler;
-    RTC0 => mpsl::HighPrioInterruptHandler;
- });
+bind_interrupts!(struct Irqs {
+   RNG => rng::InterruptHandler<RNG>;
+   EGU0_SWI0 => mpsl::LowPrioInterruptHandler;
+   CLOCK_POWER => mpsl::ClockInterruptHandler;
+   RADIO => mpsl::HighPrioInterruptHandler;
+   TIMER0 => mpsl::HighPrioInterruptHandler;
+   RTC0 => mpsl::HighPrioInterruptHandler;
+});
 
 #[cfg(feature = "nrf54l")]
 bind_interrupts!(struct Irqs {
@@ -54,7 +53,6 @@ fn build_sdc<'d, const N: usize>(
 ) -> Result<nrf_sdc::SoftdeviceController<'d>, nrf_sdc::Error> {
     sdc::Builder::new()?.support_adv()?.build(p, rng, mpsl, mem)
 }
-
 
 fn bd_addr() -> BdAddr {
     let ficr = pac::FICR;
@@ -118,8 +116,8 @@ async fn main(spawner: Spawner) {
     #[cfg(feature = "nrf52")]
     let sdc_p = sdc::Peripherals::new(
         p.PPI_CH17, p.PPI_CH18, p.PPI_CH20, p.PPI_CH21, p.PPI_CH22, p.PPI_CH23, p.PPI_CH24, p.PPI_CH25, p.PPI_CH26,
-        p.PPI_CH27, p.PPI_CH28, p.PPI_CH29);
-
+        p.PPI_CH27, p.PPI_CH28, p.PPI_CH29,
+    );
 
     #[cfg(feature = "nrf54l")]
     let sdc_p = sdc::Peripherals::new(
