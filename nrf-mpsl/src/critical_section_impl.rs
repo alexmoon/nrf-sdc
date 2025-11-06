@@ -7,7 +7,7 @@ use embassy_nrf::interrupt::Interrupt;
 
 cfg_if::cfg_if! {
     if #[cfg(any(feature = "nrf54l-s", feature = "nrf54l-ns"))] {
-        const CS_LEN: usize = 8;
+        const CS_LEN: usize = 9;
         const RESERVED_IRQS: [u32; CS_LEN] = {
             let mut irqs = [0; CS_LEN];
             irqs[Interrupt::RADIO_0 as usize / 32] = 1  << (Interrupt::RADIO_0 as usize % 32);
