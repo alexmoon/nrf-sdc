@@ -152,7 +152,7 @@ cfg_if! {
                 }
             }
         }
-    } else if #[cfg(any(feature = "nrf54l-s", feature = "nrf54l-ns"))] {
+    } else if #[cfg(feature = "_nrf54l")] {
         use embassy_nrf::interrupt::typelevel::TIMER10;
         use embassy_nrf::interrupt::typelevel::GRTC_3;
         use embassy_nrf::interrupt::typelevel::RADIO_0;
@@ -180,8 +180,16 @@ cfg_if! {
         /// - Do not use `RADIO` directly, except during timeslots you've allocated.
         /// - Do not use `CLOCK_POWER` directly, use the functions provided by this crate instead.
         pub struct Peripherals<'d> {
-            /// Real-time counter 0.
-            pub grtc: Peri<'d, peripherals::GRTC>,
+            /// Real-time counter channel 7.
+            pub grtc_ch7: Peri<'d, peripherals::GRTC_CH7>,
+            /// Real-time counter channel 8.
+            pub grtc_ch8: Peri<'d, peripherals::GRTC_CH8>,
+            /// Real-time counter channel 9.
+            pub grtc_ch9: Peri<'d, peripherals::GRTC_CH9>,
+            /// Real-time counter channel 10.
+            pub grtc_ch10: Peri<'d, peripherals::GRTC_CH10>,
+            /// Real-time counter channel 11.
+            pub grtc_ch11: Peri<'d, peripherals::GRTC_CH11>,
             /// Timer 0.
             pub timer10: Peri<'d, peripherals::TIMER10>,
             /// Timer 1.
@@ -203,7 +211,11 @@ cfg_if! {
             /// Creates a new `Peripherals` instance.
             #[allow(clippy::too_many_arguments)]
             pub fn new(
-                grtc: Peri<'d, peripherals::GRTC>,
+                grtc_ch7: Peri<'d, peripherals::GRTC_CH7>,
+                grtc_ch8: Peri<'d, peripherals::GRTC_CH8>,
+                grtc_ch9: Peri<'d, peripherals::GRTC_CH9>,
+                grtc_ch10: Peri<'d, peripherals::GRTC_CH10>,
+                grtc_ch11: Peri<'d, peripherals::GRTC_CH11>,
                 timer10: Peri<'d, peripherals::TIMER10>,
                 timer20: Peri<'d, peripherals::TIMER20>,
                 temp: Peri<'d, peripherals::TEMP>,
@@ -213,7 +225,11 @@ cfg_if! {
                 ppib21_ch0: Peri<'d, peripherals::PPIB21_CH0>,
             ) -> Self {
                 Peripherals {
-                    grtc,
+                    grtc_ch7,
+                    grtc_ch8,
+                    grtc_ch9,
+                    grtc_ch10,
+                    grtc_ch11,
                     timer10,
                     timer20,
                     temp,
@@ -265,14 +281,14 @@ unsafe extern "C" fn assert_handler(file: *const core::ffi::c_char, line: u32) {
     )
 }
 
-#[cfg(any(feature = "nrf54l-s", feature = "nrf54l-ns"))]
+#[cfg(feature = "_nrf54l")]
 #[no_mangle]
 unsafe extern "C" fn mpsl_constlat_request_callback() {
     let p = embassy_nrf::pac::POWER;
     p.tasks_constlat().write_value(1);
 }
 
-#[cfg(any(feature = "nrf54l-s", feature = "nrf54l-ns"))]
+#[cfg(feature = "_nrf54l")]
 #[no_mangle]
 unsafe extern "C" fn mpsl_lowpower_request_callback() {
     let p = embassy_nrf::pac::POWER;
@@ -302,27 +318,22 @@ impl<'d> MultiprotocolServiceLayer<'d> {
         let _ = p;
 
         // GRTC must be started and configured
-        #[cfg(any(feature = "nrf54l-s", feature = "nrf54l-ns"))]
+        #[cfg(feature = "_nrf54l")]
         {
             use embassy_nrf::pac;
 
-            #[cfg(feature = "nrf54l-ns")]
-            let freq = pac::OSCILLATORS_NS.pll().currentfreq().read().currentfreq();
-            #[cfg(feature = "nrf54l-s")]
-            let freq = pac::OSCILLATORS_S.pll().currentfreq().read().currentfreq();
+            let freq = pac::OSCILLATORS.pll().currentfreq().read().currentfreq();
             assert!(freq == pac::oscillators::vals::Currentfreq::CK128M);
 
-            #[cfg(feature = "nrf54l-s")]
-            let r = pac::GRTC_S;
-
-            #[cfg(feature = "nrf54l-ns")]
-            let r = pac::GRTC_NS;
-
-            r.mode().write(|w| {
-                w.set_syscounteren(true);
-            });
-            r.tasks_clear().write_value(1);
-            r.tasks_start().write_value(1);
+            let r = pac::GRTC;
+            // Start syscounter if not started
+            if !r.mode().read().syscounteren() {
+                r.mode().write(|w| {
+                    w.set_syscounteren(true);
+                });
+                r.tasks_clear().write_value(1);
+                r.tasks_start().write_value(1);
+            }
         }
 
         T::set_priority(Priority::P4);
@@ -334,6 +345,7 @@ impl<'d> MultiprotocolServiceLayer<'d> {
         RadioIrq::set_priority(Priority::P0);
         RtcIrq::set_priority(Priority::P0);
         TimerIrq::set_priority(Priority::P0);
+
         CLOCK_POWER::set_priority(Priority::P4);
 
         Ok(Self { _private: PhantomData })

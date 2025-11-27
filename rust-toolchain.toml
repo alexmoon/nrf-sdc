@@ -6,5 +6,6 @@ components = [ "rust-src", "rustfmt", "llvm-tools-preview" ]
 targets = [
     "thumbv7em-none-eabi",
     "thumbv7em-none-eabihf",
+    "thumbv8m.main-none-eabi",
     "thumbv8m.main-none-eabihf",
 ]
