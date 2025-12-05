@@ -43,6 +43,8 @@ cargo clippy -p nrf-mpsl --features nrf52840,critical-section-impl
 cargo clippy -p nrf-mpsl --features nrf52840,fem-simple-gpio
 cargo clippy -p nrf-mpsl --features nrf52840,fem-nrf21540-gpio
 cargo clippy -p nrf-mpsl --features nrf52840,fem-nrf21540-gpio-spi
+cargo clippy -p nrf-mpsl --features nrf54l05-app-ns --target thumbv8m.main-none-eabihf
+cargo clippy -p nrf-mpsl --features nrf54l05-app-ns --target thumbv8m.main-none-eabihf
 cargo clippy -p nrf-mpsl --features nrf54l15-app-ns --target thumbv8m.main-none-eabihf
 cargo clippy -p nrf-mpsl --features nrf54l15-app-ns,fem-simple-gpio --target thumbv8m.main-none-eabihf
 cargo clippy -p nrf-mpsl --features nrf54l15-app-ns,fem-nrf21540-gpio --target thumbv8m.main-none-eabihf
@@ -80,6 +82,8 @@ cargo clippy -p nrf-sdc --features nrf52840,peripheral
 cargo clippy -p nrf-sdc --features nrf52840,central
 cargo clippy -p nrf-sdc --features nrf52840,peripheral,central,defmt
 cargo clippy -p nrf-sdc --features nrf52840,peripheral,central,log
+cargo clippy -p nrf-sdc --features nrf54l05-app-ns,peripheral --target thumbv8m.main-none-eabihf
+cargo clippy -p nrf-sdc --features nrf54l10-app-ns,peripheral --target thumbv8m.main-none-eabihf
 cargo clippy -p nrf-sdc --features nrf54l15-app-ns,peripheral --target thumbv8m.main-none-eabihf
 cargo clippy -p nrf-sdc --features nrf54l15-app-ns,central --target thumbv8m.main-none-eabihf
 cargo clippy -p nrf-sdc --features nrf54l15-app-ns,peripheral,central --target thumbv8m.main-none-eabihf
