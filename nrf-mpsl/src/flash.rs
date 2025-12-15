@@ -150,10 +150,10 @@ const ERASE_PAGE_DURATION_US: u32 = 85_000;
 const WRITE_WORD_DURATION_US: u32 = 41;
 
 // See RRAM vs RAM section at https://argenox.com/blog/nordic-announces-nrf54l
-// 65 us for single word writes, but 22 us for sequential address ordered word writes.
-// We enforce word line writes, so we use 22 us.
+// 65 us for single (unbuffered) word writes and 22 us for sequential address ordered (buffered)
+// word writes. We do the former.
 #[cfg(feature = "nrf54l-s")]
-const WRITE_WORD_DURATION_US: u32 = 22;
+const WRITE_WORD_DURATION_US: u32 = 65;
 
 #[cfg(not(feature = "nrf52832"))]
 const ERASE_PARTIAL_PAGE_DURATION_MS: u32 = 10;
@@ -335,43 +335,43 @@ impl<'d> Flash<'d> {
     }
 }
 
-macro_rules! wait_ready {
-    ($p:expr) => {
-        while !$p.ready().read().ready() {}
-    };
+#[cfg(not(feature = "nrf54l-s"))]
+type Nvmc = pac::nvmc::Nvmc;
+#[cfg(feature = "nrf54l-s")]
+type Nvmc = pac::rramc::Rramc;
+
+#[inline(always)]
+fn wait_ready(p: Nvmc) {
+    while !p.ready().read().ready() {}
 }
 
 #[cfg(feature = "nrf54l-s")]
-macro_rules! wait_ready_write {
-    ($p:expr) => {
-        while !$p.readynext().read().readynext() {}
-        while !$p.bufstatus().writebufempty().read().empty() {}
-    };
+#[inline(always)]
+fn wait_ready_write(p: Nvmc) {
+    while !p.readynext().read().readynext() {}
+    while !p.bufstatus().writebufempty().read().empty() {}
 }
 
 #[cfg(not(feature = "nrf54l-s"))]
-macro_rules! enable_erase {
-    ($p:expr) => {
-        $p.config().write(|w| w.set_wen(Wen::EEN));
-    };
+#[inline(always)]
+fn enable_erase(p: Nvmc) {
+    p.config().write(|w| w.set_wen(Wen::EEN));
 }
 
-macro_rules! enable_read {
-    ($p:expr) => {
-        #[cfg(not(feature = "nrf54l-s"))]
-        $p.config().write(|w| w.set_wen(Wen::REN));
-        #[cfg(feature = "nrf54l-s")]
-        $p.config().write(|w| w.set_wen(false));
-    };
+#[inline(always)]
+fn enable_read(p: Nvmc) {
+    #[cfg(not(feature = "nrf54l-s"))]
+    p.config().write(|w| w.set_wen(Wen::REN));
+    #[cfg(feature = "nrf54l-s")]
+    p.config().write(|w| w.set_wen(false));
 }
 
-macro_rules! enable_write {
-    ($p:expr) => {
-        #[cfg(not(feature = "nrf54l-s"))]
-        $p.config().write(|w| w.set_wen(Wen::WEN));
-        #[cfg(feature = "nrf54l-s")]
-        $p.config().write(|w| w.set_wen(true));
-    };
+#[inline(always)]
+fn enable_write(p: Nvmc) {
+    #[cfg(not(feature = "nrf54l-s"))]
+    p.config().write(|w| w.set_wen(Wen::WEN));
+    #[cfg(feature = "nrf54l-s")]
+    p.config().write(|w| w.set_wen(true));
 }
 
 unsafe extern "C" fn timeslot_session_callback(
@@ -407,8 +407,8 @@ unsafe extern "C" fn timeslot_session_callback(
                     let p = pac::NVMC;
                     #[cfg(feature = "nrf54l-s")]
                     let p = pac::RRAMC;
-                    enable_read!(p);
-                    wait_ready!(p);
+                    enable_read(p);
+                    wait_ready(p);
                     state.result.replace(Ok(()));
                     state.return_param.callback_action = raw::MPSL_TIMESLOT_SIGNAL_ACTION_END as u8;
                     state.waker.wake();
@@ -496,13 +496,13 @@ impl FlashOp {
         let p = pac::NVMC;
         loop {
             // Enable erase and erase next page
-            enable_erase!(p);
+            enable_erase(p);
             p.erasepagepartialcfg().write(|w| w.0 = ERASE_PARTIAL_PAGE_DURATION_MS);
-            wait_ready!(p);
+            wait_ready(p);
 
             p.erasepagepartial().write_value(*address);
-            wait_ready!(p);
-            enable_read!(p);
+            wait_ready(p);
+            enable_read(p);
 
             *elapsed += ERASE_PARTIAL_PAGE_DURATION_US;
             if *elapsed > ERASE_PAGE_DURATION_US {
@@ -527,11 +527,11 @@ impl FlashOp {
         to: u32,
     ) -> core::ops::ControlFlow<()> {
         let p = pac::NVMC;
-        enable_erase!(p);
-        wait_ready!(p);
+        enable_erase(p);
+        wait_ready(p);
         p.erasepage().write_value(*address);
-        wait_ready!(p);
-        enable_read!(p);
+        wait_ready(p);
+        enable_read(p);
         *address += PAGE_SIZE as u32;
         if *address >= to {
             ControlFlow::Break(())
@@ -554,13 +554,13 @@ impl FlashOp {
         // should be able to do at least one operation.
         if *words > 0 {
             loop {
-                enable_write!(p);
-                wait_ready!(p);
+                enable_write(p);
+                wait_ready(p);
                 unsafe {
                     let w = core::ptr::read_unaligned(src.add(i));
                     core::ptr::write_volatile(dest.add(i), w);
                 }
-                wait_ready!(p);
+                wait_ready(p);
                 i += 1;
                 if get_time() + WRITE_WORD_DURATION_US >= slot_duration_us || ((i as u32) >= *words) {
                     break;
@@ -596,8 +596,8 @@ impl FlashOp {
     ) -> core::ops::ControlFlow<()> {
         let p = pac::RRAMC;
 
-        enable_write!(p);
-        wait_ready!(p);
+        enable_write(p);
+        wait_ready(p);
 
         const ERASE_WORD: u32 = 0xFFFFFFFF;
 
@@ -609,14 +609,14 @@ impl FlashOp {
                 }
                 *from += WRITE_LINE_SIZE as u32;
             }
-            wait_ready_write!(p);
+            wait_ready_write(p);
             if get_time() + (4 * WRITE_WORD_DURATION_US) >= slot_duration_us {
                 break;
             }
         }
 
-        enable_read!(p);
-        wait_ready!(p);
+        enable_read(p);
+        wait_ready(p);
 
         if *from >= to {
             ControlFlow::Break(())
@@ -638,8 +638,8 @@ impl FlashOp {
         if *words > 0 {
             let mut i = 0;
 
-            enable_write!(p);
-            wait_ready!(p);
+            enable_write(p);
+            wait_ready(p);
 
             loop {
                 unsafe {
@@ -648,7 +648,7 @@ impl FlashOp {
                 }
                 i += 1;
                 if i % 4 == 0 {
-                    wait_ready_write!(p);
+                    wait_ready_write(p);
 
                     if get_time() + (4 * WRITE_WORD_DURATION_US) >= slot_duration_us || ((i as u32) >= *words) {
                         break;
@@ -656,8 +656,8 @@ impl FlashOp {
                 }
             }
 
-            enable_read!(p);
-            wait_ready!(p);
+            enable_read(p);
+            wait_ready(p);
 
             unsafe {
                 *src = src.add(i);
