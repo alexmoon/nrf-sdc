@@ -55,5 +55,5 @@ cortex-m = "0.7.7"
 
 nrf-mpsl-sys = { version = "0.2", path = "../nrf-mpsl-sys" }
 
-embassy-nrf = { version = "0.8", features = ["unstable-pac"]}
+embassy-nrf = { version = "0.9", features = ["unstable-pac"]}
 embassy-sync = { version = "0.7" }
