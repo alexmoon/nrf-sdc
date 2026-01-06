@@ -46,7 +46,7 @@ fem-nrf21540-gpio-spi = ["nrf-mpsl-sys/fem-nrf21540-gpio-spi"]
 defmt = { version = "1", optional = true }
 log = { version = "0.4.27", optional = true }
 critical-section = { version = "1.2", optional = true }
-embedded-io = "0.6.1"
+embedded-io = "0.7"
 embedded-storage = "0.3.1"
 embedded-storage-async = "0.4.1"
 cfg-if = "1.0"

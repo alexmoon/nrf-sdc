@@ -29,11 +29,11 @@ overflow-checks = false
 #embassy-time-driver = {path = "../embassy/embassy-time-driver"}
 #embassy-embedded-hal = {path = "../embassy/embassy-embedded-hal"}
 
-embassy-executor = {git = "https://github.com/embassy-rs/embassy.git", rev="1f9a907d8ea0211a488430806d7eea479625bb1e"}
-embassy-nrf = {git = "https://github.com/embassy-rs/embassy.git", rev="1f9a907d8ea0211a488430806d7eea479625bb1e"}
-embassy-sync = {git = "https://github.com/embassy-rs/embassy.git", rev="1f9a907d8ea0211a488430806d7eea479625bb1e"}
-embassy-futures = {git = "https://github.com/embassy-rs/embassy.git", rev="1f9a907d8ea0211a488430806d7eea479625bb1e"}
-embassy-time = {git = "https://github.com/embassy-rs/embassy.git", rev="1f9a907d8ea0211a488430806d7eea479625bb1e"}
-embassy-time-driver = {git = "https://github.com/embassy-rs/embassy.git", rev="1f9a907d8ea0211a488430806d7eea479625bb1e"}
-embassy-embedded-hal = {git = "https://github.com/embassy-rs/embassy.git", rev="1f9a907d8ea0211a488430806d7eea479625bb1e"}
+embassy-executor = {git = "https://github.com/embassy-rs/embassy.git", rev="729f96b9521d6705c1d664f4e9c636155d440519"}
+embassy-nrf = {git = "https://github.com/embassy-rs/embassy.git", rev="729f96b9521d6705c1d664f4e9c636155d440519"}
+embassy-sync = {git = "https://github.com/embassy-rs/embassy.git", rev="729f96b9521d6705c1d664f4e9c636155d440519"}
+embassy-futures = {git = "https://github.com/embassy-rs/embassy.git", rev="729f96b9521d6705c1d664f4e9c636155d440519"}
+embassy-time = {git = "https://github.com/embassy-rs/embassy.git", rev="729f96b9521d6705c1d664f4e9c636155d440519"}
+embassy-time-driver = {git = "https://github.com/embassy-rs/embassy.git", rev="729f96b9521d6705c1d664f4e9c636155d440519"}
+embassy-embedded-hal = {git = "https://github.com/embassy-rs/embassy.git", rev="729f96b9521d6705c1d664f4e9c636155d440519"}
 #bt-hci = { path = "../bt-hci" }
