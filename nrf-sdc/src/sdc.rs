@@ -575,6 +575,16 @@ impl Builder {
         self.support(raw::sdc_support_le_power_class_1)
     }
 
+    /// Support Connection Subrating for central role
+    pub fn support_le_connection_subrating_central(self) -> Self {
+        self.support(raw::sdc_support_connection_subrating_central)
+    }
+
+    ///Support Connection Subrating for peripheral role
+    pub fn support_le_connection_subrating_peripheral(self) -> Self {
+        self.support(raw::sdc_support_connection_subrating_peripheral)
+    }
+
     /// Sets the default TX power.
     pub fn default_tx_power(self, dbm: i8) -> Result<Self, Error> {
         RetVal::from(unsafe { raw::sdc_default_tx_power_set(dbm) })
@@ -1206,6 +1216,8 @@ mod le {
     sdc_cmd!(LeSetPathLossReportingEnable => sdc_hci_cmd_le_set_path_loss_reporting_enable(x) -> y);
     sdc_cmd!(LeSetTransmitPowerReportingEnable => sdc_hci_cmd_le_set_transmit_power_reporting_enable(x) -> y);
     sdc_cmd!(LeSetDataRelatedAddrChanges => sdc_hci_cmd_le_set_data_related_address_changes(x));
+    sdc_cmd!(LeSetDefaultSubrate => sdc_hci_cmd_le_set_default_subrate(x));
+    sdc_cmd!(async LeSubrateRequest => sdc_hci_cmd_le_subrate_request(x));
     sdc_cmd!(LeSetHostFeature => sdc_hci_cmd_le_set_host_feature(x));
     sdc_cmd!(LeSetHostFeatureV2 => sdc_hci_cmd_le_set_host_feature_v2(x));
     sdc_cmd!(LeFrameSpaceUpdate => sdc_hci_cmd_le_frame_space_update(x));
