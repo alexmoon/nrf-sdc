@@ -441,137 +441,137 @@ impl Builder {
     }
 
     /// Enables support for advertising.
-    pub fn support_adv(self) -> Result<Self, Error> {
+    pub fn support_adv(self) -> Self {
         self.support(raw::sdc_support_adv)
     }
 
     /// Enables support for extended advertising.
-    pub fn support_ext_adv(self) -> Result<Self, Error> {
+    pub fn support_ext_adv(self) -> Self {
         self.support(raw::sdc_support_ext_adv)
     }
 
     /// Enables support for peripheral role.
-    pub fn support_peripheral(self) -> Result<Self, Error> {
+    pub fn support_peripheral(self) -> Self {
         self.support(raw::sdc_support_peripheral)
     }
 
     /// Enables support for scanning.
-    pub fn support_scan(self) -> Result<Self, Error> {
+    pub fn support_scan(self) -> Self {
         self.support(raw::sdc_support_scan)
     }
 
     /// Enables support for extended scanning.
-    pub fn support_ext_scan(self) -> Result<Self, Error> {
+    pub fn support_ext_scan(self) -> Self {
         self.support(raw::sdc_support_ext_scan)
     }
 
     /// Enables support for central role.
-    pub fn support_central(self) -> Result<Self, Error> {
+    pub fn support_central(self) -> Self {
         self.support(raw::sdc_support_central)
     }
 
     /// Enables support for extended central role.
-    pub fn support_ext_central(self) -> Result<Self, Error> {
+    pub fn support_ext_central(self) -> Self {
         self.support(raw::sdc_support_ext_central)
     }
 
     /// Enables support for Data Length Extension (DLE) in central role.
-    pub fn support_dle_central(self) -> Result<Self, Error> {
+    pub fn support_dle_central(self) -> Self {
         self.support(raw::sdc_support_dle_central)
     }
 
     /// Enables support for Data Length Extension (DLE) in peripheral role.
-    pub fn support_dle_peripheral(self) -> Result<Self, Error> {
+    pub fn support_dle_peripheral(self) -> Self {
         self.support(raw::sdc_support_dle_peripheral)
     }
 
     /// Enables support for 2M PHY.
-    pub fn support_le_2m_phy(self) -> Result<Self, Error> {
+    pub fn support_le_2m_phy(self) -> Self {
         self.support(raw::sdc_support_le_2m_phy)
     }
 
     /// Enables support for coded PHY.
-    pub fn support_le_coded_phy(self) -> Result<Self, Error> {
+    pub fn support_le_coded_phy(self) -> Self {
         self.support(raw::sdc_support_le_coded_phy)
     }
 
     /// Enables support for PHY update in central role.
-    pub fn support_phy_update_central(self) -> Result<Self, Error> {
+    pub fn support_phy_update_central(self) -> Self {
         self.support(raw::sdc_support_phy_update_central)
     }
 
     /// Enables support for PHY update in peripheral role.
-    pub fn support_phy_update_peripheral(self) -> Result<Self, Error> {
+    pub fn support_phy_update_peripheral(self) -> Self {
         self.support(raw::sdc_support_phy_update_peripheral)
     }
 
     /// Enables support for periodic advertising.
-    pub fn support_le_periodic_adv(self) -> Result<Self, Error> {
+    pub fn support_le_periodic_adv(self) -> Self {
         self.support(raw::sdc_support_le_periodic_adv)
     }
 
     /// Enables support for periodic sync.
-    pub fn support_le_periodic_sync(self) -> Result<Self, Error> {
+    pub fn support_le_periodic_sync(self) -> Self {
         self.support(raw::sdc_support_le_periodic_sync)
     }
 
     /// Enables support for LE power control in central role.
-    pub fn support_le_power_control_central(self) -> Result<Self, Error> {
+    pub fn support_le_power_control_central(self) -> Self {
         self.support(raw::sdc_support_le_power_control_central)
     }
 
     /// Enables support for LE power control in peripheral role.
-    pub fn support_le_power_control_peripheral(self) -> Result<Self, Error> {
+    pub fn support_le_power_control_peripheral(self) -> Self {
         self.support(raw::sdc_support_le_power_control_peripheral)
     }
 
     /// Enables support for sleep clock accuracy (SCA) updates in central role.
-    pub fn support_sca_central(self) -> Result<Self, Error> {
+    pub fn support_sca_central(self) -> Self {
         self.support(raw::sdc_support_sca_central)
     }
 
     /// Enables support for sleep clock accuracy (SCA) updates in peripheral role.
-    pub fn support_sca_peripheral(self) -> Result<Self, Error> {
+    pub fn support_sca_peripheral(self) -> Self {
         self.support(raw::sdc_support_sca_peripheral)
     }
 
     /// Enables support for LE connection CTE response in central role.
-    pub fn support_le_conn_cte_rsp_central(self) -> Result<Self, Error> {
+    pub fn support_le_conn_cte_rsp_central(self) -> Self {
         self.support(raw::sdc_support_le_conn_cte_rsp_central)
     }
 
     /// Enables support for LE connection CTE response in peripheral role.
-    pub fn support_le_conn_cte_rsp_peripheral(self) -> Result<Self, Error> {
+    pub fn support_le_conn_cte_rsp_peripheral(self) -> Self {
         self.support(raw::sdc_support_le_conn_cte_rsp_peripheral)
     }
 
     /// Enables support for periodic advertising sync transfer sender in central role.
-    pub fn support_periodic_adv_sync_transfer_sender_central(self) -> Result<Self, Error> {
+    pub fn support_periodic_adv_sync_transfer_sender_central(self) -> Self {
         self.support(raw::sdc_support_periodic_adv_sync_transfer_sender_central)
     }
 
     /// Enables support for periodic advertising sync transfer sender in peripheral role.
-    pub fn support_periodic_adv_sync_transfer_sender_peripheral(self) -> Result<Self, Error> {
+    pub fn support_periodic_adv_sync_transfer_sender_peripheral(self) -> Self {
         self.support(raw::sdc_support_periodic_adv_sync_transfer_sender_peripheral)
     }
 
     /// Enables support for periodic advertising sync transfer receiver in central role.
-    pub fn support_periodic_adv_sync_transfer_receiver_central(self) -> Result<Self, Error> {
+    pub fn support_periodic_adv_sync_transfer_receiver_central(self) -> Self {
         self.support(raw::sdc_support_periodic_adv_sync_transfer_receiver_central)
     }
 
     /// Enables support for periodic advertising sync transfer receiver in peripheral role.
-    pub fn support_periodic_adv_sync_transfer_receiver_peripheral(self) -> Result<Self, Error> {
+    pub fn support_periodic_adv_sync_transfer_receiver_peripheral(self) -> Self {
         self.support(raw::sdc_support_periodic_adv_sync_transfer_receiver_peripheral)
     }
 
     /// Enables support for QoS channel survey.
-    pub fn support_qos_channel_survey(self) -> Result<Self, Error> {
+    pub fn support_qos_channel_survey(self) -> Self {
         self.support(raw::sdc_support_qos_channel_survey)
     }
 
     /// Support power class 1.
-    pub fn support_le_power_class_1(self) -> Result<Self, Error> {
+    pub fn support_le_power_class_1(self) -> Self {
         self.support(raw::sdc_support_le_power_class_1)
     }
 
@@ -646,9 +646,9 @@ impl Builder {
     }
 
     #[inline]
-    fn support(self, f: unsafe extern "C" fn()) -> Result<Self, Error> {
+    fn support(self, f: unsafe extern "C" fn()) -> Self {
         unsafe { f() };
-        Ok(self)
+        self
     }
 
     fn cfg_set(self, config_type: u32, value: sdc_cfg_t) -> Result<Self, Error> {
