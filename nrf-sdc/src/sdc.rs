@@ -646,8 +646,9 @@ impl Builder {
     }
 
     #[inline]
-    fn support(self, f: unsafe extern "C" fn() -> i32) -> Result<Self, Error> {
-        RetVal::from(unsafe { f() }).to_result().and(Ok(self))
+    fn support(self, f: unsafe extern "C" fn()) -> Result<Self, Error> {
+        unsafe { f() };
+        Ok(self)
     }
 
     fn cfg_set(self, config_type: u32, value: sdc_cfg_t) -> Result<Self, Error> {
