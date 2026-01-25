@@ -594,6 +594,46 @@ impl Builder {
         RetVal::from(ret).to_result().map(|x| x as usize)
     }
 
+    /// Enables support for Frame Space Update in central role.
+    pub fn support_frame_space_update_central(self) -> Self {
+        self.support(raw::sdc_support_frame_space_update_central)
+    }
+
+    /// Enables support for Frame Space Update in peripheral role.
+    pub fn support_frame_space_update_peripheral(self) -> Self {
+        self.support(raw::sdc_support_frame_space_update_peripheral)
+    }
+
+    /// Enables support for the lowest frame space possible for ACL connections.
+    pub fn support_lowest_frame_space(self) -> Self {
+        self.support(raw::sdc_support_lowest_frame_space)
+    }
+
+    /// Enables support for Extended Feature Set.
+    pub fn support_extended_feature_set(self) -> Self {
+        self.support(raw::sdc_support_extended_feature_set)
+    }
+
+    /// Enables support for Connection Subrating in central role.
+    pub fn support_connection_subrating_central(self) -> Self {
+        self.support(raw::sdc_support_connection_subrating_central)
+    }
+
+    /// Enables support for Connection Subrating in peripheral role.
+    pub fn support_connection_subrating_peripheral(self) -> Self {
+        self.support(raw::sdc_support_connection_subrating_peripheral)
+    }
+
+    /// Enables support for Shorter Connection Intervals in central role.
+    pub fn support_shorter_connection_intervals_central(self) -> Self {
+        self.support(raw::sdc_support_shorter_connection_intervals_central)
+    }
+
+    /// Enables support for Shorter Connection Intervals in peripheral role.
+    pub fn support_shorter_connection_intervals_peripheral(self) -> Self {
+        self.support(raw::sdc_support_shorter_connection_intervals_peripheral)
+    }
+
     /// Builds the SoftDevice Controller.
     ///
     /// # Safety
@@ -1168,6 +1208,25 @@ mod le {
     sdc_cmd!(LeSetDataRelatedAddrChanges => sdc_hci_cmd_le_set_data_related_address_changes(x));
     sdc_cmd!(LeSetHostFeature => sdc_hci_cmd_le_set_host_feature(x));
     sdc_cmd!(LeSetHostFeatureV2 => sdc_hci_cmd_le_set_host_feature_v2(x));
+    sdc_cmd!(LeFrameSpaceUpdate => sdc_hci_cmd_le_frame_space_update(x));
+    sdc_cmd!(LeConnectionRateRequest => sdc_hci_cmd_le_conn_rate_request(x));
+    sdc_cmd!(LeSetDefaultRateParameters => sdc_hci_cmd_le_set_default_rate_params(x));
+
+    impl<'d> ControllerCmdSync<LeReadMinimumSupportedConnectionInterval> for super::SoftdeviceController<'d> {
+        async fn exec(
+            &self,
+            _cmd: &LeReadMinimumSupportedConnectionInterval,
+        ) -> Result<<LeReadMinimumSupportedConnectionInterval as bt_hci::cmd::SyncCmd>::Return, CmdError<Self::Error>>
+        {
+            const N: usize = 2 + (6 * 255);
+            let mut out = [0; N];
+            let ret = unsafe { raw::sdc_hci_cmd_le_read_min_supported_conn_interval(out.as_mut_ptr() as *mut _) };
+            bt_hci::param::Status::from(ret).to_result().map_err(CmdError::Hci)?;
+            Ok(unwrap!(
+                LeReadMinimumSupportedConnectionIntervalReturn::from_hci_bytes_complete(&out)
+            ))
+        }
+    }
 
     impl<'a, 'd> ControllerCmdSync<LeSetExtAdvData<'a>> for super::SoftdeviceController<'d> {
         async fn exec(&self, cmd: &LeSetExtAdvData<'a>) -> Result<(), CmdError<nrf_mpsl::Error>> {
