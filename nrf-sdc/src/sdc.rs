@@ -609,6 +609,21 @@ impl Builder {
         self.support(raw::sdc_support_lowest_frame_space)
     }
 
+    /// Enables support for Extended Feature Set.
+    pub fn support_extended_feature_set(self) -> Self {
+        self.support(raw::sdc_support_extended_feature_set)
+    }
+
+    /// Enables support for Connection Subrating in central role.
+    pub fn support_connection_subrating_central(self) -> Self {
+        self.support(raw::sdc_support_connection_subrating_central)
+    }
+
+    /// Enables support for Connection Subrating in peripheral role.
+    pub fn support_connection_subrating_peripheral(self) -> Self {
+        self.support(raw::sdc_support_connection_subrating_peripheral)
+    }
+
     /// Enables support for Shorter Connection Intervals in central role.
     pub fn support_shorter_connection_intervals_central(self) -> Self {
         self.support(raw::sdc_support_shorter_connection_intervals_central)
