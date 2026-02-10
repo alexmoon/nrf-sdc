@@ -345,12 +345,16 @@ unsafe extern "C" fn timeslot_session_callback(
             core::ptr::null_mut()
         }
         raw::MPSL_TIMESLOT_SIGNAL_CANCELLED | raw::MPSL_TIMESLOT_SIGNAL_BLOCKED => {
-            STATE.with_inner(|state| {
+            let request = STATE.with_inner(|state| {
                 state.timeslot_request.params.earliest.priority = raw::MPSL_TIMESLOT_PRIORITY_HIGH as u8;
                 state.timeslot_request.params.earliest.timeout_us = raw::MPSL_TIMESLOT_EARLIEST_TIMEOUT_MAX_US;
-                let ret = unsafe { raw::mpsl_timeslot_request(session_id, &state.timeslot_request) };
-                assert!(ret == 0);
+                core::ptr::from_ref(&state.timeslot_request)
             });
+            // Call mpsl_timeslot_request outside with_inner: since MPSL 3.2.0,
+            // SIGNAL_BLOCKED/CANCELLED may be delivered immediately, which would
+            // re-enter this callback while the RefCell is still borrowed.
+            let ret = unsafe { raw::mpsl_timeslot_request(session_id, request) };
+            assert!(ret == 0);
             core::ptr::null_mut()
         }
         raw::MPSL_TIMESLOT_SIGNAL_OVERSTAYED => {
