@@ -9,7 +9,7 @@ publish = false
 [dependencies]
 nrf-sdc = { version = "0.4.0", path = "../nrf-sdc", features = ["defmt", "peripheral"] }
 nrf-mpsl = { version = "0.3.0", path = "../nrf-mpsl", features = ["defmt", "critical-section-impl"] }
-bt-hci = { version = "0.7", default-features = false }
+bt-hci = { version = "0.8", default-features = false }
 
 embassy-executor = { version = "0.9", features = ["arch-cortex-m", "executor-thread", "defmt", "executor-interrupt"] }
 embassy-time = { version = "0.5", features = ["defmt", "defmt-timestamp-uptime"] }
