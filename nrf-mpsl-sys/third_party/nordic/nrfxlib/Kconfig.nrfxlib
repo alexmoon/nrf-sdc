@@ -1,0 +1,22 @@
+#
+# Copyright (c) 2019 - 2020 Nordic Semiconductor
+#
+# SPDX-License-Identifier: LicenseRef-Nordic-5-Clause
+#
+
+menu "Nordic nrfxlib"
+
+rsource "nrf_modem/Kconfig"
+rsource "nfc/Kconfig"
+rsource "mpsl/Kconfig"
+rsource "crypto/Kconfig"
+rsource "nrf_rpc/Kconfig"
+rsource "openthread/Kconfig"
+rsource "nrf_802154/zephyr/Kconfig.nrfxlib"
+rsource "gzll/Kconfig"
+rsource "nrf_dm/Kconfig"
+rsource "lc3/Kconfig"
+rsource "nrf_fuel_gauge/Kconfig"
+rsource "nrf71_wifi/Kconfig"
+
+endmenu

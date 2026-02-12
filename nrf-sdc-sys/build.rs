@@ -241,7 +241,6 @@ fn bindgen(target: &Target, mem_fns: Rc<RefCell<Vec<u8>>>) -> bindgen::Builder {
         .clang_arg("-I./third_party/nordic/nrfx")
         .clang_arg("-I./third_party/nordic/nrfx/mdk")
         .clang_arg("-I./third_party/nordic/nrfx/templates")
-        .clang_arg("-I./third_party/nordic/nrfx/bsp/stable")
         .clang_arg("-I./third_party/nordic/nrfxlib/mpsl/include")
         .clang_arg("-I./third_party/nordic/nrfxlib/softdevice_controller/include")
         .clang_arg(format!("-D{}", target.chip))
