@@ -1,0 +1,50 @@
+# CODEOWNERS for autoreview assigning in github
+
+# Order is important; the last matching pattern takes the most
+# precedence.
+
+# Root folder
+/CODEOWNERS                               @carlescufi
+/LICENSE                                  @carlescufi
+/Jenkinsfile                              @thst-nordic
+/README.rst                               @carlescufi
+/.checkpatch.conf                         @carlescufi
+/.gitattributes                           @thst-nordic
+/.gitlint                                 @thst-nordic
+
+# All cmake related files
+/CMakeLists.txt                           @tejlmand
+
+# All Kconfig related files
+Kconfig*                                  @tejlmand
+
+# All documentation related files
+*.rst                                     @b-gent
+doc/*                                     @b-gent
+
+# All doc image subfolders
+/mpsl/doc/pic/                            @Avalei
+/nrf_802154/doc/images/                   @Avalei
+/nrf_modem/doc/images/                    @Avalei
+/nrf_rpc/doc/img/                         @Avalei
+/softdevice_controller/doc/pic/           @Avalei
+
+# All subfolders
+/.github/                                 @thst-nordic
+/.github/test-spec.yml                    @nrfconnect/ncs-test-leads
+/softdevice_controller/                   @nrfconnect/ncs-dragoon
+/nrf_modem/                               @nrfconnect/ncs-co-networking @nrfconnect/ncs-modem
+/crypto/                                  @frkv @tejlmand
+/gzll/                                    @leewkb4567
+/mpsl/                                    @nrfconnect/ncs-dragoon
+/nfc/                                     @anangl @grochu @KAGA164
+/nrf_802154/                              @nrfconnect/ncs-radio-sw
+/nrf_security/                            @frkv @tejlmand
+/openthread/                              @lmaciejonczyk @edmont @canisLupus1313
+/zephyr/                                  @carlescufi
+/nrf_rpc/                                 @nrfconnect/ncs-blenders @nrfconnect/ncs-protocols-serialization
+/nrf_dm/                                  @Tschet1 @eriksandgren
+/lc3/                                     @koffes @alexsven
+/nrf_fuel_gauge/                          @nordic-auko
+/nrf_wifi/                                @udaynordic @rajb9 @srkanordic
+/softperipheral/                          @lopeztel @nordavid531 @ostenholkestad @bikleppe
