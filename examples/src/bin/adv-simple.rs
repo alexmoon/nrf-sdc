@@ -185,6 +185,14 @@ async fn main(spawner: Spawner) {
     #[cfg(feature = "nrf54l")]
     let mut led = Output::new(p.P1_10, Level::Low, OutputDrive::Standard);
 
+    // See adv_data above
+    defmt::info!("Complete Local Name: HelloRust");
+
+    let mut bdaddr = bd_addr().into_inner();
+    bdaddr.reverse();
+    defmt::info!("Bluetooth Device Address: {:X}", bdaddr);
+
+    defmt::info!("Advertising ...");
     loop {
         led.set_high();
         Timer::after(Duration::from_millis(300)).await;
