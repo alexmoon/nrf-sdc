@@ -9,9 +9,16 @@ use core::task::Poll;
 
 use cortex_m::peripheral::NVIC;
 use embassy_nrf::interrupt::Interrupt;
+#[cfg(feature = "nrf52")]
 use embassy_nrf::nvmc::{FLASH_SIZE, PAGE_SIZE};
+#[cfg(feature = "nrf54l-s")]
+use embassy_nrf::nvmc::{FLASH_SIZE, PAGE_SIZE};
+#[cfg(feature = "nrf52")]
 use embassy_nrf::pac::nvmc::vals::Wen;
+#[cfg(feature = "nrf52")]
 use embassy_nrf::peripherals::NVMC;
+#[cfg(feature = "nrf54l-s")]
+use embassy_nrf::peripherals::RRAMC as NVMC;
 use embassy_nrf::{pac, Peri};
 use embassy_sync::blocking_mutex::raw::RawMutex;
 use embassy_sync::blocking_mutex::Mutex;
@@ -20,19 +27,26 @@ use embedded_storage::nor_flash::{ErrorType, NorFlashError, NorFlashErrorKind};
 
 use crate::{raw, MultiprotocolServiceLayer, RetVal};
 
-// A custom RawMutex implementation that also masks the timer0 interrupt
-// which invokes the timeslot callback.
-struct Timer0RawMutex;
-unsafe impl RawMutex for Timer0RawMutex {
-    const INIT: Self = Timer0RawMutex;
+// A custom RawMutex implementation that also masks the radio timer interrupt which invokes the
+// timeslot callback.
+struct RadioTimerRawMutex;
+unsafe impl RawMutex for RadioTimerRawMutex {
+    const INIT: Self = RadioTimerRawMutex;
     fn lock<R>(&self, f: impl FnOnce() -> R) -> R {
+        #[cfg(not(feature = "nrf54l-s"))]
+        const TIMER: u32 = Interrupt::TIMER0 as u32;
+        #[cfg(feature = "nrf54l-s")]
+        const TIMER: u32 = Interrupt::TIMER10 as u32;
         unsafe {
+            const INDEX: usize = TIMER as usize / 32;
+            const MASK: u32 = 1 << (TIMER % 32);
+
             let nvic = &*NVIC::PTR;
-            nvic.icer[0].write(1 << Interrupt::TIMER0 as u8);
+            nvic.icer[INDEX].write(MASK);
             compiler_fence(Ordering::SeqCst);
             let r = f();
             compiler_fence(Ordering::SeqCst);
-            nvic.iser[0].write(1 << Interrupt::TIMER0 as u8);
+            nvic.iser[INDEX].write(MASK);
             r
         }
     }
@@ -80,7 +94,7 @@ pub struct Flash<'d> {
 
 /// Global state of the timeslot flash operation
 struct State {
-    inner: Mutex<Timer0RawMutex, RefCell<InnerState>>,
+    inner: Mutex<RadioTimerRawMutex, RefCell<InnerState>>,
 }
 
 /// Inner state.
@@ -110,6 +124,7 @@ enum FlashOp {
         dest: *mut u32,
         /// Source address
         src: *const u32,
+        /// The number of words to write
         words: u32,
     },
 }
@@ -129,15 +144,26 @@ const TIMESLOT_TIMEOUT_PRIORITY_NORMAL_US: u32 = 30000;
 const TIMESLOT_SLACK_US: u32 = 1000;
 
 // Values according to nRF52 product specification
+#[cfg(feature = "nrf52")]
 const ERASE_PAGE_DURATION_US: u32 = 85_000;
+#[cfg(feature = "nrf52")]
 const WRITE_WORD_DURATION_US: u32 = 41;
+
+// See RRAM vs RAM section at https://argenox.com/blog/nordic-announces-nrf54l
+// 65 us for single (unbuffered) word writes and 22 us for sequential address ordered (buffered)
+// word writes. We do the former.
+#[cfg(feature = "nrf54l-s")]
+const WRITE_WORD_DURATION_US: u32 = 65;
 
 #[cfg(not(feature = "nrf52832"))]
 const ERASE_PARTIAL_PAGE_DURATION_MS: u32 = 10;
 #[cfg(not(feature = "nrf52832"))]
 const ERASE_PARTIAL_PAGE_DURATION_US: u32 = ERASE_PARTIAL_PAGE_DURATION_MS * 1000;
 
-const WORD_SIZE: u32 = 4;
+const WORD_SIZE: usize = 4;
+
+#[cfg(feature = "nrf54l-s")]
+const WRITE_LINE_SIZE: usize = 16;
 
 // Values derived from Zephyr
 #[cfg(not(feature = "nrf52832"))]
@@ -262,7 +288,12 @@ impl<'d> Flash<'d> {
         if to < from || to as usize > FLASH_SIZE {
             return Err(FlashError::OutOfBounds);
         }
+        #[cfg(not(feature = "nrf54l-s"))]
         if from as usize % PAGE_SIZE != 0 || to as usize % PAGE_SIZE != 0 {
+            return Err(FlashError::Unaligned);
+        }
+        #[cfg(feature = "nrf54l-s")]
+        if from as usize % WRITE_LINE_SIZE != 0 || to as usize % WRITE_LINE_SIZE != 0 {
             return Err(FlashError::Unaligned);
         }
 
@@ -286,17 +317,61 @@ impl<'d> Flash<'d> {
         if offset as usize + data.len() > FLASH_SIZE {
             return Err(FlashError::OutOfBounds);
         }
-        if offset as usize % 4 != 0 || data.len() % 4 != 0 {
+        #[cfg(not(feature = "nrf54l-s"))]
+        if offset as usize % WORD_SIZE != 0 || data.len() % WORD_SIZE != 0 {
+            return Err(FlashError::Unaligned);
+        }
+        #[cfg(feature = "nrf54l-s")]
+        if offset as usize % WRITE_LINE_SIZE != 0 || data.len() % WRITE_LINE_SIZE != 0 {
             return Err(FlashError::Unaligned);
         }
 
         let src = data.as_ptr() as *const u32;
         let dest = offset as *mut u32;
-        let words = data.len() as u32 / WORD_SIZE;
+        let words = data.len() as u32 / WORD_SIZE as u32;
         self.do_op(TIMESLOT_LENGTH_WRITE_US, FlashOp::Write { dest, words, src })
             .await?;
         Ok(())
     }
+}
+
+#[cfg(not(feature = "nrf54l-s"))]
+type Nvmc = pac::nvmc::Nvmc;
+#[cfg(feature = "nrf54l-s")]
+type Nvmc = pac::rramc::Rramc;
+
+#[inline(always)]
+fn wait_ready(p: Nvmc) {
+    while !p.ready().read().ready() {}
+}
+
+#[cfg(feature = "nrf54l-s")]
+#[inline(always)]
+fn wait_ready_write(p: Nvmc) {
+    while !p.readynext().read().readynext() {}
+    while !p.bufstatus().writebufempty().read().empty() {}
+}
+
+#[cfg(not(feature = "nrf54l-s"))]
+#[inline(always)]
+fn enable_erase(p: Nvmc) {
+    p.config().write(|w| w.set_wen(Wen::EEN));
+}
+
+#[inline(always)]
+fn enable_read(p: Nvmc) {
+    #[cfg(not(feature = "nrf54l-s"))]
+    p.config().write(|w| w.set_wen(Wen::REN));
+    #[cfg(feature = "nrf54l-s")]
+    p.config().write(|w| w.set_wen(false));
+}
+
+#[inline(always)]
+fn enable_write(p: Nvmc) {
+    #[cfg(not(feature = "nrf54l-s"))]
+    p.config().write(|w| w.set_wen(Wen::WEN));
+    #[cfg(feature = "nrf54l-s")]
+    p.config().write(|w| w.set_wen(true));
 }
 
 unsafe extern "C" fn timeslot_session_callback(
@@ -307,7 +382,10 @@ unsafe extern "C" fn timeslot_session_callback(
     //
     // Safety: guaranteed by MPSL to provide values when called inside slot callback.
     unsafe fn get_timeslot_time_us() -> u32 {
+        #[cfg(not(feature = "nrf54l-s"))]
         let p = pac::TIMER0;
+        #[cfg(feature = "nrf54l-s")]
+        let p = pac::TIMER10;
         p.tasks_capture(0).write_value(1);
         p.cc(0).read()
     }
@@ -325,9 +403,12 @@ unsafe extern "C" fn timeslot_session_callback(
                     state.return_param.params.request.p_next = &mut state.timeslot_request;
                 }
                 ControlFlow::Break(_) => {
+                    #[cfg(not(feature = "nrf54l-s"))]
                     let p = pac::NVMC;
-                    p.config().write(|w| w.set_wen(Wen::REN));
-                    while !p.ready().read().ready() {}
+                    #[cfg(feature = "nrf54l-s")]
+                    let p = pac::RRAMC;
+                    enable_read(p);
+                    wait_ready(p);
                     state.result.replace(Ok(()));
                     state.return_param.callback_action = raw::MPSL_TIMESLOT_SIGNAL_ACTION_END as u8;
                     state.waker.wake();
@@ -405,7 +486,10 @@ impl State {
 }
 
 impl FlashOp {
-    #[cfg(not(feature = "nrf52832"))]
+    //
+    // nrf52 erase and write
+    //
+    #[cfg(not(any(feature = "nrf52832", feature = "nrf54l-s")))]
     fn erase<F: Fn() -> u32>(
         get_time: F,
         slot_duration_us: u32,
@@ -416,13 +500,13 @@ impl FlashOp {
         let p = pac::NVMC;
         loop {
             // Enable erase and erase next page
-            p.config().write(|w| w.set_wen(Wen::EEN));
+            enable_erase(p);
             p.erasepagepartialcfg().write(|w| w.0 = ERASE_PARTIAL_PAGE_DURATION_MS);
-            while !p.ready().read().ready() {}
+            wait_ready(p);
 
             p.erasepagepartial().write_value(*address);
-            while !p.ready().read().ready() {}
-            p.config().write(|w| w.set_wen(Wen::REN));
+            wait_ready(p);
+            enable_read(p);
 
             *elapsed += ERASE_PARTIAL_PAGE_DURATION_US;
             if *elapsed > ERASE_PAGE_DURATION_US {
@@ -447,13 +531,146 @@ impl FlashOp {
         to: u32,
     ) -> core::ops::ControlFlow<()> {
         let p = pac::NVMC;
-        p.config().write(|w| w.set_wen(Wen::EEN));
-        while !p.ready().read().ready() {}
+        enable_erase(p);
+        wait_ready(p);
         p.erasepage().write_value(*address);
-        while !p.ready().read().ready() {}
-        p.config().write(|w| w.set_wen(Wen::REN));
+        wait_ready(p);
+        enable_read(p);
         *address += PAGE_SIZE as u32;
         if *address >= to {
+            ControlFlow::Break(())
+        } else {
+            ControlFlow::Continue(())
+        }
+    }
+
+    #[cfg(not(feature = "nrf54l-s"))]
+    fn write<F: Fn() -> u32>(
+        get_time: F,
+        slot_duration_us: u32,
+        dest: &mut *mut u32,
+        src: &mut *const u32,
+        words: &mut u32,
+    ) -> core::ops::ControlFlow<()> {
+        let p = pac::NVMC;
+        let mut i = 0;
+        // Do at least one write to avoid getting stuck. The timeslot parameters guarantees we
+        // should be able to do at least one operation.
+        if *words > 0 {
+            loop {
+                enable_write(p);
+                wait_ready(p);
+                unsafe {
+                    let w = core::ptr::read_unaligned(src.add(i));
+                    core::ptr::write_volatile(dest.add(i), w);
+                }
+                wait_ready(p);
+                i += 1;
+                if get_time() + WRITE_WORD_DURATION_US >= slot_duration_us || ((i as u32) >= *words) {
+                    break;
+                }
+            }
+        }
+
+        unsafe {
+            *src = src.add(i);
+            *dest = dest.add(i);
+            *words -= i as u32;
+        }
+
+        if *words == 0 {
+            ControlFlow::Break(())
+        } else {
+            ControlFlow::Continue(())
+        }
+    }
+
+    //
+    // nrf54l erase and write
+    //
+    // RRAM can overwrite in place, so we don't actually need to erase before writing like
+    // NorFlash. Here, we emulate erasing by overwriting with 0xFFFFFFFF.
+    #[cfg(feature = "nrf54l-s")]
+    fn erase<F: Fn() -> u32>(
+        get_time: F,
+        slot_duration_us: u32,
+        _elapsed: &mut u32,
+        from: &mut u32,
+        to: u32,
+    ) -> core::ops::ControlFlow<()> {
+        let p = pac::RRAMC;
+
+        enable_write(p);
+        wait_ready(p);
+
+        const ERASE_WORD: u32 = 0xFFFFFFFF;
+
+        while *from < to {
+            unsafe {
+                let dest = *from as *mut u32;
+                for i in 0..(WRITE_LINE_SIZE / WORD_SIZE) {
+                    core::ptr::write_volatile(dest.add(i), ERASE_WORD);
+                }
+                *from += WRITE_LINE_SIZE as u32;
+            }
+            wait_ready_write(p);
+            if get_time() + (4 * WRITE_WORD_DURATION_US) >= slot_duration_us {
+                break;
+            }
+        }
+
+        enable_read(p);
+        wait_ready(p);
+
+        if *from >= to {
+            ControlFlow::Break(())
+        } else {
+            ControlFlow::Continue(())
+        }
+    }
+
+    #[cfg(feature = "nrf54l-s")]
+    fn write<F: Fn() -> u32>(
+        get_time: F,
+        slot_duration_us: u32,
+        dest: &mut *mut u32,
+        src: &mut *const u32,
+        words: &mut u32,
+    ) -> core::ops::ControlFlow<()> {
+        let p = pac::RRAMC;
+
+        if *words > 0 {
+            let mut i = 0;
+
+            enable_write(p);
+            wait_ready(p);
+
+            loop {
+                unsafe {
+                    let w = core::ptr::read_unaligned(src.add(i));
+                    core::ptr::write_volatile(dest.add(i), w);
+                }
+                i += 1;
+                if i % 4 == 0 {
+                    wait_ready_write(p);
+
+                    if get_time() + (4 * WRITE_WORD_DURATION_US) >= slot_duration_us || ((i as u32) >= *words) {
+                        break;
+                    }
+                }
+            }
+
+            enable_read(p);
+            wait_ready(p);
+
+            unsafe {
+                *src = src.add(i);
+                *dest = dest.add(i);
+                *words -= i as u32;
+            }
+        }
+
+        if *words == 0 {
             ControlFlow::Break(())
         } else {
             ControlFlow::Continue(())
@@ -469,38 +686,7 @@ impl FlashOp {
                 }
                 Self::erase(get_time, slot_duration_us, elapsed, address, *to)
             }
-            Self::Write { dest, src, words } => {
-                let p = pac::NVMC;
-                let mut i = 0;
-                // Do at least one write to avoid getting stuck. The timeslot parameters guarantees we should be able to at least one operation.
-                if *words > 0 {
-                    loop {
-                        p.config().write(|w| w.set_wen(Wen::WEN));
-                        while !p.ready().read().ready() {}
-                        unsafe {
-                            let w = core::ptr::read_unaligned(src.add(i));
-                            core::ptr::write_volatile(dest.add(i), w);
-                        }
-                        while !p.ready().read().ready() {}
-                        i += 1;
-                        if get_time() + WRITE_WORD_DURATION_US >= slot_duration_us || ((i as u32) >= *words) {
-                            break;
-                        }
-                    }
-                }
-
-                unsafe {
-                    *src = src.add(i);
-                    *dest = dest.add(i);
-                    *words -= i as u32;
-                }
-
-                if *words == 0 {
-                    ControlFlow::Break(())
-                } else {
-                    ControlFlow::Continue(())
-                }
-            }
+            Self::Write { dest, src, words } => Self::write(get_time, slot_duration_us, dest, src, words),
             FlashOp::None => ControlFlow::Break(()),
         }
     }
@@ -545,7 +731,10 @@ impl embedded_storage_async::nor_flash::ReadNorFlash for Flash<'_> {
 }
 
 impl embedded_storage_async::nor_flash::NorFlash for Flash<'_> {
-    const WRITE_SIZE: usize = 4;
+    #[cfg(not(feature = "nrf54l-s"))]
+    const WRITE_SIZE: usize = WORD_SIZE;
+    #[cfg(feature = "nrf54l-s")]
+    const WRITE_SIZE: usize = WRITE_LINE_SIZE;
     const ERASE_SIZE: usize = PAGE_SIZE;
 
     async fn erase(&mut self, from: u32, to: u32) -> Result<(), Self::Error> {
