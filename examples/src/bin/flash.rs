@@ -2,13 +2,14 @@
 #![no_main]
 
 use defmt::{info, unwrap};
+use defmt_rtt as _;
 use embassy_executor::Spawner;
 use embassy_nrf::bind_interrupts;
 use futures::pin_mut;
 use mpsl::{Flash, MultiprotocolServiceLayer};
 use nrf_sdc::mpsl;
+use panic_probe as _;
 use static_cell::StaticCell;
-use {defmt_rtt as _, panic_probe as _};
 
 bind_interrupts!(struct Irqs {
     EGU0_SWI0 => mpsl::LowPrioInterruptHandler;

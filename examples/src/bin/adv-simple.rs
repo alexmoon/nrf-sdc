@@ -5,6 +5,7 @@ use bt_hci::cmd::le::{LeSetAdvData, LeSetAdvEnable, LeSetAdvParams};
 use bt_hci::cmd::SyncCmd;
 use bt_hci::param::BdAddr;
 use defmt::unwrap;
+use defmt_rtt as _;
 use embassy_executor::Spawner;
 #[cfg(feature = "nrf54l")]
 use embassy_nrf::cracen;
@@ -15,10 +16,10 @@ use embassy_nrf::{bind_interrupts, config, pac};
 use embassy_nrf::{peripherals::RNG, rng};
 use embassy_time::{Duration, Timer};
 use nrf_sdc::{self as sdc, mpsl};
+use panic_probe as _;
 use sdc::mpsl::MultiprotocolServiceLayer;
 use sdc::vendor::ZephyrWriteBdAddr;
 use static_cell::StaticCell;
-use {defmt_rtt as _, panic_probe as _};
 
 #[cfg(feature = "nrf54l")]
 type Rng = cracen::Cracen<'static, Blocking>;
