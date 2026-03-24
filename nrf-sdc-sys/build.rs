@@ -149,6 +149,7 @@ enum Series {
     Nrf53,
     Nrf54l,
     Nrf54lNs,
+    Nrf54lm20,
     Nrf54h,
 }
 
@@ -158,13 +159,15 @@ impl Series {
         let nrf53 = cfg!(feature = "nrf53");
         let nrf54l_s = cfg!(feature = "nrf54l-s");
         let nrf54l_ns = cfg!(feature = "nrf54l-ns");
+        let nrf54lm20_s = cfg!(feature = "nrf54lm20-app-s");
         let nrf54h = cfg!(feature = "nrf54h");
-        match (nrf52, nrf53, nrf54l_s, nrf54l_ns, nrf54h) {
-            (true, false, false, false, false) => Series::Nrf52,
-            (false, true, false, false, false) => Series::Nrf53,
-            (false, false, true, false, false) => Series::Nrf54l,
-            (false, false, false, true, false) => Series::Nrf54lNs,
-            (false, false, false, false, true) => Series::Nrf54h,
+        match (nrf52, nrf53, nrf54l_s, nrf54l_ns, nrf54lm20_s, nrf54h) {
+            (true, false, false, false, false, false) => Series::Nrf52,
+            (false, true, false, false, false, false) => Series::Nrf53,
+            (false, false, true, false, false, false) => Series::Nrf54l,
+            (false, false, false, true, false, false) => Series::Nrf54lNs,
+            (false, false, false, false, true, false) => Series::Nrf54lm20,
+            (false, false, false, false, false, true) => Series::Nrf54h,
             _ => panic!("Exactly one architecture feature must be enabled for nrf_sdc_sys"),
         }
     }
@@ -206,6 +209,20 @@ impl Target {
                 "soft",
                 "nrf54l_ns",
                 "NRF54L15_XXAA",
+                Some("NRF_APPLICATION"),
+            ),
+            (Series::Nrf54lm20, "thumbv8m.main-none-eabihf") => (
+                "cortex-m33",
+                "hard",
+                "nrf54l",
+                "NRF54LM20A_ENGA_XXAA", // TODO: Remove ENGA after updating nrfx to 4.x
+                Some("NRF_APPLICATION"),
+            ),
+            (Series::Nrf54lm20, "thumbv8m.main-none-eabi") => (
+                "cortex-m33",
+                "soft",
+                "nrf54l",
+                "NRF54LM20A_ENGA_XXAA",
                 Some("NRF_APPLICATION"),
             ),
             (Series::Nrf54h, "thumbv8m.main-none-eabihf") => {

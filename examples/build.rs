@@ -20,6 +20,8 @@ fn linker_data() -> &'static [u8] {
     return include_bytes!("memory-nrf52840.x");
     #[cfg(feature = "nrf54l15")]
     return include_bytes!("memory-nrf54l15.x");
+    #[cfg(feature = "nrf54lm20")]
+    return include_bytes!("memory-nrf54lm20.x");
 }
 
 fn main() {
