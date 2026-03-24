@@ -70,6 +70,7 @@ keep_only "$THIRD_PARTY/nordic/nrfx/haly" nrfy_common.h
 # templates: only need nrfx_glue.h
 keep_only "$THIRD_PARTY/nordic/nrfx/templates" nrfx_glue.h
 # mdk: strip down to only the headers we need (full dir is ~70MB)
+# TODO: Remove _enga_ for nrf54lm20a after updating nrfx to 4.x
 keep_only "$THIRD_PARTY/nordic/nrfx/mdk" \
     nrf.h nrf_peripherals.h nrf_mem.h nrf_erratas.h \
     compiler_abstraction.h system_nrf.h core_vpr.h \
@@ -79,6 +80,13 @@ keep_only "$THIRD_PARTY/nordic/nrfx/mdk" \
     nrf5340_network.h nrf5340_network_bitfields.h nrf5340_network_peripherals.h \
     nrf5340_network_name_change.h nrf5340_xxaa_network_memory.h \
     system_nrf5340_network.h nrf53_erratas.h \
+    nrf54lm20a_enga.h nrf54lm20a_enga_application.h nrf54lm20a_enga_application_peripherals.h \
+    nrf54lm20a_enga_application_vectors.h nrf54lm20a_enga_flpr.h \
+    nrf54lm20a_enga_flpr_peripherals.h nrf54lm20a_enga_flpr_vectors.h \
+    nrf54lm20a_enga_global.h nrf54lm20a_enga_interim.h \
+    nrf54lm20a_enga_name_change.h nrf54lm20a_enga_peripherals.h \
+    nrf54lm20a_enga_types.h nrf54lm20a_enga_version.h \
+    nrf54lm20a_enga_xxaa_application_memory.h nrf54lm20a_enga_xxaa_flpr_memory.h \
     nrf54l15.h nrf54l15_types.h nrf54l15_global.h \
     nrf54l15_application.h nrf54l15_application_peripherals.h \
     nrf54l15_xxaa_application_memory.h \

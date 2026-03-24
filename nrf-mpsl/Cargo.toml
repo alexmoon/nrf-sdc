@@ -28,6 +28,7 @@ nrf54l10-app-ns = ["embassy-nrf/nrf54l10-app-ns", "nrf-mpsl-sys/nrf54l-ns", "nrf
 nrf54l10-app-s = ["embassy-nrf/nrf54l10-app-s", "nrf-mpsl-sys/nrf54l-s", "nrf54l-s"]
 nrf54l15-app-ns = ["embassy-nrf/nrf54l15-app-ns", "nrf-mpsl-sys/nrf54l-ns", "nrf54l-ns"]
 nrf54l15-app-s = ["embassy-nrf/nrf54l15-app-s", "nrf-mpsl-sys/nrf54l-s", "nrf54l-s"]
+nrf54lm20-app-s = ["embassy-nrf/nrf54lm20-app-s", "nrf-mpsl-sys/nrf54lm20-app-s", "nrf54l-s"]
 
 
 nrf52 = ["nrf-mpsl-sys/nrf52"]
