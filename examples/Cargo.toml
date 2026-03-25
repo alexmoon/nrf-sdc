@@ -59,7 +59,6 @@ nrf54l = []
 [[bin]]
 name = "flash"
 path = "src/bin/flash.rs"
-required-features = ["nrf52"]
 
 [[bin]]
 name = "adv-simple"
