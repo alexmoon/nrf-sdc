@@ -4,19 +4,29 @@
 use defmt::{info, unwrap};
 use defmt_rtt as _;
 use embassy_executor::Spawner;
-use embassy_nrf::bind_interrupts;
+use embassy_nrf::{bind_interrupts, config};
 use futures::pin_mut;
 use mpsl::{Flash, MultiprotocolServiceLayer};
 use nrf_sdc::mpsl;
 use panic_probe as _;
 use static_cell::StaticCell;
 
+#[cfg(feature = "nrf52")]
 bind_interrupts!(struct Irqs {
     EGU0_SWI0 => mpsl::LowPrioInterruptHandler;
     CLOCK_POWER => mpsl::ClockInterruptHandler;
     RADIO => mpsl::HighPrioInterruptHandler;
     TIMER0 => mpsl::HighPrioInterruptHandler;
     RTC0 => mpsl::HighPrioInterruptHandler;
+});
+
+#[cfg(feature = "nrf54l")]
+bind_interrupts!(struct Irqs {
+    SWI00 => mpsl::LowPrioInterruptHandler;
+    CLOCK_POWER => mpsl::ClockInterruptHandler;
+    RADIO_0 => mpsl::HighPrioInterruptHandler;
+    TIMER10 => mpsl::HighPrioInterruptHandler;
+    GRTC_3 => mpsl::HighPrioInterruptHandler;
 });
 
 #[embassy_executor::task]
@@ -32,13 +42,46 @@ const ERASE_START: u32 = 0x60000;
 #[cfg(feature = "nrf52840")]
 const ERASE_START: u32 = 0x80000;
 
+#[cfg(feature = "nrf54l15")]
+const ERASE_START: u32 = 0x100000;
+
+#[cfg(feature = "nrf54lm20")]
+const ERASE_START: u32 = 0x120000;
+
 const ERASE_STOP: u32 = ERASE_START + 0x2000;
 
 #[embassy_executor::main]
 async fn main(spawner: Spawner) {
-    let p = embassy_nrf::init(Default::default());
+    #[cfg(feature = "nrf52")]
+    let nrf_config: config::Config = Default::default();
+    #[cfg(feature = "nrf54l")]
+    let mut nrf_config: config::Config = Default::default();
+    #[cfg(feature = "nrf54l")]
+    {
+        nrf_config.clock_speed = config::ClockSpeed::CK128;
+        nrf_config.hfclk_source = config::HfclkSource::ExternalXtal;
+        nrf_config.lfclk_source = config::LfclkSource::ExternalXtal;
+    }
+    let p = embassy_nrf::init(nrf_config);
 
+    #[cfg(feature = "nrf52")]
     let mpsl_p = mpsl::Peripherals::new(p.RTC0, p.TIMER0, p.TEMP, p.PPI_CH19, p.PPI_CH30, p.PPI_CH31);
+    #[cfg(feature = "nrf54l")]
+    let mpsl_p = mpsl::Peripherals::new(
+        p.GRTC_CH7,
+        p.GRTC_CH8,
+        p.GRTC_CH9,
+        p.GRTC_CH10,
+        p.GRTC_CH11,
+        p.TIMER10,
+        p.TIMER20,
+        p.TEMP,
+        p.PPI10_CH0,
+        p.PPI20_CH1,
+        p.PPIB11_CH0,
+        p.PPIB21_CH0,
+    );
+
     let lfclk_cfg = mpsl::raw::mpsl_clock_lfclk_cfg_t {
         source: mpsl::raw::MPSL_CLOCK_LF_SRC_RC as u8,
         rc_ctiv: mpsl::raw::MPSL_RECOMMENDED_RC_CTIV as u8,
@@ -57,7 +100,10 @@ async fn main(spawner: Spawner) {
     )));
     spawner.spawn(unwrap!(mpsl_task(&*mpsl)));
 
+    #[cfg(feature = "nrf52")]
     let f = Flash::take(mpsl, p.NVMC);
+    #[cfg(feature = "nrf54l")]
+    let f = Flash::take(mpsl, p.RRAMC);
     pin_mut!(f);
 
     info!("starting erase");
@@ -77,17 +123,21 @@ async fn main(spawner: Spawner) {
     info!("matched!");
 
     info!("starting write");
-    for offset in (ERASE_START..ERASE_STOP).step_by(4) {
-        unwrap!(f.as_mut().write(offset, &[1, 2, 3, 4]).await);
+    for offset in (ERASE_START..ERASE_STOP).step_by(16) {
+        unwrap!(
+            f.as_mut()
+                .write(offset, &[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16])
+                .await
+        );
     }
     info!("write done!");
 
-    for offset in (ERASE_START..ERASE_STOP).step_by(4) {
-        let mut buf = [0; 4];
+    for offset in (ERASE_START..ERASE_STOP).step_by(16) {
+        let mut buf = [0; 16];
         info!("starting read");
         unwrap!(f.as_mut().read(offset, &mut buf));
         info!("read done!");
-        assert_eq!(&[1, 2, 3, 4], &buf[..]);
+        assert_eq!(&[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16], &buf);
     }
     info!("matched!");
 }

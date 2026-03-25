@@ -80,7 +80,7 @@ pub(crate) mod fmt;
 /// Error handling.
 mod error;
 /// Flash operations using the timeslot API.
-#[cfg(feature = "nrf52")]
+#[cfg(any(feature = "nrf52", feature = "nrf54l-s"))]
 mod flash;
 /// High-frequency clock management.
 mod hfclk;
@@ -93,7 +93,7 @@ mod temp;
 mod critical_section_impl;
 
 pub use error::*;
-#[cfg(feature = "nrf52")]
+#[cfg(any(feature = "nrf52", feature = "nrf54l-s"))]
 pub use flash::*;
 pub use hfclk::*;
 pub use mpsl::*;
