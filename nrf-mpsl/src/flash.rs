@@ -176,10 +176,14 @@ const TIMESLOT_LENGTH_ERASE_US: u32 = ERASE_PAGE_DURATION_US;
 
 #[cfg(feature = "nrf52")]
 const TIMESLOT_LENGTH_WRITE_US: u32 = 7500;
+// nRF54L15 datasheet: tWRITE,UNBUFFERED = 65us per 32-bit word.
+// One 128-bit wordline = 4 words = 260us.
 #[cfg(feature = "nrf54l-s")]
-const TIMESLOT_LENGTH_ERASE_US: u32 = 1000;
+const WRITE_LINE_DURATION_US: u32 = 260;
 #[cfg(feature = "nrf54l-s")]
-const TIMESLOT_LENGTH_WRITE_US: u32 = 1000;
+const TIMESLOT_LENGTH_ERASE_US: u32 = 1200;
+#[cfg(feature = "nrf54l-s")]
+const TIMESLOT_LENGTH_WRITE_US: u32 = 1200;
 
 static STATE: State = State::new();
 
@@ -597,7 +601,7 @@ impl FlashOp {
         flash_enable_read();
     }
 
-    fn perform<F: Fn() -> u32>(&mut self, _get_time: F, _slot_duration_us: u32) -> core::ops::ControlFlow<()> {
+    fn perform<F: Fn() -> u32>(&mut self, get_time: F, slot_duration_us: u32) -> core::ops::ControlFlow<()> {
         match self {
             Self::Erase {
                 address,
@@ -608,18 +612,23 @@ impl FlashOp {
                     return ControlFlow::Break(());
                 }
 
-                Self::erase_line(*address, *page_offset);
-                *page_offset += FLASH_WRITE_SIZE as u32;
+                // Do at least one erase-line to avoid getting stuck, then keep going
+                // while there is enough time left in the timeslot.
+                loop {
+                    Self::erase_line(*address, *page_offset);
+                    *page_offset += FLASH_WRITE_SIZE as u32;
 
-                if *page_offset >= PAGE_SIZE as u32 {
-                    *page_offset = 0;
-                    *address += PAGE_SIZE as u32;
-                }
+                    if *page_offset >= PAGE_SIZE as u32 {
+                        *page_offset = 0;
+                        *address += PAGE_SIZE as u32;
+                    }
 
-                if *address >= *to {
-                    ControlFlow::Break(())
-                } else {
-                    ControlFlow::Continue(())
+                    if *address >= *to {
+                        return ControlFlow::Break(());
+                    }
+                    if get_time() + WRITE_LINE_DURATION_US >= slot_duration_us {
+                        return ControlFlow::Continue(());
+                    }
                 }
             }
             Self::Write { dest, src, words } => {
@@ -627,18 +636,23 @@ impl FlashOp {
                     return ControlFlow::Break(());
                 }
 
-                Self::write_line(*dest, *src);
+                // Do at least one write-line to avoid getting stuck, then keep going
+                // while there is enough time left in the timeslot.
+                loop {
+                    Self::write_line(*dest, *src);
 
-                unsafe {
-                    *src = src.add(FLASH_WRITE_WORDS);
-                    *dest = dest.add(FLASH_WRITE_WORDS);
-                }
-                *words -= FLASH_WRITE_WORDS as u32;
+                    unsafe {
+                        *src = src.add(FLASH_WRITE_WORDS);
+                        *dest = dest.add(FLASH_WRITE_WORDS);
+                    }
+                    *words -= FLASH_WRITE_WORDS as u32;
 
-                if *words == 0 {
-                    ControlFlow::Break(())
-                } else {
-                    ControlFlow::Continue(())
+                    if *words == 0 {
+                        return ControlFlow::Break(());
+                    }
+                    if get_time() + WRITE_LINE_DURATION_US >= slot_duration_us {
+                        return ControlFlow::Continue(());
+                    }
                 }
             }
             FlashOp::None => ControlFlow::Break(()),
