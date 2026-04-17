@@ -342,7 +342,7 @@ impl<'d> Flash<'d> {
 #[cfg(feature = "nrf52")]
 fn flash_enable_read() {
     let p = pac::NVMC;
-    p.config().write(|w| w.set_wen(Wen::REN));
+    p.config().write(|w| w.set_wen(Wen::Ren));
     while !p.ready().read().ready() {}
 }
 
@@ -472,13 +472,13 @@ impl FlashOp {
         let p = pac::NVMC;
         loop {
             // Enable erase and erase next page
-            p.config().write(|w| w.set_wen(Wen::EEN));
+            p.config().write(|w| w.set_wen(Wen::Een));
             p.erasepagepartialcfg().write(|w| w.0 = ERASE_PARTIAL_PAGE_DURATION_MS);
             while !p.ready().read().ready() {}
 
             p.erasepagepartial().write_value(*address);
             while !p.ready().read().ready() {}
-            p.config().write(|w| w.set_wen(Wen::REN));
+            p.config().write(|w| w.set_wen(Wen::Ren));
 
             *elapsed += ERASE_PARTIAL_PAGE_DURATION_US;
             if *elapsed > ERASE_PAGE_DURATION_US {
@@ -503,11 +503,11 @@ impl FlashOp {
         to: u32,
     ) -> core::ops::ControlFlow<()> {
         let p = pac::NVMC;
-        p.config().write(|w| w.set_wen(Wen::EEN));
+        p.config().write(|w| w.set_wen(Wen::Een));
         while !p.ready().read().ready() {}
         p.erasepage().write_value(*address);
         while !p.ready().read().ready() {}
-        p.config().write(|w| w.set_wen(Wen::REN));
+        p.config().write(|w| w.set_wen(Wen::Ren));
         *address += PAGE_SIZE as u32;
         if *address >= to {
             ControlFlow::Break(())
@@ -531,7 +531,7 @@ impl FlashOp {
                 // Do at least one write to avoid getting stuck. The timeslot parameters guarantees we should be able to at least one operation.
                 if *words > 0 {
                     loop {
-                        p.config().write(|w| w.set_wen(Wen::WEN));
+                        p.config().write(|w| w.set_wen(Wen::Wen));
                         while !p.ready().read().ready() {}
                         unsafe {
                             let w = core::ptr::read_unaligned(src.add(i));
@@ -568,7 +568,7 @@ impl FlashOp {
         let p = pac::RRAMC;
         p.config().write(|w| {
             w.set_wen(true);
-            w.set_writebufsize(Writebufsize::UNBUFFERED);
+            w.set_writebufsize(Writebufsize::Unbuffered);
         });
         while !p.ready().read().ready() {}
     }
