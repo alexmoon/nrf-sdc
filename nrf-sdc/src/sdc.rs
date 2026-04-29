@@ -288,7 +288,7 @@ extern "C" fn sdc_callback() {
 ///
 /// The softdevice controller calls this function exclusively from `mpsl_low_priority_process`,
 /// which is appropriately synchronized.
-unsafe extern "C" fn rand_blocking<R: CryptoRng + Send>(p_buff: *mut u8, length: u8) {
+unsafe extern "C" fn rand_blocking<R: CryptoRng>(p_buff: *mut u8, length: u8) {
     let rng = SDC_RNG.load(Ordering::Acquire) as *mut R;
     if rng.is_null() {
         panic!("rand_blocking called from Softdevice Controller when no rng is set");
@@ -649,7 +649,7 @@ impl Builder {
     /// # Safety
     ///
     /// The returned `SoftdeviceController` must not have its lifetime end without running its destructor, e.g. using `mem::forget`.
-    pub fn build<'d, R: CryptoRng + Send, const N: usize>(
+    pub fn build<'d, R: CryptoRng, const N: usize>(
         self,
         p: Peripherals<'d>,
         rng: &'d mut R,
