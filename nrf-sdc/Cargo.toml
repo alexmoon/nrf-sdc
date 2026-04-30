@@ -34,6 +34,7 @@ nrf52 = ["nrf-sdc-sys/nrf52"]
 nrf53 = ["nrf-sdc-sys/nrf53"]
 nrf54l = []
 
+multirole = ["central", "peripheral"]
 peripheral = ["nrf-sdc-sys/peripheral"]
 central = ["nrf-sdc-sys/central"]
 

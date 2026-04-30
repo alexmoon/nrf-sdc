@@ -144,6 +144,7 @@ impl ParseCallbacks for Callback {
     }
 }
 
+#[derive(Debug, Clone, Copy)]
 enum Series {
     Nrf52,
     Nrf53,
@@ -274,18 +275,22 @@ fn bindgen(target: &Target, mem_fns: Rc<RefCell<Vec<u8>>>) -> bindgen::Builder {
 }
 
 fn main() {
-    let target = Target::new(Series::get(), env::var("TARGET").unwrap());
+    let series = Series::get();
+    let target = Target::new(series, env::var("TARGET").unwrap());
 
-    // Only nrf52 series have different binaries depending on the role.
-    let role = if cfg!(feature = "nrf52") {
-        match (cfg!(feature = "peripheral"), cfg!(feature = "central")) {
-            (true, true) => "multirole",
-            (true, false) => "peripheral",
-            (false, true) => "central",
-            (false, false) => panic!("At least one of the \"peripheral\" and/or \"central\" features must be enabled!"),
+    // Only some series have different binaries depending on the role.
+    let role = match series {
+        Series::Nrf53 | Series::Nrf54lNs => "multirole",
+        Series::Nrf52 | Series::Nrf54l | Series::Nrf54lm20 | Series::Nrf54h => {
+            match (cfg!(feature = "peripheral"), cfg!(feature = "central")) {
+                (true, true) => "multirole",
+                (true, false) => "peripheral",
+                (false, true) => "central",
+                (false, false) => {
+                    panic!("At least one of the \"peripheral\" and/or \"central\" features must be enabled!")
+                }
+            }
         }
-    } else {
-        "multirole"
     };
 
     let mem_fns = Rc::new(RefCell::new(Vec::new()));

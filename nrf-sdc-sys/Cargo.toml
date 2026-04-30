@@ -33,6 +33,7 @@ nrf54l-s = ["nrf-mpsl-sys/nrf54l-s"]
 nrf54lm20-app-s = ["nrf-mpsl-sys/nrf54lm20-app-s"]
 nrf54h = ["nrf-mpsl-sys/nrf54h"]
 
+multirole = ["central", "peripheral"]
 peripheral = []
 central = []
 
