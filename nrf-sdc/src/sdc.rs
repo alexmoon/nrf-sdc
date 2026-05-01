@@ -441,46 +441,55 @@ impl Builder {
     }
 
     /// Enables support for advertising.
+    #[cfg(feature = "peripheral")]
     pub fn support_adv(self) -> Self {
         self.support(raw::sdc_support_adv)
     }
 
     /// Enables support for extended advertising.
+    #[cfg(all(feature = "central", feature = "peripheral"))]
     pub fn support_ext_adv(self) -> Self {
         self.support(raw::sdc_support_ext_adv)
     }
 
     /// Enables support for peripheral role.
+    #[cfg(feature = "peripheral")]
     pub fn support_peripheral(self) -> Self {
         self.support(raw::sdc_support_peripheral)
     }
 
     /// Enables support for scanning.
+    #[cfg(feature = "central")]
     pub fn support_scan(self) -> Self {
         self.support(raw::sdc_support_scan)
     }
 
     /// Enables support for extended scanning.
+    #[cfg(all(feature = "central", feature = "peripheral"))]
     pub fn support_ext_scan(self) -> Self {
         self.support(raw::sdc_support_ext_scan)
     }
 
     /// Enables support for central role.
+    #[cfg(feature = "central")]
     pub fn support_central(self) -> Self {
         self.support(raw::sdc_support_central)
     }
 
     /// Enables support for extended central role.
+    #[cfg(all(feature = "central", feature = "peripheral"))]
     pub fn support_ext_central(self) -> Self {
         self.support(raw::sdc_support_ext_central)
     }
 
     /// Enables support for Data Length Extension (DLE) in central role.
+    #[cfg(feature = "central")]
     pub fn support_dle_central(self) -> Self {
         self.support(raw::sdc_support_dle_central)
     }
 
     /// Enables support for Data Length Extension (DLE) in peripheral role.
+    #[cfg(feature = "peripheral")]
     pub fn support_dle_peripheral(self) -> Self {
         self.support(raw::sdc_support_dle_peripheral)
     }
@@ -491,81 +500,97 @@ impl Builder {
     }
 
     /// Enables support for coded PHY.
+    #[cfg(all(feature = "central", feature = "peripheral"))]
     pub fn support_le_coded_phy(self) -> Self {
         self.support(raw::sdc_support_le_coded_phy)
     }
 
     /// Enables support for PHY update in central role.
+    #[cfg(feature = "central")]
     pub fn support_phy_update_central(self) -> Self {
         self.support(raw::sdc_support_phy_update_central)
     }
 
     /// Enables support for PHY update in peripheral role.
+    #[cfg(feature = "peripheral")]
     pub fn support_phy_update_peripheral(self) -> Self {
         self.support(raw::sdc_support_phy_update_peripheral)
     }
 
     /// Enables support for periodic advertising.
+    #[cfg(all(feature = "central", feature = "peripheral"))]
     pub fn support_le_periodic_adv(self) -> Self {
         self.support(raw::sdc_support_le_periodic_adv)
     }
 
     /// Enables support for periodic sync.
+    #[cfg(all(feature = "central", feature = "peripheral"))]
     pub fn support_le_periodic_sync(self) -> Self {
         self.support(raw::sdc_support_le_periodic_sync)
     }
 
     /// Enables support for LE power control in central role.
+    #[cfg(feature = "central")]
     pub fn support_le_power_control_central(self) -> Self {
         self.support(raw::sdc_support_le_power_control_central)
     }
 
     /// Enables support for LE power control in peripheral role.
+    #[cfg(feature = "peripheral")]
     pub fn support_le_power_control_peripheral(self) -> Self {
         self.support(raw::sdc_support_le_power_control_peripheral)
     }
 
     /// Enables support for sleep clock accuracy (SCA) updates in central role.
+    #[cfg(all(feature = "central", feature = "peripheral"))]
     pub fn support_sca_central(self) -> Self {
         self.support(raw::sdc_support_sca_central)
     }
 
     /// Enables support for sleep clock accuracy (SCA) updates in peripheral role.
+    #[cfg(all(feature = "central", feature = "peripheral"))]
     pub fn support_sca_peripheral(self) -> Self {
         self.support(raw::sdc_support_sca_peripheral)
     }
 
     /// Enables support for LE connection CTE response in central role.
+    #[cfg(all(feature = "central", feature = "peripheral"))]
     pub fn support_le_conn_cte_rsp_central(self) -> Self {
         self.support(raw::sdc_support_le_conn_cte_rsp_central)
     }
 
     /// Enables support for LE connection CTE response in peripheral role.
+    #[cfg(all(feature = "central", feature = "peripheral"))]
     pub fn support_le_conn_cte_rsp_peripheral(self) -> Self {
         self.support(raw::sdc_support_le_conn_cte_rsp_peripheral)
     }
 
     /// Enables support for periodic advertising sync transfer sender in central role.
+    #[cfg(all(feature = "central", feature = "peripheral"))]
     pub fn support_periodic_adv_sync_transfer_sender_central(self) -> Self {
         self.support(raw::sdc_support_periodic_adv_sync_transfer_sender_central)
     }
 
     /// Enables support for periodic advertising sync transfer sender in peripheral role.
+    #[cfg(all(feature = "central", feature = "peripheral"))]
     pub fn support_periodic_adv_sync_transfer_sender_peripheral(self) -> Self {
         self.support(raw::sdc_support_periodic_adv_sync_transfer_sender_peripheral)
     }
 
     /// Enables support for periodic advertising sync transfer receiver in central role.
+    #[cfg(all(feature = "central", feature = "peripheral"))]
     pub fn support_periodic_adv_sync_transfer_receiver_central(self) -> Self {
         self.support(raw::sdc_support_periodic_adv_sync_transfer_receiver_central)
     }
 
     /// Enables support for periodic advertising sync transfer receiver in peripheral role.
+    #[cfg(all(feature = "central", feature = "peripheral"))]
     pub fn support_periodic_adv_sync_transfer_receiver_peripheral(self) -> Self {
         self.support(raw::sdc_support_periodic_adv_sync_transfer_receiver_peripheral)
     }
 
     /// Enables support for QoS channel survey.
+    #[cfg(feature = "central")]
     pub fn support_qos_channel_survey(self) -> Self {
         self.support(raw::sdc_support_qos_channel_survey)
     }
@@ -575,14 +600,134 @@ impl Builder {
         self.support(raw::sdc_support_le_power_class_1)
     }
 
-    /// Support Connection Subrating for central role
-    pub fn support_le_connection_subrating_central(self) -> Self {
+    /// Enables support for Frame Space Update in central role.
+    #[cfg(all(feature = "central", feature = "peripheral"))]
+    pub fn support_frame_space_update_central(self) -> Self {
+        self.support(raw::sdc_support_frame_space_update_central)
+    }
+
+    /// Enables support for Frame Space Update in peripheral role.
+    #[cfg(all(feature = "central", feature = "peripheral"))]
+    pub fn support_frame_space_update_peripheral(self) -> Self {
+        self.support(raw::sdc_support_frame_space_update_peripheral)
+    }
+
+    /// Enables support for the lowest frame space possible for ACL connections.
+    #[cfg(all(feature = "central", feature = "peripheral"))]
+    pub fn support_lowest_frame_space(self) -> Self {
+        self.support(raw::sdc_support_lowest_frame_space)
+    }
+
+    /// Enables support for Extended Feature Set.
+    #[cfg(all(feature = "central", feature = "peripheral"))]
+    pub fn support_extended_feature_set(self) -> Self {
+        self.support(raw::sdc_support_extended_feature_set)
+    }
+
+    /// Enables support for Connection Subrating in central role.
+    #[cfg(all(feature = "central", feature = "peripheral"))]
+    pub fn support_connection_subrating_central(self) -> Self {
         self.support(raw::sdc_support_connection_subrating_central)
     }
 
-    ///Support Connection Subrating for peripheral role
-    pub fn support_le_connection_subrating_peripheral(self) -> Self {
+    /// Enables support for Connection Subrating in peripheral role.
+    #[cfg(all(feature = "central", feature = "peripheral"))]
+    pub fn support_connection_subrating_peripheral(self) -> Self {
         self.support(raw::sdc_support_connection_subrating_peripheral)
+    }
+
+    /// Enables support for Shorter Connection Intervals in central role.
+    #[cfg(all(feature = "central", feature = "peripheral"))]
+    pub fn support_shorter_connection_intervals_central(self) -> Self {
+        self.support(raw::sdc_support_shorter_connection_intervals_central)
+    }
+
+    /// Enables support for Shorter Connection Intervals in peripheral role.
+    #[cfg(all(feature = "central", feature = "peripheral"))]
+    pub fn support_shorter_connection_intervals_peripheral(self) -> Self {
+        self.support(raw::sdc_support_shorter_connection_intervals_peripheral)
+    }
+
+    /// Support LE Path Loss Monitoring.
+    pub fn support_le_path_loss_monitoring(self) -> Self {
+        self.support(raw::sdc_support_le_path_loss_monitoring)
+    }
+
+    /// Support LE Privacy.
+    pub fn support_le_privacy(self) -> Self {
+        self.support(raw::sdc_support_le_privacy)
+    }
+
+    /// Support for scanning and initiating at the same time.
+    #[cfg(feature = "central")]
+    pub fn support_parallel_scanning_and_initiating(self) -> Self {
+        self.support(raw::sdc_support_parallel_scanning_and_initiating)
+    }
+
+    /// Support Broadcast Isochronous streams as a sink.
+    #[cfg(all(feature = "central", feature = "peripheral"))]
+    pub fn support_bis_sink(self) -> Self {
+        self.support(raw::sdc_support_bis_sink)
+    }
+
+    /// Support Broadcast Isochronous streams as a source.
+    #[cfg(all(feature = "central", feature = "peripheral"))]
+    pub fn support_bis_source(self) -> Self {
+        self.support(raw::sdc_support_bis_source)
+    }
+
+    /// Support Channel Sounding Initiator role.
+    #[cfg(all(feature = "central", feature = "peripheral", feature = "nrf54l"))]
+    pub fn support_channel_sounding_initiator_role(self) -> Self {
+        self.support(raw::sdc_support_channel_sounding_initiator_role)
+    }
+
+    /// Support Channel Sounding Step Mode 3.
+    #[cfg(all(feature = "central", feature = "peripheral", feature = "nrf54l"))]
+    pub fn support_channel_sounding_mode3(self) -> Self {
+        self.support(raw::sdc_support_channel_sounding_mode3)
+    }
+
+    /// Support Channel Sounding Reflector role.
+    #[cfg(all(feature = "central", feature = "peripheral", feature = "nrf54l"))]
+    pub fn support_channel_sounding_reflector_role(self) -> Self {
+        self.support(raw::sdc_support_channel_sounding_reflector_role)
+    }
+
+    /// Support Channel Sounding test command.
+    #[cfg(all(feature = "central", feature = "peripheral", feature = "nrf54l"))]
+    pub fn support_channel_sounding_test(self) -> Self {
+        self.support(raw::sdc_support_channel_sounding_test)
+    }
+
+    /// Support Connected Isochronous streams in the central role.
+    #[cfg(all(feature = "central", feature = "peripheral"))]
+    pub fn support_cis_central(self) -> Self {
+        self.support(raw::sdc_support_cis_central)
+    }
+
+    /// Support Connected Isochronous streams in the peripheral role.
+    #[cfg(all(feature = "central", feature = "peripheral"))]
+    pub fn support_cis_peripheral(self) -> Self {
+        self.support(raw::sdc_support_cis_peripheral)
+    }
+
+    /// Support LE Connectionless CTE Transmitter.
+    #[cfg(all(feature = "central", feature = "peripheral"))]
+    pub fn support_le_connectionless_cte_transmitter(self) -> Self {
+        self.support(raw::sdc_support_le_connectionless_cte_transmitter)
+    }
+
+    /// Support LE Periodic Advertising with Responses in the Advertising state.
+    #[cfg(all(feature = "central", feature = "peripheral"))]
+    pub fn support_le_periodic_adv_with_rsp(self) -> Self {
+        self.support(raw::sdc_support_le_periodic_adv_with_rsp)
+    }
+
+    /// Support LE Periodic Advertising with Responses in the Synchronization state.
+    #[cfg(all(feature = "central", feature = "peripheral"))]
+    pub fn support_le_periodic_sync_with_rsp(self) -> Self {
+        self.support(raw::sdc_support_le_periodic_sync_with_rsp)
     }
 
     /// Sets the default TX power.
@@ -602,46 +747,6 @@ impl Builder {
             )
         };
         RetVal::from(ret).to_result().map(|x| x as usize)
-    }
-
-    /// Enables support for Frame Space Update in central role.
-    pub fn support_frame_space_update_central(self) -> Self {
-        self.support(raw::sdc_support_frame_space_update_central)
-    }
-
-    /// Enables support for Frame Space Update in peripheral role.
-    pub fn support_frame_space_update_peripheral(self) -> Self {
-        self.support(raw::sdc_support_frame_space_update_peripheral)
-    }
-
-    /// Enables support for the lowest frame space possible for ACL connections.
-    pub fn support_lowest_frame_space(self) -> Self {
-        self.support(raw::sdc_support_lowest_frame_space)
-    }
-
-    /// Enables support for Extended Feature Set.
-    pub fn support_extended_feature_set(self) -> Self {
-        self.support(raw::sdc_support_extended_feature_set)
-    }
-
-    /// Enables support for Connection Subrating in central role.
-    pub fn support_connection_subrating_central(self) -> Self {
-        self.support(raw::sdc_support_connection_subrating_central)
-    }
-
-    /// Enables support for Connection Subrating in peripheral role.
-    pub fn support_connection_subrating_peripheral(self) -> Self {
-        self.support(raw::sdc_support_connection_subrating_peripheral)
-    }
-
-    /// Enables support for Shorter Connection Intervals in central role.
-    pub fn support_shorter_connection_intervals_central(self) -> Self {
-        self.support(raw::sdc_support_shorter_connection_intervals_central)
-    }
-
-    /// Enables support for Shorter Connection Intervals in peripheral role.
-    pub fn support_shorter_connection_intervals_peripheral(self) -> Self {
-        self.support(raw::sdc_support_shorter_connection_intervals_peripheral)
     }
 
     /// Builds the SoftDevice Controller.
