@@ -36,7 +36,7 @@ const TIMESLOT_TIMER_INTERRUPT: Interrupt = Interrupt::TIMER0;
 #[cfg(feature = "nrf54l-s")]
 const TIMESLOT_TIMER_INTERRUPT: Interrupt = Interrupt::TIMER10;
 
-// A custom RawMutex implementation that also masks the MPSL timeslot timer interrupt.
+// A custom RawMutex implementation that masks only the MPSL timeslot timer interrupt.
 struct TimeslotRawMutex;
 unsafe impl RawMutex for TimeslotRawMutex {
     const INIT: Self = TimeslotRawMutex;
@@ -45,6 +45,11 @@ unsafe impl RawMutex for TimeslotRawMutex {
             let nvic = &*NVIC::PTR;
             let irq = TIMESLOT_TIMER_INTERRUPT as usize;
             nvic.icer[irq / 32].write(1u32 << (irq % 32));
+            // Per Arm DAI0321A section 4.6:
+            // > if it is necessary to ensure an interrupt will not be triggered after disabling it in the NVIC,
+            // > add a DSB instruction and then an ISB instruction
+            cortex_m::asm::dsb();
+            cortex_m::asm::isb();
             compiler_fence(Ordering::SeqCst);
             let r = f();
             compiler_fence(Ordering::SeqCst);
