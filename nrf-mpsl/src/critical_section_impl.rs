@@ -73,6 +73,12 @@ unsafe impl critical_section::Impl for CriticalSection {
                 for i in 0..RESERVED_IRQS.len() {
                     nvic.icer[i].write(!RESERVED_IRQS[i]);
                 }
+
+                // Per Arm DAI0321A section 4.6:
+                // > if it is necessary to ensure an interrupt will not be triggered after disabling it in the NVIC,
+                // > add a DSB instruction and then an ISB instruction
+                cortex_m::asm::dsb();
+                cortex_m::asm::isb();
             });
         }
 
