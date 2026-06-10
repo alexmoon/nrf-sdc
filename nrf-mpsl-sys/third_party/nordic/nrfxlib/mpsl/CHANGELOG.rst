@@ -10,6 +10,27 @@ Changelog
 
 All the notable changes to this project are documented on this page.
 
+nRF Connect SDK v3.3.0
+**********************
+
+Added
+=====
+
+* Experimental support for the nRF54LS device. (DRGN-26915)
+* Separate libraries for the nRF54LM and nRF54LV series devices. (DRGN-27252)
+* The :ref:`MPSL radio notification API <mpsl_radio_notification>` has been added back. (DRGN-27353)
+* On the nRF54L Series, added :c:func:`mpsl_low_latency_acquire_callback` and :c:func:`mpsl_low_latency_release_callback`.
+  They replace ``mpsl_constlat_request_callback()``, ``mpsl_lowpower_request_callback()``, so a single acquire/release pair covers CPU constant-latency / power profile and NVM (RRAM) low-latency around time-critical MPSL work.
+  To coordinate constant-latency (CONSTLAT) with MPSL through ``nrf_sys_event``, enable :kconfig:option:`CONFIG_NRF_SYS_EVENT`; to coordinate NVM latency the same way, enable :kconfig:option:`CONFIG_NRF_SYS_EVENT_IRQ_LATENCY` where required. (DRGN-27788)
+
+Changes
+=======
+
+* Reduced static RAM usage. (DRGN-26915)
+* The old high-frequency clock API (:c:func:`mpsl_clock_hfclk_request`, :c:func:`mpsl_clock_hfclk_release`, and :c:func:`mpsl_clock_hfclk_is_running`) is deprecated.
+  It will be removed in a future release.
+  It is superseded by a new API to manage the high-frequency clock for a given source (:c:func:`mpsl_clock_hfclk_src_request`, :c:func:`mpsl_clock_hfclk_src_release`, and :c:func:`mpsl_clock_hfclk_src_is_running`) which was added in v3.1.0.
+
 nRF Connect SDK v3.2.0
 **********************
 
@@ -62,7 +83,6 @@ Added
 * Added support for the Simple GPIO Front-End Module on the nRF54L Series SoCs. (KRKNWK-20506)
 * Added support for boosting the current timeslot priority for the nRF 802.15.4 Radio Driver. (KRKNWK-19125)
 * Added :c:func:`mpsl_clock_hfclk_src_request`, :c:func:`mpsl_clock_hfclk_src_release`, and :c:func:`mpsl_clock_hfclk_src_is_running` to manage the high-frequency clock for a given source.
-  The old API (:c:func:`mpsl_clock_hfclk_request`, :c:func:`mpsl_clock_hfclk_release`, and :c:func:`mpsl_clock_hfclk_is_running`) has been deprecated and will be removed in a future release.
 
 Bug fixes
 =========

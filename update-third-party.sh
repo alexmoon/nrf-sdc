@@ -9,7 +9,7 @@ NRFX_REPO="https://github.com/NordicSemiconductor/nrfx.git"
 NRFX_REF="v3.14.0"
 
 NRFXLIB_REPO="https://github.com/nrfconnect/sdk-nrfxlib.git"
-NRFXLIB_REF="v3.2.1"
+NRFXLIB_REF="v3.3.0"
 
 THIRD_PARTY="nrf-mpsl-sys/third_party"
 

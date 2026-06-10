@@ -9,6 +9,49 @@ Changelog
 
 All the notable changes to this project are documented on this page.
 
+nRF Connect SDK v3.3.0
+**********************
+
+Added
+=====
+
+* Experimental support for the nRF54LS device. (DRGN-26915)
+* Separate libraries for the nRF54LM and nRF54LV series devices. (DRGN-27252)
+* Experimental support for Direct Test Mode. (DRGN-27368)
+* Experimental support for the LE Flushable ACL Data feature and the LE Read and Write Automatic Flush Timeout HCI commands. (DRGN-27485)
+
+Changes
+=======
+
+* Optimized RAM consumption for simple configurations of the SoftDevice Controller. (DRGN-26915)
+* The controller now uses the same coding scheme as the associated periodic advertiser when using LE Coded PHY with the ``LE Create BIG`` or ``LE Create BIG Test`` HCI commands. (DRGN-27494)
+* The Quality of Service (QoS) channel survey feature is now :ref:`supported <nrf:software_maturity>` instead of experimental. (DRGN-26264)
+* The :c:func:`sdc_hci_cmd_le_set_adv_data` and :c:func:`sdc_hci_cmd_le_set_scan_response_data` functions now return the error code ``0x12`` if the data length is more than 31 bytes.
+  Previously, the extra data was truncated. (DRGN-27247)
+* The controller acting as a central will now schedule continuation events only if it has received a packet from the peer device in the previous subrated connection event or in any subsequent continuation events.
+  This change improves scheduling performance with multiple links. (DRGN-27952)
+
+Bug fixes
+=========
+
+* Fixed two issues where the scanner would assert when performing extended active scanning. (DRGN-27065, DRGN-28050)
+* Fixed an issue where the controller acting as a central would send a packet on the wrong channel.
+  This would only happen at the instant of the channel map update procedure. (DRGN-27264)
+* Fixed an issue where the controller, when acting as a channel sounding reflector,
+  would select the wrong antenna during the first (TX) T_PM period of a mode-2 step if it followed a mode-3 step. (DRGN-27360)
+* Fixed an issue where the controller could send ``LL_CS_CAPABILITIES_REQ`` PDU on an unencrypted link.
+  This would only happen when the ``LE CS Read Remote Supported Capabilities`` HCI command triggers the Feature Exchange procedure. (DRGN-27530)
+* Fixed an issue where the controller could generate one too many HCI LE CS Subevent Result events for a CS procedure. (DRGN-27538)
+
+  The issue would only happen if all the following conditions are met:
+
+    * The CS procedure terminates due to running out of channels, based on the configured channel map and channel map repetition.
+    * The configured duration of the last CS subevent in the CS procedure is just enough to fit all the remaining CS steps.
+
+* Fixed an issue where the controller did not generate an ``LE CS Procedure Enable Complete`` HCI event when disabling the last CS procedure.
+  This would only happen if the maximum number of CS procedures (``Max_Procedure_Count``) was set to a value greater than ``1``. (DRGN-27705)
+* Fixed a rare issue where establishing a CIS would make the CIS peripheral unresponsive on other established CISes in the same CIG. (DRGN-23021)
+
 nRF Connect SDK v3.2.0
 **********************
 
