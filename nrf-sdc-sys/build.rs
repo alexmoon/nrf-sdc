@@ -215,14 +215,14 @@ impl Target {
             (Series::Nrf54lm20, "thumbv8m.main-none-eabihf") => (
                 "cortex-m33",
                 "hard",
-                "nrf54l",
+                "nrf54lm",
                 "NRF54LM20A_ENGA_XXAA", // TODO: Remove ENGA after updating nrfx to 4.x
                 Some("NRF_APPLICATION"),
             ),
             (Series::Nrf54lm20, "thumbv8m.main-none-eabi") => (
                 "cortex-m33",
                 "soft",
-                "nrf54l",
+                "nrf54lm",
                 "NRF54LM20A_ENGA_XXAA",
                 Some("NRF_APPLICATION"),
             ),

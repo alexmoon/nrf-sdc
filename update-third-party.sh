@@ -109,7 +109,8 @@ sparse_clone "$NRFXLIB_REPO" "$NRFXLIB_REF" "$THIRD_PARTY/nordic/nrfxlib" \
     mpsl/fem/simple_gpio mpsl/fem/nrf21540_gpio mpsl/fem/nrf21540_gpio_spi \
     softdevice_controller/include \
     softdevice_controller/lib/nrf52 softdevice_controller/lib/nrf53 \
-    softdevice_controller/lib/nrf54l softdevice_controller/lib/nrf54l_ns softdevice_controller/lib/nrf54h
+    softdevice_controller/lib/nrf54l softdevice_controller/lib/nrf54l_ns softdevice_controller/lib/nrf54h \
+    softdevice_controller/lib/nrf54lm
 
 # Verify key files exist
 echo ""
