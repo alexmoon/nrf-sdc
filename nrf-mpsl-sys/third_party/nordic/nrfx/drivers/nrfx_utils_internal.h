@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022 - 2025, Nordic Semiconductor ASA
+ * Copyright (c) 2022 - 2026, Nordic Semiconductor ASA
  * All rights reserved.
  *
  * SPDX-License-Identifier: BSD-3-Clause
@@ -160,12 +160,12 @@
  * @param[in] i                 Index.
  * @param[in] periph_name_small Peripheral name in small letters, e.g. spim.
  */
-#define _NRFX_IRQ_HANDLER(periph_name, prefix, i, periph_name_small) \
-void NRFX_CONCAT(nrfx_, periph_name_small, _, prefix, i, _irq_handler)(void) \
-{ \
+#define _NRFX_IRQ_HANDLER(periph_name, prefix, i, periph_name_small)                         \
+void NRFX_CONCAT(nrfx_, periph_name_small, _, prefix, i, _irq_handler)(void *)               \
+{                                                                                            \
     irq_handler(NRFX_COND_CODE_1(NRFX_INSTANCE_PRESENT(NRFX_CONCAT(periph_name, prefix, i)), \
-                                 (NRFX_CONCAT(NRF_, periph_name, prefix, i)), (NULL)), \
-                &m_cb[NRFX_CONCAT(NRFX_, periph_name, prefix, i, _INST_IDX)]); \
+                                 (NRFX_CONCAT(NRF_, periph_name, prefix, i)), (NULL)),       \
+                &m_cb[NRFX_CONCAT(NRFX_, periph_name, prefix, i, _INST_IDX)]);               \
 }
 
 /* Macro used for generation of irq handlers with addtional parameter.
@@ -182,19 +182,24 @@ void NRFX_CONCAT(nrfx_, periph_name_small, _, prefix, i, _irq_handler)(void) \
  * @param[in] periph_name_small Peripheral name in small letters, e.g. spim.
  * @param[in] ext_macro         Macro called as third parameter of the handler.
  */
-#define _NRFX_IRQ_HANDLER_EXT(periph_name, prefix, i, periph_name_small, ext_macro) \
-void NRFX_CONCAT(nrfx_, periph_name_small, _, prefix, i, _irq_handler)(void) \
-{ \
-    irq_handler(NRFX_CONCAT(NRF_, periph_name, prefix, i), \
-                &m_cb[NRFX_CONCAT(NRFX_, periph_name, prefix, i, _INST_IDX)], \
-                ext_macro(NRFX_CONCAT(prefix, i))); \
+#define _NRFX_IRQ_HANDLER_EXT(periph_name, prefix, i, periph_name_small, ext_macro)      \
+void NRFX_CONCAT(nrfx_, periph_name_small, _, prefix, i, _irq_handler)(void * p_context) \
+{                                                                                        \
+    (void)p_context;                                                                     \
+    irq_handler(NRFX_CONCAT(NRF_, periph_name, prefix, i),                               \
+                &m_cb[NRFX_CONCAT(NRFX_, periph_name, prefix, i, _INST_IDX)],            \
+                ext_macro(NRFX_CONCAT(prefix, i)));                                      \
 }
 
 #define _NRFX_IRQ_HANDLER_LIST(periph_name, prefix, i, periph_name_small) \
     NRFX_CONCAT(nrfx_, periph_name_small, _, prefix, i, _irq_handler),
 
 #define _NRFX_IRQ_HANDLER_DECLARE(periph_name, prefix, i, periph_name_small) \
-    void NRFX_CONCAT(nrfx_, periph_name_small, _, prefix, i, _irq_handler)(void);
+    void NRFX_CONCAT(nrfx_, periph_name_small, _, prefix, i, _irq_handler)(void *);
+
+#define _PERIPH_PTR_COMPARE(periph_name, prefix, idx, reg)                       \
+    ((uintptr_t)reg == (uintptr_t)NRFX_CONCAT(NRF_, periph_name, prefix, idx)) ? \
+    (NRFX_CONCAT(NRFX_, periph_name, prefix, idx, _INST_IDX)) :
 
 /* Macro for getting the fourth argument from the set of input arguments. */
 #define __NRFX_GET_ARG4(arg1, arg2, arg3, arg4, ...) arg4
@@ -1746,5 +1751,15 @@ void NRFX_CONCAT(nrfx_, periph_name_small, _, prefix, i, _irq_handler)(void) \
     _NRFX_FOR_LOOP_63(call, sep, fixed_arg0, fixed_arg1, ##__VA_ARGS__) \
     NRFX_DEBRACKET sep \
     call(63, x, fixed_arg0, fixed_arg1)
+
+// for lowercasing the 54L and 54H series names
+#define NRF_SERIES_LOWERCASE_52         52
+#define NRF_SERIES_LOWERCASE_53         53
+#define NRF_SERIES_LOWERCASE_54L        54l
+#define NRF_SERIES_LOWERCASE_54H        54h
+#define NRF_SERIES_LOWERCASE_71         71
+#define NRF_SERIES_LOWERCASE_91         91
+#define NRF_SERIES_LOWERCASE_92         92
+#define NRF_SERIES_LOWERCASE(series)    NRFX_CONCAT_2(NRF_SERIES_LOWERCASE_, series)
 
 #endif /* NRFX_UTILS_INTERNAL_H__ */

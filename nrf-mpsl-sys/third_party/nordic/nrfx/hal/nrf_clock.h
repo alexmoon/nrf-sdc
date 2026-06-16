@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015 - 2025, Nordic Semiconductor ASA
+ * Copyright (c) 2015 - 2026, Nordic Semiconductor ASA
  * All rights reserved.
  *
  * SPDX-License-Identifier: BSD-3-Clause
@@ -70,16 +70,14 @@ extern "C" {
 #define NRF_CLOCK_HAS_CALIBRATION_TIMER 0
 #endif
 
-#if (defined(CLOCK_INTENSET_HFCLK192MSTARTED_Msk) && !defined(NRF5340_XXAA_NETWORK)) \
-    || defined(__NRFX_DOXYGEN__)
+#if defined(CLOCK_INTENSET_HFCLK192MSTARTED_Msk) || defined(__NRFX_DOXYGEN__)
 /** @brief Symbol indicating whether the 192 MHz clock is present. */
 #define NRF_CLOCK_HAS_HFCLK192M 1
 #else
 #define NRF_CLOCK_HAS_HFCLK192M 0
 #endif
 
-#if (defined(CLOCK_INTENSET_HFCLKAUDIOSTARTED_Msk) && !defined(NRF5340_XXAA_NETWORK)) \
-    || defined(__NRFX_DOXYGEN__)
+#if defined(CLOCK_INTENSET_HFCLKAUDIOSTARTED_Msk) || defined(__NRFX_DOXYGEN__)
 /** @brief Symbol indicating whether the Audio clock is present. */
 #define NRF_CLOCK_HAS_HFCLKAUDIO 1
 #else
@@ -93,8 +91,7 @@ extern "C" {
 #define NRF_CLOCK_HAS_HFCLK24M 0
 #endif
 
-#if (defined(CLOCK_HFCLKCTRL_HCLK_Div1) && !defined(NRF5340_XXAA_NETWORK)) \
-    || defined(__NRFX_DOXYGEN__)
+#if defined(CLOCK_HFCLKCTRL_HCLK_Div1) || defined(__NRFX_DOXYGEN__)
 /** @brief Symbol indicating whether the HFCLK frequency configuration is present. */
 #define NRF_CLOCK_HAS_HFCLK_DIV 1
 #else
@@ -114,6 +111,13 @@ extern "C" {
 #define NRF_CLOCK_HAS_HFCLK_ALWAYSRUN 1
 #else
 #define NRF_CLOCK_HAS_HFCLK_ALWAYSRUN 0
+#endif
+
+#if defined(CLOCK_HFCLKRUN_STATUS_Msk) || defined(__NRFX_DOXYGEN__)
+/** @brief Symbol indicating whether the HFCLK clock is present. */
+#define NRF_CLOCK_HAS_HFCLK 1
+#else
+#define NRF_CLOCK_HAS_HFCLK 0
 #endif
 
 #if defined(CLOCK_HFCLKSRC_SRC_Msk) || defined(__NRFX_DOXYGEN__)
@@ -153,6 +157,15 @@ extern "C" {
 #define NRF_CLOCK_HAS_XO_TUNE 0
 #endif
 
+#if defined(CLOCK_LFCLK_SRC_SRC_Msk) || defined(CLOCK_LFCLKCTRL_SRC_ResetValue) || \
+    defined(CLOCK_LFCLKRUN_STATUS_Msk) || defined(CLOCK_LFCLKSTAT_RUN_ResetValue) || \
+    defined(__NRFX_DOXYGEN__)
+/** @brief Symbol indicating whether the LFCLK clock is present. */
+#define NRF_CLOCK_HAS_LFCLK 1
+#else
+#define NRF_CLOCK_HAS_LFCLK 0
+#endif
+
 #if defined(CLOCK_LFCLK_SRC_SRC_Msk) || defined(__NRFX_DOXYGEN__)
 /** @brief Symbol indicating whether the CLOCK type contains LFCLK subtype. */
 #define NRF_CLOCK_HAS_LFCLK_TYPE 1
@@ -181,11 +194,12 @@ extern "C" {
 #define NRF_CLOCK_HAS_LFCLKCTRL 0
 #endif
 
-#if defined(CLOCK_LFCLKSTAT_RUN_ResetValue) || defined(__NRFX_DOXYGEN__)
-/** @brief Symbol indicating whether the CLOCK type contains LFCLKSTAT subtype. */
-#define NRF_CLOCK_HAS_LFCLKSTAT 1
+#if (defined(CLOCK_LFCLKSTAT_RUN_ResetValue) && defined(CLOCK_LFCLKSTAT_SRC_ResetValue)) || \
+    defined(__NRFX_DOXYGEN__)
+/** @brief Symbol indicating whether the CLOCK type contains LFCLKSTAT subtype with SRC and RUN registers. */
+#define NRF_CLOCK_HAS_LFCLKSTAT_SRC_RUN 1
 #else
-#define NRF_CLOCK_HAS_LFCLKSTAT 0
+#define NRF_CLOCK_HAS_LFCLKSTAT_SRC_RUN 0
 #endif
 
 #if defined(CLOCK_CONFIG_SETUP_ResetValue) || defined(__NRFX_DOXYGEN__)
@@ -225,6 +239,20 @@ extern "C" {
 #define NRF_CLOCK_HAS_HFDOMAIN 0
 #endif
 
+#if defined(CLOCK_FEATURE_HFCLK_DIVIDE_PRESENT) || defined(__NRFX_DOXYGEN__)
+/** @brief Symbol indicating whether high frequency clock divide register is present. */
+#define NRF_CLOCK_FEATURE_HFCLK_DIVIDE_PRESENT 1
+#else
+#define NRF_CLOCK_FEATURE_HFCLK_DIVIDE_PRESENT 0
+#endif
+
+#if defined(CLOCK_TASKS_CALSTOP_TASKS_CALSTOP_Msk) || defined(__NRFX_DOXYGEN__)
+/** @brief Symbol indicating whether the LFCLK calibration stop task is present. */
+#define NRF_CLOCK_HAS_CALSTOP 1
+#else
+#define NRF_CLOCK_HAS_CALSTOP 0
+#endif
+
 #if NRF_CLOCK_HAS_LFCLK_TYPE
 #define NRF_CLOCK_LFCLKRUN_STATUS_NotTriggered CLOCK_LFCLK_RUN_STATUS_NotTriggered /**< Task LFCLKSTART/HFCLKSTART has not been triggered definiton. */
 #define NRF_CLOCK_LFCLKRUN_STATUS_Triggered    CLOCK_LFCLK_RUN_STATUS_Triggered    /**< Task LFCLKSTART/HFCLKSTART has been triggered. */
@@ -258,7 +286,7 @@ extern "C" {
 #define NRF_LFCLKALWAYSRUN                     LFCLKCTRL.ALWAYSRUN
 #define NRF_CLOCK_LFCLKALWAYSRUN_ALWAYSRUN_Msk CLOCK_LFCLKCTRL_ALWAYSRUN_FORCE_Msk
 #define NRF_CLOCK_LFCLKALWAYSRUN_ALWAYSRUN_Pos CLOCK_LFCLKCTRL_ALWAYSRUN_FORCE_Pos
-#else
+#elif NRF_CLOCK_HAS_LFCLK
 #define NRF_CLOCK_LFCLKRUN_STATUS_NotTriggered CLOCK_LFCLKRUN_STATUS_NotTriggered
 #define NRF_CLOCK_LFCLKRUN_STATUS_Triggered    CLOCK_LFCLKRUN_STATUS_Triggered
 #define NRF_CLOCK_INTENSET_LFCLKSTARTED_Msk    CLOCK_INTENSET_LFCLKSTARTED_Msk
@@ -305,13 +333,14 @@ extern "C" {
 #define NRF_CLOCK_HFCLKSTAT_STATE_Pos       CLOCK_HFCLKSTAT_STATE_Pos
 #endif
 
+#if NRF_CLOCK_HAS_LFCLK || defined(__NRFX_DOXYGEN__)
 /**
  * @brief Low-frequency clock sources.
  * @details Used by LFCLKSRC, LFCLKSTAT, and LFCLKSRCCOPY registers.
  */
 typedef enum
 {
-#if NRF_CLOCK_HAS_LFCLKSTAT
+#if NRF_CLOCK_HAS_LFCLKSTAT_SRC_RUN
     NRF_CLOCK_LFCLK_LPRC       = (CLOCK_LFCLKSTAT_SRC_LFLPRC_Active << CLOCK_LFCLKSTAT_SRC_LFLPRC_Pos), /**< Internal 32 kHz low power RC oscillator. */
 #endif
 #if defined(CLOCK_LFCLKSRC_SRC_LFULP) || defined(__NRFX_DOXYGEN__)
@@ -322,7 +351,7 @@ typedef enum
     NRF_CLOCK_LFCLK_RC         = CLOCK_LFCLKSRC_SRC_RC,                                                 /**< Internal 32 kHz RC oscillator. */
 #elif NRF_CLOCK_HAS_LFCLK_TYPE
     NRF_CLOCK_LFCLK_RC         = CLOCK_LFCLK_SRC_SRC_LFRC,                                              /**< Internal 32 kHz RC oscillator. */
-#elif NRF_CLOCK_HAS_LFCLKSTAT
+#elif NRF_CLOCK_HAS_LFCLKSTAT_SRC_RUN
     NRF_CLOCK_LFCLK_RC         = (CLOCK_LFCLKSTAT_SRC_LFRC_Active << CLOCK_LFCLKSTAT_SRC_LFRC_Pos),     /**< Internal 32 kHz RC oscillator. */
 #else
     NRF_CLOCK_LFCLK_RC         = CLOCK_LFCLKSRC_SRC_LFRC,                                               /**< Internal 32 kHz RC oscillator. */
@@ -333,7 +362,7 @@ typedef enum
     NRF_CLOCK_LFCLK_XTAL       = CLOCK_LFCLKSRC_SRC_Xtal,                                               /**< External 32 kHz crystal. */
 #elif NRF_CLOCK_HAS_LFCLK_LFXO
     NRF_CLOCK_LFCLK_XTAL       = CLOCK_LFCLK_SRC_SRC_LFXO,                                              /**< External 32 kHz crystal. */
-#elif NRF_CLOCK_HAS_LFCLKSTAT
+#elif NRF_CLOCK_HAS_LFCLKSTAT_SRC_RUN
     NRF_CLOCK_LFCLK_XTAL       = (CLOCK_LFCLKSTAT_SRC_LFXO_Active << CLOCK_LFCLKSTAT_SRC_LFXO_Pos),     /**< External 32 kHz crystal. */
 #else
     NRF_CLOCK_LFCLK_XTAL       = CLOCK_LFCLKSRC_SRC_LFXO,                                               /**< External 32 kHz crystal. */
@@ -346,11 +375,11 @@ typedef enum
     NRF_CLOCK_LFCLK_SYNTH      = CLOCK_LFCLK_SRC_SRC_LFSYNT,                                            /**< Internal 32 kHz synthesized from HFCLK system clock. */
 #elif defined(CLOCK_LFCLKSRC_SRC_LFSYNT)
     NRF_CLOCK_LFCLK_SYNTH      = CLOCK_LFCLKSRC_SRC_LFSYNT,                                             /**< Internal 32 kHz synthesized from HFCLK system clock. */
-#elif NRF_CLOCK_HAS_LFCLKSTAT
+#elif NRF_CLOCK_HAS_LFCLKSTAT_SRC_RUN
     NRF_CLOCK_LFCLK_SYNTH      = (CLOCK_LFCLKSTAT_SRC_SYNTH_Active << CLOCK_LFCLKSTAT_SRC_SYNTH_Pos),   /**< Internal 32 kHz synthesized. */
 #endif
 
-#if NRF_CLOCK_HAS_LFCLKSTAT
+#if NRF_CLOCK_HAS_LFCLKSTAT_SRC_RUN
     NRF_CLOCK_LFCLK_LPRC_XTAL  = NRF_CLOCK_LFCLK_LPRC  | NRF_CLOCK_LFCLK_XTAL,                          /**< Internal 32 kHz low power RC oscillator and external 32 kHz crystal. */
     NRF_CLOCK_LFCLK_RC_XTAL    = NRF_CLOCK_LFCLK_RC    | NRF_CLOCK_LFCLK_XTAL,                          /**< Internal 32 kHz RC oscillator and external 32 kHz crystal. */
     NRF_CLOCK_LFCLK_SYNTH_XTAL = NRF_CLOCK_LFCLK_SYNTH | NRF_CLOCK_LFCLK_XTAL,                          /**< Internal 32 kHz synthesized and external 32 kHz crystal. */
@@ -372,6 +401,7 @@ typedef enum
         (CLOCK_LFCLKSRC_EXTERNAL_Enabled << CLOCK_LFCLKSRC_EXTERNAL_Pos)),
 #endif // defined(NRF_CLOCK_USE_EXTERNAL_LFCLK_SOURCES) || defined(__NRFX_DOXYGEN__)
 } nrf_clock_lfclk_t;
+#endif // NRF_CLOCK_HAS_LFCLK
 
 #if NRF_CLOCK_HAS_HFDOMAIN
 /**
@@ -416,7 +446,7 @@ typedef enum
 #endif
 } nrf_clock_domain_t;
 
-#if defined(CLOCK_FEATURE_HFCLK_DIVIDE_PRESENT) || NRF_CLOCK_HAS_HFCLK192M
+#if NRF_CLOCK_FEATURE_HFCLK_DIVIDE_PRESENT || NRF_CLOCK_HAS_HFCLK192M
 /**
  * @brief High-frequency clock frequency configuration.
  * @details Used by HFCLKCTRL and HFCLK192MCTRL registers.
@@ -429,20 +459,7 @@ typedef enum
     NRF_CLOCK_HFCLK_DIV_4 = CLOCK_HFCLK192MCTRL_HCLK192M_Div4, /**< Divide HFCLK192M by 4 */
 #endif
 } nrf_clock_hfclk_div_t;
-#endif // defined(CLOCK_FEATURE_HFCLK_DIVIDE_PRESENT) || NRF_CLOCK_HAS_HFCLK192M
-
-/**
- * @brief Trigger status of task LFCLKSTART/HFCLKSTART.
- *
- * @note This enum is deprecated.
- *
- * @details Used by LFCLKRUN and HFCLKRUN registers.
- */
-typedef enum
-{
-    NRF_CLOCK_START_TASK_NOT_TRIGGERED = NRF_CLOCK_LFCLKRUN_STATUS_NotTriggered, /**< Task LFCLKSTART/HFCLKSTART has not been triggered. */
-    NRF_CLOCK_START_TASK_TRIGGERED     = NRF_CLOCK_LFCLKRUN_STATUS_Triggered     /**< Task LFCLKSTART/HFCLKSTART has been triggered. */
-} nrf_clock_start_task_status_t;
+#endif // NRF_CLOCK_FEATURE_HFCLK_DIVIDE_PRESENT || NRF_CLOCK_HAS_HFCLK192M
 
 /** @brief Interrupts. */
 typedef enum
@@ -450,7 +467,9 @@ typedef enum
 #if NRF_CLOCK_HAS_HFDOMAIN
     NRF_CLOCK_INT_HF_STARTED_MASK       = NRF_CLOCK_INTENSET_HFCLKSTARTED_Msk,  /**< Interrupt on HFCLKSTARTED event. */
 #endif
+#if NRF_CLOCK_HAS_LFCLK
     NRF_CLOCK_INT_LF_STARTED_MASK       = NRF_CLOCK_INTENSET_LFCLKSTARTED_Msk,  /**< Interrupt on LFCLKSTARTED event. */
+#endif
 #if NRF_CLOCK_HAS_LFCLK_SRC_CHANGED
     NRF_CLOCK_INT_LF_SRC_CHANGED_MASK   = CLOCK_INTENSET_LFCLKSRCCHANGED_Msk,   /**< Interrupt on LFCLKCHANGED event. */
 #endif
@@ -504,10 +523,15 @@ typedef enum
     NRF_CLOCK_TASK_PLLSTART        = offsetof(NRF_CLOCK_Type, TASKS_PLLSTART),        /**< Start PLL and keep it running, regardless of the automatic clock requests. */
     NRF_CLOCK_TASK_PLLSTOP         = offsetof(NRF_CLOCK_Type, TASKS_PLLSTOP),         /**< Stop PLL. */
 #endif
+#if NRF_CLOCK_HAS_LFCLK
     NRF_CLOCK_TASK_LFCLKSTART      = offsetof(NRF_CLOCK_Type, TASKS_LFCLKSTART),      /**< Start LFCLK clock source. */
     NRF_CLOCK_TASK_LFCLKSTOP       = offsetof(NRF_CLOCK_Type, TASKS_LFCLKSTOP),       /**< Stop LFCLK clock source. */
+#endif
 #if NRF_CLOCK_HAS_CALIBRATION
     NRF_CLOCK_TASK_CAL             = offsetof(NRF_CLOCK_Type, TASKS_CAL),             /**< Start calibration of LFCLK RC oscillator. */
+#if NRF_CLOCK_HAS_CALSTOP
+    NRF_CLOCK_TASK_CALSTOP         = offsetof(NRF_CLOCK_Type, TASKS_CALSTOP),         /**< Stop calibration of LFCLK RC oscillator. */
+#endif
 #endif
 #if NRF_CLOCK_HAS_CALIBRATION_TIMER
     NRF_CLOCK_TASK_CTSTART         = offsetof(NRF_CLOCK_Type, TASKS_CTSTART),         /**< Start calibration timer. */
@@ -544,7 +568,9 @@ typedef enum
 #if NRF_CLOCK_HAS_PLL
     NRF_CLOCK_EVENT_PLLSTARTED        = offsetof(NRF_CLOCK_Type, EVENTS_PLLSTARTED),        /**< PLL started. */
 #endif
+#if NRF_CLOCK_HAS_LFCLK
     NRF_CLOCK_EVENT_LFCLKSTARTED      = offsetof(NRF_CLOCK_Type, EVENTS_LFCLKSTARTED),      /**< LFCLK oscillator started. */
+#endif
 #if NRF_CLOCK_HAS_LFCLK_SRC_CHANGED
     NRF_CLOCK_EVENT_LFCLKSRCCHANGED   = offsetof(NRF_CLOCK_Type, EVENTS_LFCLKSRCCHANGED),   /**< LFCLK source changed */
 #endif
@@ -698,6 +724,7 @@ NRF_STATIC_INLINE bool nrf_clock_is_running(NRF_CLOCK_Type const * p_reg,
                                             nrf_clock_domain_t     domain,
                                             void *                 p_clk_src);
 
+#if NRF_CLOCK_HAS_LFCLK || defined(__NRFX_DOXYGEN__)
 /**
  * @brief Function for changing the low-frequency clock source.
  * @details Check in Product Specification if this function can be called when
@@ -722,22 +749,6 @@ NRF_STATIC_INLINE void nrf_clock_lf_src_set(NRF_CLOCK_Type * p_reg, nrf_clock_lf
  */
 NRF_STATIC_INLINE nrf_clock_lfclk_t nrf_clock_lf_src_get(NRF_CLOCK_Type const * p_reg);
 
-/**
- * @brief Function for retrieving the active source of the low-frequency clock.
- *
- * @note This function is deprecated. Use @ref nrf_clock_is_running instead.
- *
- * @param[in] p_reg Pointer to the structure of registers of the peripheral.
- *
- * @retval NRF_CLOCK_LFCLK_RC    The internal 32 kHz RC oscillator
- *                               is the active source of the low-frequency clock.
- * @retval NRF_CLOCK_LFCLK_Xtal  An external 32 kHz crystal oscillator
- *                               is the active source of the low-frequency clock.
- * @retval NRF_CLOCK_LFCLK_Synth The internal 32 kHz synthesized from
- *                               the HFCLK is the active source of the low-frequency clock.
- */
-NRF_STATIC_INLINE nrf_clock_lfclk_t nrf_clock_lf_actv_src_get(NRF_CLOCK_Type const * p_reg);
-
 #if NRF_CLOCK_HAS_SRC_COPY
 /**
  * @brief Function for retrieving the clock source for the LFCLK clock when
@@ -753,32 +764,8 @@ NRF_STATIC_INLINE nrf_clock_lfclk_t nrf_clock_lf_actv_src_get(NRF_CLOCK_Type con
  *                               the HFCLK is running and generating the LFCLK clock.
  */
 NRF_STATIC_INLINE nrf_clock_lfclk_t nrf_clock_lf_srccopy_get(NRF_CLOCK_Type const * p_reg);
-#endif
-
-/**
- * @brief Function for retrieving the state of the LFCLK clock.
- *
- * @note This function is deprecated. Use @ref nrf_clock_is_running instead.
- *
- * @param[in] p_reg Pointer to the structure of registers of the peripheral.
- *
- * @retval false The LFCLK clock is not running.
- * @retval true  The LFCLK clock is running.
- */
-NRF_STATIC_INLINE bool nrf_clock_lf_is_running(NRF_CLOCK_Type const * p_reg);
-
-/**
- * @brief Function for retrieving the trigger status of the task LFCLKSTART.
- *
- * @note This function is deprecated. Use @ref nrf_clock_start_task_check instead.
- *
- * @param[in] p_reg Pointer to the structure of registers of the peripheral.
- *
- * @retval NRF_CLOCK_START_TASK_NOT_TRIGGERED The task LFCLKSTART has not been triggered.
- * @retval NRF_CLOCK_START_TASK_TRIGGERED     The task LFCLKSTART has been triggered.
- */
-NRF_STATIC_INLINE
-nrf_clock_start_task_status_t nrf_clock_lf_start_task_status_get(NRF_CLOCK_Type const * p_reg);
+#endif // NRF_CLOCK_HAS_SRC_COPY
+#endif // NRF_CLOCK_HAS_LFCLK
 
 #if NRF_CLOCK_HAS_HFDOMAIN
 #if NRF_CLOCK_HAS_HFCLKSRC
@@ -805,33 +792,6 @@ NRF_STATIC_INLINE void nrf_clock_hf_src_set(NRF_CLOCK_Type * p_reg, nrf_clock_hf
  *                                       source of the high-frequency clock.
  */
 NRF_STATIC_INLINE nrf_clock_hfclk_t nrf_clock_hf_src_get(NRF_CLOCK_Type const * p_reg);
-
-/**
- * @brief Function for retrieving the state of the HFCLK clock.
- *
- * @note This function is deprecated. Use @ref nrf_clock_is_running instead.
- *
- * @param[in] p_reg   Pointer to the structure of registers of the peripheral.
- * @param[in] clk_src Clock source to be checked.
- *
- * @retval false The HFCLK clock is not running.
- * @retval true  The HFCLK clock is running.
- */
-NRF_STATIC_INLINE bool nrf_clock_hf_is_running(NRF_CLOCK_Type const * p_reg,
-                                               nrf_clock_hfclk_t      clk_src);
-
-/**
- * @brief Function for retrieving the trigger status of the task HFCLKSTART.
- *
- * @note This function is deprecated. Use @ref nrf_clock_start_task_check instead.
- *
- * @param[in] p_reg Pointer to the structure of registers of the peripheral.
- *
- * @retval NRF_CLOCK_START_TASK_NOT_TRIGGERED The task HFCLKSTART has not been triggered.
- * @retval NRF_CLOCK_START_TASK_TRIGGERED     The task HFCLKSTART has been triggered.
- */
-NRF_STATIC_INLINE
-nrf_clock_start_task_status_t nrf_clock_hf_start_task_status_get(NRF_CLOCK_Type const * p_reg);
 
 #if NRF_CLOCK_HAS_HFCLKAUDIO
 /**
@@ -876,7 +836,7 @@ uint16_t nrf_clock_hfclkaudio_config_get(NRF_CLOCK_Type const * p_reg);
 NRF_STATIC_INLINE void nrf_clock_cal_timer_timeout_set(NRF_CLOCK_Type * p_reg, uint32_t interval);
 #endif
 
-#if defined(CLOCK_FEATURE_HFCLK_DIVIDE_PRESENT)
+#if NRF_CLOCK_FEATURE_HFCLK_DIVIDE_PRESENT
 /**
  * @brief Function for changing the HFCLK frequency divider.
  *
@@ -1154,9 +1114,11 @@ NRF_STATIC_INLINE bool nrf_clock_start_task_check(NRF_CLOCK_Type const * p_reg,
 {
     switch (domain)
     {
+#if NRF_CLOCK_HAS_LFCLK
         case NRF_CLOCK_DOMAIN_LFCLK:
             return ((p_reg->NRF_LFCLKRUN & NRF_CLOCK_LFCLKRUN_STATUS_Msk)
                     >> NRF_CLOCK_LFCLKRUN_STATUS_Pos);
+#endif
 #if NRF_CLOCK_HAS_HFDOMAIN
         case NRF_CLOCK_DOMAIN_HFCLK:
             return ((p_reg->NRF_HFCLKRUN & NRF_CLOCK_HFCLKRUN_STATUS_Msk)
@@ -1201,8 +1163,9 @@ NRF_STATIC_INLINE bool nrf_clock_is_running(NRF_CLOCK_Type const * p_reg,
     bool clock_running = false;
     switch (domain)
     {
+#if NRF_CLOCK_HAS_LFCLK
         case NRF_CLOCK_DOMAIN_LFCLK:
-#if NRF_CLOCK_HAS_LFCLKSTAT
+#if NRF_CLOCK_HAS_LFCLKSTAT_SRC_RUN
             clock_running = p_reg->LFCLKSTAT.SRC;
             if (p_clk_src != NULL)
             {
@@ -1219,6 +1182,7 @@ NRF_STATIC_INLINE bool nrf_clock_is_running(NRF_CLOCK_Type const * p_reg,
             }
             break;
 #endif
+#endif // NRF_CLOCK_HAS_LFCLK
 #if NRF_CLOCK_HAS_HFDOMAIN
         case NRF_CLOCK_DOMAIN_HFCLK:
             clock_running = p_reg->NRF_HFCLKSTAT & NRF_CLOCK_HFCLKSTAT_STATE_Msk;
@@ -1269,6 +1233,7 @@ NRF_STATIC_INLINE bool nrf_clock_is_running(NRF_CLOCK_Type const * p_reg,
 #pragma GCC diagnostic pop
 #endif
 
+#if NRF_CLOCK_HAS_LFCLK
 NRF_STATIC_INLINE void nrf_clock_lf_src_set(NRF_CLOCK_Type * p_reg, nrf_clock_lfclk_t source)
 {
 #if NRF_CLOCK_HAS_LFCLKCTRL
@@ -1287,13 +1252,6 @@ NRF_STATIC_INLINE nrf_clock_lfclk_t nrf_clock_lf_src_get(NRF_CLOCK_Type const * 
 #endif
 }
 
-NRF_STATIC_INLINE nrf_clock_lfclk_t nrf_clock_lf_actv_src_get(NRF_CLOCK_Type const * p_reg)
-{
-    nrf_clock_lfclk_t clk_src;
-    (void)nrf_clock_is_running(p_reg, NRF_CLOCK_DOMAIN_LFCLK, &clk_src);
-    return clk_src;
-}
-
 #if NRF_CLOCK_HAS_SRC_COPY
 NRF_STATIC_INLINE nrf_clock_lfclk_t nrf_clock_lf_srccopy_get(NRF_CLOCK_Type const * p_reg)
 {
@@ -1301,18 +1259,7 @@ NRF_STATIC_INLINE nrf_clock_lfclk_t nrf_clock_lf_srccopy_get(NRF_CLOCK_Type cons
                                 >> NRF_CLOCK_LFCLKSRCCOPY_SRC_Pos);
 }
 #endif
-
-NRF_STATIC_INLINE bool nrf_clock_lf_is_running(NRF_CLOCK_Type const * p_reg)
-{
-    return nrf_clock_is_running(p_reg, NRF_CLOCK_DOMAIN_LFCLK, NULL);
-}
-
-NRF_STATIC_INLINE
-nrf_clock_start_task_status_t nrf_clock_lf_start_task_status_get(NRF_CLOCK_Type const * p_reg)
-{
-    return (nrf_clock_start_task_status_t)nrf_clock_start_task_check(p_reg,
-                                                                     NRF_CLOCK_DOMAIN_LFCLK);
-}
+#endif // NRF_CLOCK_HAS_LFCLK
 
 #if NRF_CLOCK_HAS_HFDOMAIN
 #if NRF_CLOCK_HAS_HFCLKSRC
@@ -1336,21 +1283,6 @@ NRF_STATIC_INLINE nrf_clock_hfclk_t nrf_clock_hf_src_get(NRF_CLOCK_Type const * 
                                 >> CLOCK_HFCLKSTAT_SRC_Pos);
 #endif
 }
-
-NRF_STATIC_INLINE bool nrf_clock_hf_is_running(NRF_CLOCK_Type const * p_reg,
-                                               nrf_clock_hfclk_t      clk_src)
-{
-    nrf_clock_hfclk_t active_clk_src;
-    bool ret = nrf_clock_is_running(p_reg, NRF_CLOCK_DOMAIN_HFCLK, &active_clk_src);
-    return (ret && (active_clk_src == clk_src));
-}
-
-NRF_STATIC_INLINE
-nrf_clock_start_task_status_t nrf_clock_hf_start_task_status_get(NRF_CLOCK_Type const * p_reg)
-{
-    return (nrf_clock_start_task_status_t)nrf_clock_start_task_check(p_reg,
-                                                                     NRF_CLOCK_DOMAIN_HFCLK);
-}
 #endif // NRF_CLOCK_HAS_HFDOMAIN
 
 #if NRF_CLOCK_HAS_HFCLKAUDIO
@@ -1367,7 +1299,7 @@ uint16_t nrf_clock_hfclkaudio_config_get(NRF_CLOCK_Type const * p_reg)
 }
 #endif
 
-#if defined(CLOCK_FEATURE_HFCLK_DIVIDE_PRESENT)
+#if NRF_CLOCK_FEATURE_HFCLK_DIVIDE_PRESENT
 NRF_STATIC_INLINE
 void nrf_clock_hfclk_div_set(NRF_CLOCK_Type * p_reg, nrf_clock_hfclk_div_t divider)
 {

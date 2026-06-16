@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2020 - 2025, Nordic Semiconductor ASA
+ * Copyright (c) 2020 - 2026, Nordic Semiconductor ASA
  * All rights reserved.
  *
  * SPDX-License-Identifier: BSD-3-Clause
@@ -43,11 +43,11 @@ extern "C" {
 #endif
 
 #ifndef NRFX_CONFIG_API_VER_MAJOR
-#define NRFX_CONFIG_API_VER_MAJOR 3
+#define NRFX_CONFIG_API_VER_MAJOR 4
 #endif
 
 #ifndef NRFX_CONFIG_API_VER_MINOR
-#define NRFX_CONFIG_API_VER_MINOR 12
+#define NRFX_CONFIG_API_VER_MINOR 0
 #endif
 
 #ifndef NRFX_CONFIG_API_VER_MICRO
@@ -107,43 +107,43 @@ extern "C" {
 #define NRF_CTZ(value) __builtin_ctz(value)
 #endif
 
-#if defined(HALTIUM_XXAA) || defined(LUMOS_XXAA)
-#define DMA_BUFFER_UNIFIED_BYTE_ACCESS 1
-#endif
-
-#if defined(LUMOS_XXAA)
-#if defined(NRF_TRUSTZONE_NONSECURE)
-/* Non-secure images must have CPU frequency specified and cannot rely on default values,
- * as NRF_OSCILLATORS might be assigned and configured by Secure image. */
-#if defined(NRF_CONFIG_CPU_FREQ_MHZ) && (NRF_CONFIG_CPU_FREQ_MHZ == 64)
-#define NRF_CPU_FREQ_IS_64MHZ 1
-#elif defined(NRF_CONFIG_CPU_FREQ_MHZ) && (NRF_CONFIG_CPU_FREQ_MHZ == 128)
-#define NRF_CPU_FREQ_IS_128MHZ 1
-#elif defined(NRF_CONFIG_CPU_FREQ_MHZ) && (NRF_CONFIG_CPU_FREQ_MHZ == 256)
-#define NRF_CPU_FREQ_IS_256MHZ 1
-#elif !defined(NRF_CONFIG_CPU_FREQ_MHZ)
-#error "MCU frequency not specified"
-#else
-#error "Invalid MCU frequency"
-#endif
-
-#else
-
-#if defined(NRF_SKIP_CLOCK_CONFIGURATION) || \
-    (defined(NRF_CONFIG_CPU_FREQ_MHZ) && (NRF_CONFIG_CPU_FREQ_MHZ == 64))
-#define NRF_CPU_FREQ_IS_64MHZ 1
-#elif defined(NRF_CONFIG_CPU_FREQ_MHZ) && (NRF_CONFIG_CPU_FREQ_MHZ == 128)
-#define NRF_CPU_FREQ_IS_128MHZ 1
-#elif !defined(NRF_CONFIG_CPU_FREQ_MHZ)
-/* If clock configuration is not skipped and frequency not specified,
- * SystemInit() applies 128 MHz setting. */
-#define NRF_CPU_FREQ_IS_128MHZ 1
-#elif defined(NRF_CONFIG_CPU_FREQ_MHZ) && (NRF_CONFIG_CPU_FREQ_MHZ == 256)
-#define NRF_CPU_FREQ_IS_256MHZ 1
-#else
-#error "Invalid MCU frequency"
-#endif
-#endif
+#if defined(STATIC_CPU_FREQ_CONFIG_PRESENT)
+    #if defined(NRF_TRUSTZONE_NONSECURE)
+    /* Non-secure images must have CPU frequency specified and cannot rely on default values,
+     * as NRF_OSCILLATORS might be assigned and configured by Secure image. */
+        #if defined(STATIC_CPU_FREQ_CONFIG_64_MHZ_PRESENT) && \
+            defined(NRF_CONFIG_CPU_FREQ_MHZ) && (NRF_CONFIG_CPU_FREQ_MHZ == 64)
+            #define NRF_CPU_FREQ_IS_64MHZ 1
+        #elif defined(STATIC_CPU_FREQ_CONFIG_128_MHZ_PRESENT) && \
+            defined(NRF_CONFIG_CPU_FREQ_MHZ) && (NRF_CONFIG_CPU_FREQ_MHZ == 128)
+            #define NRF_CPU_FREQ_IS_128MHZ 1
+        #elif defined(STATIC_CPU_FREQ_CONFIG_256_MHZ_PRESENT) && \
+            defined(NRF_CONFIG_CPU_FREQ_MHZ) && (NRF_CONFIG_CPU_FREQ_MHZ == 256)
+            #define NRF_CPU_FREQ_IS_256MHZ 1
+        #elif !defined(NRF_CONFIG_CPU_FREQ_MHZ)
+            #error "MCU frequency not specified"
+        #else
+            #error "Invalid MCU frequency"
+        #endif
+    #else
+        #if defined(NRF_SKIP_CLOCK_CONFIGURATION) || \
+            (defined(STATIC_CPU_FREQ_CONFIG_64_MHZ_PRESENT) && \
+             defined(NRF_CONFIG_CPU_FREQ_MHZ) && (NRF_CONFIG_CPU_FREQ_MHZ == 64))
+            #define NRF_CPU_FREQ_IS_64MHZ 1
+        #elif defined(STATIC_CPU_FREQ_CONFIG_128_MHZ_PRESENT) && \
+              defined(NRF_CONFIG_CPU_FREQ_MHZ) && (NRF_CONFIG_CPU_FREQ_MHZ == 128)
+            #define NRF_CPU_FREQ_IS_128MHZ 1
+        #elif !defined(NRF_CONFIG_CPU_FREQ_MHZ)
+            /* If clock configuration is not skipped and frequency not specified,
+            * SystemInit() applies 128 MHz setting. */
+            #define NRF_CPU_FREQ_IS_128MHZ 1
+        #elif defined(STATIC_CPU_FREQ_CONFIG_256_MHZ_PRESENT) && \
+              defined(NRF_CONFIG_CPU_FREQ_MHZ) && (NRF_CONFIG_CPU_FREQ_MHZ == 256)
+            #define NRF_CPU_FREQ_IS_256MHZ 1
+        #else
+            #error "Invalid MCU frequency"
+        #endif
+    #endif
 #endif
 
 /** @brief Macro for extracting relative pin number from the absolute pin number. */
@@ -155,15 +155,16 @@ extern "C" {
 /** @brief Macro for extracting absolute pin number from the relative pin and port numbers. */
 #define NRF_PIN_PORT_TO_PIN_NUMBER(pin, port) (((pin) & 0x1F) | ((port) << 5))
 
-#if defined(LUMOS_XXAA)
+#if defined(TYPES_DOMAIN)
 typedef NRF_DOMAINID_Type nrf_domain_t;
-typedef NRF_OWNERID_Type  nrf_owner_t;
 #endif
 
-#if defined(HALTIUM_XXAA)
-typedef NRF_DOMAINID_Type    nrf_domain_t;
+#if defined(TYPES_PROCESSOR)
 typedef NRF_PROCESSORID_Type nrf_processor_t;
-typedef NRF_OWNERID_Type     nrf_owner_t;
+#endif
+
+#if defined(TYPES_OWNER)
+typedef NRF_OWNERID_Type nrf_owner_t;
 #endif
 
 /**
@@ -213,11 +214,38 @@ NRF_STATIC_INLINE uint8_t nrf_address_slave_get(uint32_t addr);
 NRF_STATIC_INLINE uint16_t nrf_address_periphid_get(uint32_t addr);
 #endif
 
+/**
+ * @brief Macro for statically checking errata susceptibility.
+ *        It determines if the fix should be compiled in (and later dynamically checked) or not.
+ */
+#define NRF_ERRATA_STATIC_CHECK(series, erratum)   \
+    (NRFX_CHECK(NRF##series##_ERRATA_##erratum##_ENABLE_WORKAROUND))
+
+#if defined(NRF_TRUSTZONE_NONSECURE) && \
+    (defined(NRF53_SERIES) || defined(NRF91_SERIES)) && defined(NRF_APPLICATION)
+/* Non-secure builds for nRF53 Series and nRF91 Series SoCs cannot access secure-only memory
+ * used for determining errata appliance in runtime. */
+#define NRF_ERRATA_DYNAMIC_CHECK(series, erratum) NRF_ERRATA_STATIC_CHECK(series, erratum)
+#else
+/**
+ * @brief Macro for dynamically checking errata susceptibility.
+ *        In addition to checking compilation-time defines, it reads the chip's hardware revision
+ *        at runtime to determine if this specific version is affected or not.
+ *
+ * @note  This macro does a static check first, if false, it statically evaluates to false.
+ *        Only when static check evaluates to true, a dynamic check call is made.
+ */
+#define NRF_ERRATA_DYNAMIC_CHECK(series, erratum)                                           \
+    NRFX_COND_CODE_1(NRF##series##_ERRATA_##erratum##_ENABLE_WORKAROUND,                    \
+                     (NRFX_CONCAT(nrf, NRF_SERIES_LOWERCASE(series), _errata_, erratum())), \
+                     (false))
+#endif
+
 #ifndef NRF_DECLARE_ONLY
 
 NRF_STATIC_INLINE void nrf_event_readback(void * p_event_reg)
 {
-#if NRFX_CHECK(NRFX_EVENT_READBACK_ENABLED) && !defined(NRF51)
+#if NRFX_CHECK(NRFX_EVENT_READBACK_ENABLED) && !NRFX_CHECK(EVENT_READBACK_NOT_NEEDED)
     (void)*((volatile uint32_t *)(p_event_reg));
 #else
     (void)p_event_reg;
@@ -289,7 +317,7 @@ NRF_STATIC_INLINE uint16_t nrf_address_periphid_get(uint32_t addr)
 
 NRF_STATIC_INLINE bool nrf_dma_accessible_check(void const * p_reg, void const * p_object)
 {
-#if defined(HALTIUM_XXAA)
+#if NRFX_CHECK(DMA_ACCESSIBLE_CUSTOM_CHECK)
     if (nrf_address_bus_get((uint32_t)p_reg, 0x10000) == 0x8E)
     {
         /* When peripheral instance is high-speed check whether */

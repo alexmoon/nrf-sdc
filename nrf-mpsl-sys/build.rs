@@ -107,14 +107,14 @@ impl Target {
                 "cortex-m33",
                 "hard",
                 "nrf54l",
-                "NRF54LM20A_ENGA_XXAA", // TODO: Remove ENGA after updating nrfx to 4.x
+                "NRF54LM20A_XXAA",
                 Some("NRF_APPLICATION"),
             ),
             (Series::Nrf54lm20, "thumbv8m.main-none-eabi") => (
                 "cortex-m33",
                 "soft",
                 "nrf54l",
-                "NRF54LM20A_ENGA_XXAA",
+                "NRF54LM20A_XXAA",
                 Some("NRF_APPLICATION"),
             ),
             (Series::Nrf54h, "thumbv8m.main-none-eabihf") => {
@@ -148,7 +148,9 @@ fn bindgen(target: &Target) -> bindgen::Builder {
         .clang_arg("-I./include")
         .clang_arg("-I./third_party/arm/CMSIS_5/CMSIS/Core/Include")
         .clang_arg("-I./third_party/nordic/nrfx")
-        .clang_arg("-I./third_party/nordic/nrfx/mdk")
+        .clang_arg("-I./third_party/nordic/nrfx/bsp/stable")
+        .clang_arg("-I./third_party/nordic/nrfx/bsp/stable/soc")
+        .clang_arg("-I./third_party/nordic/nrfx/bsp/stable/mdk")
         .clang_arg("-I./third_party/nordic/nrfx/templates")
         .clang_arg("-I./third_party/nordic/nrfxlib/mpsl/include")
         .clang_arg("-I./third_party/nordic/nrfxlib/mpsl/fem/include")

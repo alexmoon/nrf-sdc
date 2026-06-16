@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2017 - 2025, Nordic Semiconductor ASA
+ * Copyright (c) 2017 - 2026, Nordic Semiconductor ASA
  * All rights reserved.
  *
  * SPDX-License-Identifier: BSD-3-Clause
@@ -33,6 +33,7 @@
 
 #ifndef NRFX_ERRORS_H__
 #define NRFX_ERRORS_H__
+#include <errno.h>
 
 #if !NRFX_CHECK(NRFX_CUSTOM_ERROR_CODES)
 
@@ -42,6 +43,8 @@
  * @ingroup nrfx
  *
  * @brief Global error code definitions.
+ *
+ * @note  Global nrfx error codes are deprecated. Use errno values instead.
  */
 
 /** @brief Base number of error codes. */
@@ -65,7 +68,6 @@ typedef enum {
     NRFX_ERROR_INVALID_ADDR        = (NRFX_ERROR_BASE_NUM + 10), ///< Bad memory address.
     NRFX_ERROR_BUSY                = (NRFX_ERROR_BASE_NUM + 11), ///< Busy.
     NRFX_ERROR_ALREADY             = (NRFX_ERROR_BASE_NUM + 12), ///< Operation already done.
-    NRFX_ERROR_ALREADY_INITIALIZED = NRFX_ERROR_ALREADY,         ///< @deprecated Use @ref NRFX_ERROR_ALREADY instead.
 
     NRFX_ERROR_DRV_TWI_ERR_OVERRUN = (NRFX_ERROR_DRIVERS_BASE_NUM + 0), ///< TWI error: Overrun.
     NRFX_ERROR_DRV_TWI_ERR_ANACK   = (NRFX_ERROR_DRIVERS_BASE_NUM + 1), ///< TWI error: Address not acknowledged.
