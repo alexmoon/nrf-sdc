@@ -13,7 +13,7 @@ bt-hci = { version = "0.9", default-features = false }
 
 embassy-executor = { version = "0.10", features = ["platform-cortex-m", "executor-thread", "defmt", "executor-interrupt"] }
 embassy-time = { version = "0.5", features = ["defmt", "defmt-timestamp-uptime"] }
-embassy-nrf = { version = "0.10", features = ["defmt", "time-driver-grtc", "gpiote", "unstable-pac"] }
+embassy-nrf = { version = "0.11", features = ["defmt", "time-driver-grtc", "gpiote", "unstable-pac"] }
 embassy-sync = { version = "0.8", features = ["defmt"] }
 
 chacha20 = { version = "0.9.1", default-features = false }

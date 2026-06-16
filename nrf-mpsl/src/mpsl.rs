@@ -323,7 +323,7 @@ impl<'d> MultiprotocolServiceLayer<'d> {
             use embassy_nrf::pac;
 
             let freq = pac::OSCILLATORS.pll().currentfreq().read().currentfreq();
-            assert!(freq == pac::oscillators::vals::Currentfreq::CK128M);
+            assert!(freq == pac::oscillators::vals::Currentfreq::Ck128m);
 
             let r = pac::GRTC;
             // Start syscounter if not started
