@@ -24,7 +24,7 @@ pub struct Hfclk {
 
 impl Drop for Hfclk {
     fn drop(&mut self) {
-        let ret = unsafe { raw::mpsl_clock_hfclk_release() };
+        let ret = unsafe { raw::mpsl_clock_hfclk_src_release(raw::MPSL_CLOCK_HF_SRC_XO) };
         if let Err(err) = RetVal::from(ret).to_result() {
             warn!("Error releasing Hfclk: {:?}", err);
         }
@@ -39,11 +39,11 @@ impl Hfclk {
             return Err(Error::EINVAL);
         }
 
-        extern "C" fn on_hfclk_started() {
+        extern "C" fn on_hfclk_started(_evt_type: raw::mpsl_clock_hfclk_src_t) {
             WAKER.wake();
         }
 
-        let ret = unsafe { raw::mpsl_clock_hfclk_request(Some(on_hfclk_started)) };
+        let ret = unsafe { raw::mpsl_clock_hfclk_src_request(raw::MPSL_CLOCK_HF_SRC_XO, Some(on_hfclk_started)) };
         RetVal::from(ret).to_result().and(Ok(Hfclk { _private: PhantomData }))
     }
 
@@ -52,7 +52,7 @@ impl Hfclk {
         poll_fn(|cx| {
             WAKER.register(cx.waker());
             let mut is_running = 0;
-            let ret = unsafe { raw::mpsl_clock_hfclk_is_running(&mut is_running) };
+            let ret = unsafe { raw::mpsl_clock_hfclk_src_is_running(raw::MPSL_CLOCK_HF_SRC_XO, &mut is_running) };
             if let Err(err) = RetVal::from(ret).to_result() {
                 Poll::Ready(Err(err))
             } else if is_running == 0 {
