@@ -283,14 +283,14 @@ unsafe extern "C" fn assert_handler(file: *const core::ffi::c_char, line: u32) {
 
 #[cfg(feature = "_nrf54l")]
 #[no_mangle]
-unsafe extern "C" fn mpsl_lowlatency_request_callback() {
+unsafe extern "C" fn mpsl_low_latency_acquire_callback() {
     let p = embassy_nrf::pac::POWER;
     p.tasks_constlat().write_value(1);
 }
 
 #[cfg(feature = "_nrf54l")]
 #[no_mangle]
-unsafe extern "C" fn mpsl_lowlatency_release_callback() {
+unsafe extern "C" fn mpsl_low_latency_release_callback() {
     let p = embassy_nrf::pac::POWER;
     p.tasks_lowpwr().write_value(1);
 }
