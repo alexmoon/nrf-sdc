@@ -414,7 +414,13 @@ unsafe extern "C" fn timeslot_session_callback(
             // SIGNAL_BLOCKED/CANCELLED may be delivered immediately, which would
             // re-enter this callback while the RefCell is still borrowed.
             let ret = unsafe { raw::mpsl_timeslot_request(session_id, request) };
-            assert!(ret == 0);
+            if let Err(err) = RetVal::from(ret).to_result() {
+                warn!("mpsl flash: timeslot re-request failed: {:?}", err);
+                STATE.with_inner(|state| {
+                    state.result.replace(Err(FlashError::Mpsl(err)));
+                    state.waker.wake();
+                });
+            }
             core::ptr::null_mut()
         }
         raw::MPSL_TIMESLOT_SIGNAL_OVERSTAYED => {
