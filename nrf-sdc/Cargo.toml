@@ -38,7 +38,7 @@ multirole = ["central", "peripheral"]
 peripheral = ["nrf-sdc-sys/peripheral"]
 central = ["nrf-sdc-sys/central"]
 
-defmt = ["dep:defmt", "nrf-mpsl/defmt", "bt-hci/defmt"]
+defmt = ["dep:defmt", "nrf-mpsl/defmt", "bt-hci/defmt", "bt-hci-transport/defmt"]
 log = ["dep:log", "nrf-mpsl/log", "bt-hci/log"]
 
 [dependencies]
@@ -54,4 +54,5 @@ critical-section = "1.2.0"
 rand_core = "0.9"
 embedded-io = "0.7"
 embedded-io-async = "0.7"
-bt-hci = "0.9"
+bt-hci = "0.10"
+bt-hci-transport = "0.1"
