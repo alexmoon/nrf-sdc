@@ -487,6 +487,7 @@ impl FlashOp {
 
             *elapsed += ERASE_PARTIAL_PAGE_DURATION_US;
             if *elapsed > ERASE_PAGE_DURATION_US {
+                *elapsed = 0;
                 *address += PAGE_SIZE as u32;
                 if *address >= to {
                     return ControlFlow::Break(());
