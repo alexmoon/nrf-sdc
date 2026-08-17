@@ -28,5 +28,3 @@ overflow-checks = false
 #embassy-time = {path = "../embassy/embassy-time"}
 #embassy-time-driver = {path = "../embassy/embassy-time-driver"}
 #embassy-embedded-hal = {path = "../embassy/embassy-embedded-hal"}
-
-#bt-hci = { path = "../bt-hci" }
