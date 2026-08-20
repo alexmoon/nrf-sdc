@@ -618,10 +618,16 @@ impl Builder {
         self.support(raw::sdc_support_lowest_frame_space)
     }
 
-    /// Enables support for Extended Feature Set.
+    /// Enables support for Extended Feature Set as Central.
     #[cfg(all(feature = "central", feature = "peripheral"))]
-    pub fn support_extended_feature_set(self) -> Self {
-        self.support(raw::sdc_support_extended_feature_set)
+    pub fn support_extended_feature_set_central(self) -> Self {
+        self.support(raw::sdc_support_extended_feature_set_central)
+    }
+
+    /// Enables support for Extended Feature Set as Peripheral.
+    #[cfg(all(feature = "central", feature = "peripheral"))]
+    pub fn support_extended_feature_set_peripheral(self) -> Self {
+        self.support(raw::sdc_support_extended_feature_set_peripheral)
     }
 
     /// Enables support for Connection Subrating in central role.
@@ -676,10 +682,16 @@ impl Builder {
         self.support(raw::sdc_support_bis_source)
     }
 
-    /// Support Channel Sounding Initiator role.
+    /// Support Channel Sounding Initiator role as Central.
     #[cfg(all(feature = "central", feature = "peripheral", feature = "nrf54l"))]
-    pub fn support_channel_sounding_initiator_role(self) -> Self {
-        self.support(raw::sdc_support_channel_sounding_initiator_role)
+    pub fn support_channel_sounding_initiator_role_central(self) -> Self {
+        self.support(raw::sdc_support_channel_sounding_initiator_role_central)
+    }
+
+    /// Support Channel Sounding Initiator role as Peripheral.
+    #[cfg(all(feature = "central", feature = "peripheral", feature = "nrf54l"))]
+    pub fn support_channel_sounding_initiator_role_peripheral(self) -> Self {
+        self.support(raw::sdc_support_channel_sounding_initiator_role_peripheral)
     }
 
     /// Support Channel Sounding Step Mode 3.
@@ -688,10 +700,16 @@ impl Builder {
         self.support(raw::sdc_support_channel_sounding_mode3)
     }
 
-    /// Support Channel Sounding Reflector role.
+    /// Support Channel Sounding Reflector role as Central.
     #[cfg(all(feature = "central", feature = "peripheral", feature = "nrf54l"))]
-    pub fn support_channel_sounding_reflector_role(self) -> Self {
-        self.support(raw::sdc_support_channel_sounding_reflector_role)
+    pub fn support_channel_sounding_reflector_role_central(self) -> Self {
+        self.support(raw::sdc_support_channel_sounding_reflector_role_central)
+    }
+
+    /// Support Channel Sounding Reflector role as Peripheral.
+    #[cfg(all(feature = "central", feature = "peripheral", feature = "nrf54l"))]
+    pub fn support_channel_sounding_reflector_role_peripheral(self) -> Self {
+        self.support(raw::sdc_support_channel_sounding_reflector_role_peripheral)
     }
 
     /// Support Channel Sounding test command.
