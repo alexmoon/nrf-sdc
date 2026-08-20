@@ -5,7 +5,7 @@ edition = "2021"
 license = "MIT OR Apache-2.0"
 name = "nrf-mpsl"
 repository = "https://github.com/alexmoon/nrf-sdc"
-version = "0.3.0"
+version = "0.4.0"
 rust-version = "1.77"
 
 [package.metadata.docs.rs]
@@ -54,7 +54,7 @@ cfg-if = "1.0"
 
 cortex-m = "0.7.7"
 
-nrf-mpsl-sys = { version = "0.2", path = "../nrf-mpsl-sys" }
+nrf-mpsl-sys = { version = "0.3", path = "../nrf-mpsl-sys" }
 
 embassy-nrf = { version = "0.11", features = ["unstable-pac"]}
 embassy-sync = { version = "0.8" }

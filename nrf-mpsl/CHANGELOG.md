@@ -1,5 +1,13 @@
 # Change Log
 
+## 0.4.0
+
+- Update nrfx to v4.5.0
+- Update nrfxlib to v3.4.0
+- Add support for the nRF54L and nRF54LM20 chips
+- Update to embassy-nrf v0.11
+- Update to nrf-mpsl-sys v0.3
+
 ## 0.3.0
 
 - Update embassy-nrf version
