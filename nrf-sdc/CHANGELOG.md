@@ -1,5 +1,9 @@
 # Change Log
 
+## Unreleased
+
+- Update to bt-hci v0.11 (`Disconnect` and `LeFrameSpaceUpdate` are now async commands)
+
 ## 0.4.0
 
 - Add support for nRF54L and nRF54LM20 chips
