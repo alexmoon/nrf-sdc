@@ -1190,7 +1190,7 @@ mod link_control {
 
     use crate::raw;
 
-    sdc_cmd!(Disconnect => sdc_hci_cmd_lc_disconnect(x));
+    sdc_cmd!(async Disconnect => sdc_hci_cmd_lc_disconnect(x));
     sdc_cmd!(async ReadRemoteVersionInformation => sdc_hci_cmd_lc_read_remote_version_information(x));
 }
 
@@ -1357,7 +1357,7 @@ mod le {
     sdc_cmd!(async LeSubrateRequest => sdc_hci_cmd_le_subrate_request(x));
     sdc_cmd!(LeSetHostFeature => sdc_hci_cmd_le_set_host_feature(x));
     sdc_cmd!(LeSetHostFeatureV2 => sdc_hci_cmd_le_set_host_feature_v2(x));
-    sdc_cmd!(LeFrameSpaceUpdate => sdc_hci_cmd_le_frame_space_update(x));
+    sdc_cmd!(async LeFrameSpaceUpdate => sdc_hci_cmd_le_frame_space_update(x));
     sdc_cmd!(LeConnectionRateRequest => sdc_hci_cmd_le_conn_rate_request(x));
     sdc_cmd!(LeSetDefaultRateParameters => sdc_hci_cmd_le_set_default_rate_params(x));
 
