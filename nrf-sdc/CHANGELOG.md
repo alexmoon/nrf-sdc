@@ -3,6 +3,7 @@
 ## Unreleased
 
 - Update to bt-hci v0.11 (`Disconnect` and `LeFrameSpaceUpdate` are now async commands)
+- Update to rand_core v0.10
 
 ## 0.4.0
 

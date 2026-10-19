@@ -17,7 +17,7 @@ embassy-nrf = { version = "0.11", features = ["defmt", "time-driver-grtc", "gpio
 embassy-sync = { version = "0.8", features = ["defmt"] }
 
 chacha20 = { version = "0.9.1", default-features = false }
-rand_core = "0.9.3"
+rand_core = "0.10"
 
 defmt = "1"
 defmt-rtt = "1"
