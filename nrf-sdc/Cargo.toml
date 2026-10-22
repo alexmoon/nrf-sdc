@@ -51,7 +51,7 @@ nrf-sdc-sys = { version = "0.3.0", path = "../nrf-sdc-sys" }
 embassy-nrf = "0.11"
 embassy-sync = "0.8"
 critical-section = "1.2.0"
-rand_core = "0.9"
+rand_core = "0.10"
 embedded-io = "0.7"
 embedded-io-async = "0.7"
 bt-hci = "0.11"
