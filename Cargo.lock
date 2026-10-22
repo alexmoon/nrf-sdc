@@ -954,7 +954,7 @@ dependencies = [
  "log",
  "nrf-mpsl",
  "nrf-sdc-sys",
- "rand_core 0.9.5",
+ "rand_core 0.10.1",
 ]
 
 [[package]]
@@ -975,7 +975,7 @@ dependencies = [
  "nrf-mpsl",
  "nrf-sdc",
  "panic-probe",
- "rand_core 0.9.5",
+ "rand_core 0.10.1",
  "static_cell",
 ]
 
