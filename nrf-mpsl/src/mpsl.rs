@@ -301,6 +301,30 @@ impl Drop for MultiprotocolServiceLayer<'_> {
     }
 }
 
+/// Clears POWER USB interrupts that a bootloader can leave behind.
+///
+/// Bootloaders may start the application without a chip reset. The Adafruit
+/// nRF52 bootloader does this after a USB DFU session, with the POWER USB
+/// interrupts it enabled through `nrfx_power_usbevt_enable()` still on. They
+/// share `CLOCK_POWER` with MPSL, and with only MPSL's handler bound nothing
+/// clears those events, so the interrupt keeps firing.
+///
+/// Apps that use `HardwareVbusDetect` re-enable these interrupts when they
+/// create it, so it must be created after this runs.
+#[cfg(any(feature = "nrf52820", feature = "nrf52833", feature = "nrf52840"))]
+fn clear_bootloader_usb_interrupts() {
+    let power = embassy_nrf::pac::POWER;
+    power.intenclr().write(|w| {
+        w.set_usbdetected(true);
+        w.set_usbremoved(true);
+        w.set_usbpwrrdy(true);
+    });
+    power.events_usbdetected().write_value(0);
+    power.events_usbremoved().write_value(0);
+    power.events_usbpwrrdy().write_value(0);
+    CLOCK_POWER::unpend();
+}
+
 impl<'d> MultiprotocolServiceLayer<'d> {
     /// Initializes the multiprotocol service layer.
     ///
@@ -335,6 +359,9 @@ impl<'d> MultiprotocolServiceLayer<'d> {
                 r.tasks_start().write_value(1);
             }
         }
+
+        #[cfg(any(feature = "nrf52820", feature = "nrf52833", feature = "nrf52840"))]
+        clear_bootloader_usb_interrupts();
 
         T::set_priority(Priority::P4);
         T::unpend();
