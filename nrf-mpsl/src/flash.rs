@@ -31,20 +31,28 @@ type FlashPeri<'d> = Peri<'d, NVMC>;
 #[cfg(feature = "nrf54l-s")]
 type FlashPeri<'d> = Peri<'d, RRAMC>;
 
+// MPSL runs the timeslot signals "in the same context as MPSL_IRQ_TIMER0_Handler", its
+// high-priority context, which the RADIO and RTC0 handlers share. Masking TIMER0 alone let a
+// slot start preempt a thread-mode borrow of the state.
 #[cfg(feature = "nrf52")]
-const TIMESLOT_TIMER_INTERRUPT: Interrupt = Interrupt::TIMER0;
+const TIMESLOT_INTERRUPTS: [Interrupt; 3] = [Interrupt::RADIO, Interrupt::RTC0, Interrupt::TIMER0];
 #[cfg(feature = "nrf54l-s")]
-const TIMESLOT_TIMER_INTERRUPT: Interrupt = Interrupt::TIMER10;
+const TIMESLOT_INTERRUPTS: [Interrupt; 3] = [Interrupt::RADIO_0, Interrupt::GRTC_3, Interrupt::TIMER10];
 
-// A custom RawMutex implementation that masks only the MPSL timeslot timer interrupt.
+// A custom RawMutex implementation that masks only the MPSL high-priority interrupts the
+// timeslot signals run in, so the other interrupts keep running.
 struct TimeslotRawMutex;
 unsafe impl RawMutex for TimeslotRawMutex {
     const INIT: Self = TimeslotRawMutex;
     fn lock<R>(&self, f: impl FnOnce() -> R) -> R {
         unsafe {
             let nvic = &*NVIC::PTR;
-            let irq = TIMESLOT_TIMER_INTERRUPT as usize;
-            nvic.icer[irq / 32].write(1u32 << (irq % 32));
+            let mut enabled = [false; TIMESLOT_INTERRUPTS.len()];
+            for (enabled, irq) in enabled.iter_mut().zip(TIMESLOT_INTERRUPTS) {
+                let (word, bit) = (irq as usize / 32, 1u32 << (irq as usize % 32));
+                *enabled = nvic.iser[word].read() & bit != 0;
+                nvic.icer[word].write(bit);
+            }
             // Per Arm DAI0321A section 4.6:
             // > if it is necessary to ensure an interrupt will not be triggered after disabling it in the NVIC,
             // > add a DSB instruction and then an ISB instruction
@@ -53,7 +61,11 @@ unsafe impl RawMutex for TimeslotRawMutex {
             compiler_fence(Ordering::SeqCst);
             let r = f();
             compiler_fence(Ordering::SeqCst);
-            nvic.iser[irq / 32].write(1u32 << (irq % 32));
+            for (enabled, irq) in enabled.into_iter().zip(TIMESLOT_INTERRUPTS) {
+                if enabled {
+                    nvic.iser[irq as usize / 32].write(1u32 << (irq as usize % 32));
+                }
+            }
             r
         }
     }
