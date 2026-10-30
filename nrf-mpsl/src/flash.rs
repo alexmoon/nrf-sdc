@@ -31,16 +31,15 @@ type FlashPeri<'d> = Peri<'d, NVMC>;
 #[cfg(feature = "nrf54l-s")]
 type FlashPeri<'d> = Peri<'d, RRAMC>;
 
-// MPSL runs the timeslot signals "in the same context as MPSL_IRQ_TIMER0_Handler", its
-// high-priority context, which the RADIO and RTC0 handlers share. Masking TIMER0 alone let a
-// slot start preempt a thread-mode borrow of the state.
+// MPSL can deliver MPSL_TIMESLOT_SIGNAL_START from its RTC0 handler (GRTC_3 on nRF54L), not
+// only from TIMER0. Masking TIMER0 alone let a slot start preempt a thread-mode borrow of the state.
 #[cfg(feature = "nrf52")]
-const TIMESLOT_INTERRUPTS: [Interrupt; 3] = [Interrupt::RADIO, Interrupt::RTC0, Interrupt::TIMER0];
+const TIMESLOT_INTERRUPTS: [Interrupt; 2] = [Interrupt::RTC0, Interrupt::TIMER0];
 #[cfg(feature = "nrf54l-s")]
-const TIMESLOT_INTERRUPTS: [Interrupt; 3] = [Interrupt::RADIO_0, Interrupt::GRTC_3, Interrupt::TIMER10];
+const TIMESLOT_INTERRUPTS: [Interrupt; 2] = [Interrupt::GRTC_3, Interrupt::TIMER10];
 
-// A custom RawMutex implementation that masks only the MPSL high-priority interrupts the
-// timeslot signals run in, so the other interrupts keep running.
+// A custom RawMutex implementation that masks only the MPSL interrupts the timeslot signals
+// run in, so the other interrupts keep running.
 struct TimeslotRawMutex;
 unsafe impl RawMutex for TimeslotRawMutex {
     const INIT: Self = TimeslotRawMutex;
