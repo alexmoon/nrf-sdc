@@ -38,35 +38,44 @@ const TIMESLOT_INTERRUPTS: [Interrupt; 2] = [Interrupt::RTC0, Interrupt::TIMER0]
 #[cfg(feature = "nrf54l-s")]
 const TIMESLOT_INTERRUPTS: [Interrupt; 2] = [Interrupt::GRTC_3, Interrupt::TIMER10];
 
+/// Masks the timeslot interrupts and returns which of them were enabled.
+// Not inlined: `lock` is inlined at every `with_inner` call site.
+#[inline(never)]
+fn mask_timeslot_interrupts() -> [bool; TIMESLOT_INTERRUPTS.len()] {
+    TIMESLOT_INTERRUPTS.map(|irq| {
+        let enabled = NVIC::is_enabled(irq);
+        NVIC::mask(irq);
+        enabled
+    })
+}
+
+/// Unmasks the timeslot interrupts that `mask_timeslot_interrupts` found enabled.
+#[inline(never)]
+fn unmask_timeslot_interrupts(enabled: [bool; TIMESLOT_INTERRUPTS.len()]) {
+    for (enabled, irq) in enabled.into_iter().zip(TIMESLOT_INTERRUPTS) {
+        if enabled {
+            unsafe { NVIC::unmask(irq) };
+        }
+    }
+}
+
 // A custom RawMutex implementation that masks only the MPSL interrupts the timeslot signals
 // run in, so the other interrupts keep running.
 struct TimeslotRawMutex;
 unsafe impl RawMutex for TimeslotRawMutex {
     const INIT: Self = TimeslotRawMutex;
     fn lock<R>(&self, f: impl FnOnce() -> R) -> R {
-        unsafe {
-            let nvic = &*NVIC::PTR;
-            let mut enabled = [false; TIMESLOT_INTERRUPTS.len()];
-            for (enabled, irq) in enabled.iter_mut().zip(TIMESLOT_INTERRUPTS) {
-                let (word, bit) = (irq as usize / 32, 1u32 << (irq as usize % 32));
-                *enabled = nvic.iser[word].read() & bit != 0;
-                nvic.icer[word].write(bit);
-            }
-            // Per Arm DAI0321A section 4.6:
-            // > if it is necessary to ensure an interrupt will not be triggered after disabling it in the NVIC,
-            // > add a DSB instruction and then an ISB instruction
-            cortex_m::asm::dsb();
-            cortex_m::asm::isb();
-            compiler_fence(Ordering::SeqCst);
-            let r = f();
-            compiler_fence(Ordering::SeqCst);
-            for (enabled, irq) in enabled.into_iter().zip(TIMESLOT_INTERRUPTS) {
-                if enabled {
-                    nvic.iser[irq as usize / 32].write(1u32 << (irq as usize % 32));
-                }
-            }
-            r
-        }
+        let enabled = mask_timeslot_interrupts();
+        // Per Arm DAI0321A section 4.6:
+        // > if it is necessary to ensure an interrupt will not be triggered after disabling it in the NVIC,
+        // > add a DSB instruction and then an ISB instruction
+        cortex_m::asm::dsb();
+        cortex_m::asm::isb();
+        compiler_fence(Ordering::SeqCst);
+        let r = f();
+        compiler_fence(Ordering::SeqCst);
+        unmask_timeslot_interrupts(enabled);
+        r
     }
 }
 
