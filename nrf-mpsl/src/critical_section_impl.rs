@@ -10,9 +10,9 @@ cfg_if::cfg_if! {
         const CS_LEN: usize = 10;
         const RESERVED_IRQS: [u32; CS_LEN] = {
             let mut irqs = [0; CS_LEN];
-            irqs[Interrupt::RADIO_0 as usize / 32] = 1  << (Interrupt::RADIO_0 as usize % 32);
-            irqs[Interrupt::GRTC_3 as usize / 32] = 1  << (Interrupt::GRTC_3 as usize % 32);
-            irqs[Interrupt::TIMER10 as usize / 32] = 1  << (Interrupt::TIMER10 as usize % 32);
+            irqs[Interrupt::RADIO_0 as usize / 32] |= 1 << (Interrupt::RADIO_0 as usize % 32);
+            irqs[Interrupt::GRTC_3 as usize / 32] |= 1 << (Interrupt::GRTC_3 as usize % 32);
+            irqs[Interrupt::TIMER10 as usize / 32] |= 1 << (Interrupt::TIMER10 as usize % 32);
             irqs
         };
     } else {
