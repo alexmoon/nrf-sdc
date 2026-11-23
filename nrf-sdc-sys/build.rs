@@ -251,6 +251,7 @@ fn bindgen(target: &Target, mem_fns: Rc<RefCell<Vec<u8>>>) -> bindgen::Builder {
         .use_core()
         .size_t_is_usize(true)
         .clang_arg(format!("--target={}", target.target))
+        .clang_arg("-ffreestanding")
         .clang_arg(format!("-mcpu={}", target.cpu))
         .clang_arg(format!("-mfloat-abi={}", target.float_abi))
         .clang_arg("-mthumb")
