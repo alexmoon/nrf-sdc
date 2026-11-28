@@ -395,7 +395,12 @@ impl<'d> MultiprotocolServiceLayer<'d> {
 
     /// Returns the temperature of the chip.
     pub fn get_temperature(&self) -> temp::Temperature {
-        temp::Temperature(unsafe { raw::mpsl_temperature_get() })
+        let temperature = unsafe { raw::mpsl_temperature_get() };
+        // MPSL waits for the measurement with WFE, which consumes an event
+        // that a task wake may have left for the thread executor's WFE: put
+        // it back, or the executor can sleep with work queued.
+        cortex_m::asm::sev();
+        temp::Temperature(temperature)
     }
 
     /// Requests the high-frequency clock.
